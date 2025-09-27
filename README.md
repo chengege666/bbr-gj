@@ -30,6 +30,7 @@
 打开你的 VPS 终端，执行：
 
 ```bash
+
 bash <(curl -Ls https://raw.githubusercontent.com/chengege666/bbr-speedtest/main/bbr_speedtest.sh)
 
 
