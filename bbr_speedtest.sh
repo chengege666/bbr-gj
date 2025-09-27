@@ -10,7 +10,6 @@ print_welcome() {
     RED="\033[1;31m"
     GREEN="\033[1;32m"
     YELLOW="\033[1;33m"
-    BLUE="\033[1;34m"
     MAGENTA="\033[1;35m"
     CYAN="\033[1;36m"
     RESET="\033[0m"
@@ -25,7 +24,7 @@ print_welcome() {
 }
 
 # -------------------------------
-# root 检查
+# root 权限检查
 # -------------------------------
 check_root() {
     if [ "$(id -u)" -ne 0 ]; then
@@ -80,8 +79,7 @@ show_progress() {
 # 测速函数
 # -------------------------------
 run_test() {
-    RESULT_FILE="bbr_result.txt"
-    > "$RESULT_FILE"
+    > "$RESULT_FILE"  # 清空结果文件
 
     CYAN="\033[1;36m"
     GREEN="\033[1;32m"
@@ -91,6 +89,7 @@ run_test() {
     RESET="\033[0m"
 
     for MODE in "reno" "bbr"; do
+        echo -e "\n${CYAN}================== 测试 $MODE ==================${RESET}\n"
         echo -e "${CYAN}>>> 切换到 ${MODE} 并测速...${RESET}"
 
         case $MODE in
@@ -112,7 +111,6 @@ run_test() {
 
         if [ -z "$RAW" ]; then
             echo -e "${RED}$MODE 测速失败${RESET}" | tee -a "$RESULT_FILE"
-            echo ""
             continue
         fi
 
@@ -124,8 +122,7 @@ run_test() {
         echo -e "${MAGENTA}| 算法                 | Ping(ms)   | 下载(Mbps) | 上传(Mbps) |${RESET}"
         echo -e "${MAGENTA}+----------------------+------------+------------+------------+${RESET}"
         printf "| %-20s | ${CYAN}%-10s${RESET} | ${GREEN}%-10s${RESET} | ${YELLOW}%-10s${RESET} |\n" "$MODE" "$PING" "$DOWNLOAD" "$UPLOAD" | tee -a "$RESULT_FILE"
-        echo -e "${MAGENTA}+----------------------+------------+------------+------------+${RESET}"
-        echo ""
+        echo -e "${MAGENTA}+----------------------+------------+------------+------------+${RESET}\n"
     done
 
     echo -e "${GREEN}=== 测试完成，结果汇总 ===${RESET}"
