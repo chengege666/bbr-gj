@@ -31,3 +31,28 @@
 
 ```bash
 bash <(curl -Ls https://raw.githubusercontent.com/chengege666/bbr-speedtest/main/bbr_speedtest.sh)
+
+
+② 手动下载 & 运行
+git clone https://github.com/chengege666/bbr-speedtest.git
+cd bbr-speedtest
+chmod +x bbr_speedtest.sh
+sudo ./bbr_speedtest.sh
+
+输出示例
+=== BBR / BBR Plus / BBRv2 / BBRv3 自动测速对比 ===
+>>> 切换到 BBR 并测速...
+BBR | Ping: 20.3ms | Down: 150.45 Mbps | Up: 45.67 Mbps
+
+>>> 切换到 BBR Plus 并测速...
+BBR Plus | Ping: 21.1ms | Down: 148.33 Mbps | Up: 47.89 Mbps
+
+⚠️ 你的内核可能不支持 BBRv2  
+⚠️ 你的内核可能不支持 BBRv3  
+
+=== 测试完成，结果汇总 ===
+BBR | Ping: 20.3ms | Down: 150.45 Mbps | Up: 45.67 Mbps  
+BBR Plus | Ping: 21.1ms | Down: 148.33 Mbps | Up: 47.89 Mbps  
+
+
+测试结果会被写入 bbr_result.txt。
