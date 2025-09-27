@@ -17,7 +17,7 @@ print_welcome() {
     echo -e "${CYAN}==================================================${RESET}"
     echo -e "${MAGENTA}                BBR 测速脚本                     ${RESET}"
     echo -e "${CYAN}--------------------------------------------------${RESET}"
-    echo -e "${YELLOW}支持算法: reno / bbr${RESET}"
+    echo -e "${YELLOW}支持算法: Reno / BBR / BBR Plus / BBRv2 / BBRv3${RESET}"
     echo -e "${GREEN}测速结果会保存到文件: ${RESULT_FILE}${RESET}"
     echo -e "${CYAN}==================================================${RESET}"
     echo ""
@@ -76,6 +76,23 @@ show_progress() {
 }
 
 # -------------------------------
+# 检测可用算法
+# -------------------------------
+detect_algos() {
+    AVAILABLE=$(sysctl net.ipv4.tcp_available_congestion_control 2>/dev/null | awk '{print $3}')
+    ALGOS=("reno" "bbr" "bbrplus" "bbrv2" "bbrv3")
+    SUPPORTED_ALGOS=()
+
+    for algo in "${ALGOS[@]}"; do
+        if echo "$AVAILABLE" | grep -qw "$algo"; then
+            SUPPORTED_ALGOS+=("$algo")
+        else
+            SUPPORTED_ALGOS+=("$algo (不可用)")
+        fi
+    done
+}
+
+# -------------------------------
 # 测速函数
 # -------------------------------
 run_test() {
@@ -88,8 +105,15 @@ run_test() {
     RED="\033[1;31m"
     RESET="\033[0m"
 
-    for MODE in "reno" "bbr"; do
+    for MODE in "${SUPPORTED_ALGOS[@]}"; do
         echo -e "\n${CYAN}================== 测试 $MODE ==================${RESET}\n"
+
+        # 判断是否可用
+        if [[ "$MODE" == *"不可用"* ]]; then
+            echo -e "${RED}$MODE 不支持，跳过测速${RESET}" | tee -a "$RESULT_FILE"
+            continue
+        fi
+
         echo -e "${CYAN}>>> 切换到 ${MODE} 并测速...${RESET}"
 
         case $MODE in
@@ -101,9 +125,21 @@ run_test() {
             "reno")
                 sysctl -w net.ipv4.tcp_congestion_control=reno >/dev/null
                 ;;
+            "bbrplus")
+                modprobe tcp_bbrplus 2>/dev/null
+                sysctl -w net.ipv4.tcp_congestion_control=bbrplus >/dev/null 2>&1
+                ;;
+            "bbrv2")
+                modprobe tcp_bbrv2 2>/dev/null
+                sysctl -w net.ipv4.tcp_congestion_control=bbrv2 >/dev/null 2>&1
+                ;;
+            "bbrv3")
+                modprobe tcp_bbrv3 2>/dev/null
+                sysctl -w net.ipv4.tcp_congestion_control=bbrv3 >/dev/null 2>&1
+                ;;
         esac
 
-        show_progress 10 &  
+        show_progress 10 &
         PROGRESS_PID=$!
         RAW=$(speedtest-cli --simple 2>/dev/null)
         kill $PROGRESS_PID 2>/dev/null
@@ -141,6 +177,7 @@ show_menu() {
         read -p "输入数字选择: " choice
         case "$choice" in
             1)
+                detect_algos
                 run_test
                 echo ""
                 read -n1 -p "按 k 返回菜单或任意键继续..." key
