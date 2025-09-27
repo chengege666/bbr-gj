@@ -56,3 +56,14 @@ BBR Plus | Ping: 21.1ms | Down: 148.33 Mbps | Up: 47.89 Mbps
 
 
 测试结果会被写入 bbr_result.txt。
+
+注意事项 & 已知问题
+
+脚本必须 以 root 权限 执行
+
+并非所有内核都支持 BBR Plus / BBRv2 / BBRv3
+
+speedtest-cli 安装失败时要手动解决依赖
+
+如果在防火墙 / 网络策略限制下测速失败，请检查网络连通性
+
