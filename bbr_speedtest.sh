@@ -1,17 +1,15 @@
 #!/bin/bash
-
+# BBR 系列测速脚本（只测速 BBR 系列）
 RESULT_FILE="bbr_result.txt"
-> "$RESULT_FILE"
 
 # -------------------------------
-# 美化欢迎窗口
+# 欢迎窗口
 # -------------------------------
 print_welcome() {
     clear
     RED="\033[1;31m"
     GREEN="\033[1;32m"
     YELLOW="\033[1;33m"
-    BLUE="\033[1;34m"
     MAGENTA="\033[1;35m"
     CYAN="\033[1;36m"
     RESET="\033[0m"
@@ -19,24 +17,24 @@ print_welcome() {
     echo -e "${CYAN}==================================================${RESET}"
     echo -e "${MAGENTA}                BBR 测速脚本                     ${RESET}"
     echo -e "${CYAN}--------------------------------------------------${RESET}"
-    echo -e "${YELLOW}支持算法: reno / bbr${RESET}"
+    echo -e "${YELLOW}支持算法: BBR / BBR Plus / BBRv2 / BBRv3${RESET}"
     echo -e "${GREEN}测速结果会保存到文件: ${RESULT_FILE}${RESET}"
     echo -e "${CYAN}==================================================${RESET}"
     echo ""
 }
 
-print_welcome
+# -------------------------------
+# Root 检查
+# -------------------------------
+check_root() {
+    if [ "$(id -u)" -ne 0 ]; then
+        echo "❌ 错误：请使用 root 权限运行本脚本"
+        exit 1
+    fi
+}
 
 # -------------------------------
-# root 权限检查
-# -------------------------------
-if [ "$(id -u)" -ne 0 ]; then
-    echo "错误：请使用 root 权限运行本脚本"
-    exit 1
-fi
-
-# -------------------------------
-# 安装依赖（可选）
+# 安装依赖
 # -------------------------------
 install_deps() {
     PKGS="curl wget git speedtest-cli"
@@ -46,33 +44,19 @@ install_deps() {
     elif [ -f /etc/redhat-release ]; then
         yum install -y $PKGS
     else
-        echo "未知系统，请手动安装依赖: $PKGS"
+        echo "⚠️ 未知系统，请手动安装依赖: $PKGS"
         exit 1
     fi
 }
 
-for CMD in curl wget git speedtest-cli; do
-    if ! command -v $CMD >/dev/null 2>&1; then
-        echo "未检测到 $CMD，正在安装依赖..."
-        install_deps
-        break
-    fi
-done
-
-# -------------------------------
-# 模拟动态进度条
-# -------------------------------
-show_progress() {
-    local duration=$1
-    local interval=0.1
-    local steps=$(awk "BEGIN {print int($duration/$interval)}")
-    for ((i=0;i<=steps;i++)); do
-        pct=$((i*100/steps))
-        bar=$(printf "%-${steps}s" "#" | tr ' ' '#')
-        printf "\r[%-50s] %d%%" "${bar:0:i*50/steps}" "$pct"
-        sleep $interval
+check_deps() {
+    for CMD in curl wget git speedtest-cli; do
+        if ! command -v $CMD >/dev/null 2>&1; then
+            echo "未检测到 $CMD，正在安装依赖..."
+            install_deps
+            break
+        fi
     done
-    echo ""
 }
 
 # -------------------------------
@@ -80,32 +64,39 @@ show_progress() {
 # -------------------------------
 run_test() {
     MODE=$1
-    CYAN="\033[1;36m"
+    RED="\033[1;31m"
     GREEN="\033[1;32m"
-    YELLOW="\033[1;33m"
-    MAGENTA="\033[1;35m"
+    CYAN="\033[1;36m"
     RESET="\033[0m"
 
-    echo -e "${CYAN}>>> 切换到 ${MODE} 并测速...${RESET}"
+    echo -e "${CYAN}>>> 切换到 $MODE 并测速...${RESET}"
 
+    # 尝试加载模块，如果失败标记不可用
     case $MODE in
-        "bbr")
-            modprobe tcp_bbr 2>/dev/null
-            sysctl -w net.core.default_qdisc=fq >/dev/null
-            sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null
-            ;;
-        "reno")
-            sysctl -w net.ipv4.tcp_congestion_control=reno >/dev/null
-            ;;
+        "BBR") modprobe tcp_bbr 2>/dev/null ;;
+        "BBR Plus") modprobe tcp_bbrplus 2>/dev/null ;;
+        "BBRv2") modprobe tcp_bbrv2 2>/dev/null ;;
+        "BBRv3") modprobe tcp_bbrv3 2>/dev/null ;;
     esac
 
-    # 启动测速并显示进度条（模拟 10 秒）
-    show_progress 10 &  
-    PROGRESS_PID=$!
-    RAW=$(speedtest-cli --simple 2>/dev/null)
-    kill $PROGRESS_PID 2>/dev/null
-    wait $PROGRESS_PID 2>/dev/null
+    # 检查算法是否可用
+    AVAILABLE=$(sysctl net.ipv4.tcp_available_congestion_control 2>/dev/null | awk '{print $3}')
+    if ! echo "$AVAILABLE" | grep -qw "$(echo $MODE | tr ' ' '_' | tr '[:upper:]' '[:lower:]')" ; then
+        echo -e "${RED}$MODE 不可用或内核不支持，跳过测速${RESET}" | tee -a "$RESULT_FILE"
+        echo ""
+        return
+    fi
 
+    # 设置 BBR 算法
+    case $MODE in
+        "BBR") sysctl -w net.core.default_qdisc=fq >/dev/null; sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1 ;;
+        "BBR Plus") sysctl -w net.core.default_qdisc=fq >/dev/null; sysctl -w net.ipv4.tcp_congestion_control=bbrplus >/dev/null 2>&1 ;;
+        "BBRv2") sysctl -w net.core.default_qdisc=fq >/dev/null; sysctl -w net.ipv4.tcp_congestion_control=bbrv2 >/dev/null 2>&1 ;;
+        "BBRv3") sysctl -w net.core.default_qdisc=fq >/dev/null; sysctl -w net.ipv4.tcp_congestion_control=bbrv3 >/dev/null 2>&1 ;;
+    esac
+
+    # 执行测速
+    RAW=$(speedtest-cli --simple 2>/dev/null)
     if [ -z "$RAW" ]; then
         echo -e "${RED}$MODE 测速失败${RESET}" | tee -a "$RESULT_FILE"
         echo ""
@@ -116,20 +107,46 @@ run_test() {
     DOWNLOAD=$(echo "$RAW" | grep "Download" | awk '{print $2}')
     UPLOAD=$(echo "$RAW" | grep "Upload" | awk '{print $2}')
 
-    echo -e "${MAGENTA}+----------------------+------------+------------+------------+${RESET}"
-    echo -e "${MAGENTA}| 算法                 | Ping(ms)   | 下载(Mbps) | 上传(Mbps) |${RESET}"
-    echo -e "${MAGENTA}+----------------------+------------+------------+------------+${RESET}"
-    printf "| %-20s | ${CYAN}%-10s${RESET} | ${GREEN}%-10s${RESET} | ${YELLOW}%-10s${RESET} |\n" "$MODE" "$PING" "$DOWNLOAD" "$UPLOAD" | tee -a "$RESULT_FILE"
-    echo -e "${MAGENTA}+----------------------+------------+------------+------------+${RESET}"
+    echo "$MODE | Ping: ${PING}ms | Down: ${DOWNLOAD} Mbps | Up: ${UPLOAD} Mbps" | tee -a "$RESULT_FILE"
     echo ""
 }
 
 # -------------------------------
-# 循环测试
+# 交互菜单
 # -------------------------------
-for MODE in "reno" "bbr"; do
-    run_test "$MODE"
-done
+show_menu() {
+    while true; do
+        print_welcome
+        echo "请选择操作："
+        echo "1) 执行 BBR 系列测速"
+        echo "2) 退出"
+        read -p "输入数字选择: " choice
+        case "$choice" 在
+            1)
+                > "$RESULT_FILE"
+                for MODE in "BBR" "BBR Plus" "BBRv2" "BBRv3"; do
+                    run_test "$MODE"
+                done
+                echo "=== 测试完成，结果汇总 ==="
+                cat "$RESULT_FILE"
+                echo ""
+                read -n1 -p "按 k 返回菜单或任意键继续..." key
+                echo ""
+                ;;
+            2)
+                echo "退出脚本"
+                exit 0
+                ;;
+            *)
+                echo "无效选项，请输入 1 或 2"
+                ;;
+        esac
+    done
+}
 
-echo -e "${GREEN}=== 测试完成，结果汇总 ===${RESET}"
-cat "$RESULT_FILE"
+# -------------------------------
+# 主程序
+# -------------------------------
+check_root
+check_deps
+show_menu
