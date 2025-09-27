@@ -1,114 +1,144 @@
 #!/bin/bash
 
-# 自动切换 BBR 算法并测速对比（兼容 speedtest-cli）
-
-# GitHub: [https://github.com/chengege666/bbr-speedtest](https://github.com/chengege666/bbr-speedtest)
-
 RESULT_FILE="bbr_result.txt"
-
 > "$RESULT_FILE"
 
-echo "=== BBR / BBR Plus / BBRv2 / BBRv3 自动测速对比 ==="
-echo "结果会保存到 $RESULT_FILE"
-echo ""
-
 # -------------------------------
-
-# 检查 root 权限
-
+# 美化欢迎窗口
 # -------------------------------
+print_welcome() {
+    clear
+    RED="\033[1;31m"
+    GREEN="\033[1;32m"
+    YELLOW="\033[1;33m"
+    BLUE="\033[1;34m"
+    MAGENTA="\033[1;35m"
+    CYAN="\033[1;36m"
+    RESET="\033[0m"
 
-if [ "$(id -u)" -ne 0 ]; then
-echo "❌ 错误：请使用 root 权限运行本脚本"
-echo "👉 使用方法: sudo bash $0"
-exit 1
-fi
-
-# -------------------------------
-
-# 系统检测 + 自动安装依赖
-
-# -------------------------------
-
-install_deps() {
-PKGS="curl wget git speedtest-cli"
-if [ -f /etc/debian_version ]; then
-apt update -y
-apt install -y $PKGS
-elif [ -f /etc/redhat-release ]; then
-yum install -y $PKGS
-else
-echo "⚠️ 未知系统，请手动安装以下依赖: $PKGS"
-exit 1
-fi
+    echo -e "${CYAN}==============================================${RESET}"
+    echo -e "${MAGENTA}          欢迎使用 BBR 测速脚本          ${RESET}"
+    echo -e "${CYAN}----------------------------------------------${RESET}"
+    echo -e "${YELLOW}支持 TCP 拥塞控制算法: BBR / BBR Plus / BBRv2 / BBRv3${RESET}"
+    echo -e "${GREEN}结果会保存到文件: ${RESULT_FILE}${RESET}"
+    echo -e "${CYAN}==============================================${RESET}"
+    echo ""
 }
+print_welcome
 
-# 检查依赖是否存在
+# -------------------------------
+# root 权限检查
+# -------------------------------
+if [ "$(id -u)" -ne 0 ]; then
+    echo "❌ 错误：请使用 root 权限运行本脚本"
+    exit 1
+fi
+
+# -------------------------------
+# 安装依赖
+# -------------------------------
+install_deps() {
+    PKGS="curl wget git speedtest-cli"
+    if [ -f /etc/debian_version ]; then
+        apt update -y
+        apt install -y $PKGS
+    elif [ -f /etc/redhat-release ]; then
+        yum install -y $PKGS
+    else
+        echo "⚠️ 未知系统，请手动安装以下依赖: $PKGS"
+        exit 1
+    fi
+}
 
 for CMD in curl wget git speedtest-cli; do
-if ! command -v $CMD >/dev/null 2>&1; then
-echo "未检测到 $CMD，正在安装依赖..."
-install_deps
-break
-fi
+    if ! command -v $CMD >/dev/null 2>&1; then
+        echo "未检测到 $CMD，正在安装依赖..."
+        install_deps
+        break
+    fi
 done
 
 # -------------------------------
-
-# 定义测速函数
-
+# 动态进度条函数
 # -------------------------------
-
-run_test() {
-MODE=$1
-echo ">>> 切换到 $MODE 并测速..."
-
-```
-case $MODE in
-    "BBR")
-        modprobe tcp_bbr 2>/dev/null
-        sysctl -w net.core.default_qdisc=fq >/dev/null
-        sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null
-        ;;
-    "BBR Plus")
-        modprobe tcp_bbrplus 2>/dev/null
-        sysctl -w net.core.default_qdisc=fq >/dev/null
-        sysctl -w net.ipv4.tcp_congestion_control=bbrplus >/dev/null
-        ;;
-    "BBRv2")
-        echo "⚠️ 你的内核可能不支持 BBRv2"
-        ;;
-    "BBRv3")
-        echo "⚠️ 你的内核可能不支持 BBRv3"
-        ;;
-esac
-
-RAW=$(speedtest-cli --simple 2>/dev/null)
-if [ -z "$RAW" ]; then
-    echo "$MODE | 测速失败，可能是网络问题或 speedtest-cli 不兼容" | tee -a "$RESULT_FILE"
+show_progress() {
+    local duration=$1
+    local interval=0.1
+    local steps=$(awk "BEGIN {print int($duration/$interval)}")
+    for ((i=0;i<=steps;i++)); do
+        pct=$((i*100/steps))
+        bar=$(printf "%-${steps}s" "#" | tr ' ' '#')
+        printf "\r[%-50s] %d%%" "${bar:0:i*50/steps}" "$pct"
+        sleep $interval
+    done
     echo ""
-    return
-fi
-
-PING=$(echo "$RAW" | grep "Ping" | awk '{print $2}')
-DOWNLOAD_MBPS=$(echo "$RAW" | grep "Download" | awk '{print $2}')
-UPLOAD_MBPS=$(echo "$RAW" | grep "Upload" | awk '{print $2}')
-
-echo "$MODE | Ping: ${PING}ms | Down: ${DOWNLOAD_MBPS} Mbps | Up: ${UPLOAD_MBPS} Mbps" | tee -a "$RESULT_FILE"
-echo ""
-```
-
 }
 
 # -------------------------------
+# 测速函数
+# -------------------------------
+run_test() {
+    MODE=$1
+    RED="\033[1;31m"
+    GREEN="\033[1;32m"
+    YELLOW="\033[1;33m"
+    BLUE="\033[1;34m"
+    MAGENTA="\033[1;35m"
+    CYAN="\033[1;36m"
+    RESET="\033[0m"
 
-# 循环测试
+    echo -e "${CYAN}>>> 切换到 ${MODE} 并测速...${RESET}"
+
+    case $MODE in
+        "BBR")
+            modprobe tcp_bbr 2>/dev/null
+            sysctl -w net.core.default_qdisc=fq >/dev/null
+            sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null
+            ;;
+        "BBR Plus")
+            modprobe tcp_bbrplus 2>/dev/null
+            sysctl -w net.core.default_qdisc=fq >/dev/null
+            sysctl -w net.ipv4.tcp_congestion_control=bbrplus >/dev/null
+            ;;
+        "BBRv2")
+            echo -e "${YELLOW}⚠️ 你的内核可能不支持 BBRv2${RESET}"
+            ;;
+        "BBRv3")
+            echo -e "${YELLOW}⚠️ 你的内核可能不支持 BBRv3${RESET}"
+            ;;
+    esac
+
+    # 启动测速并显示进度条（模拟 15 秒）
+    show_progress 15 &  # 后台显示进度条
+    PROGRESS_PID=$!
+    RAW=$(speedtest-cli --simple 2>/dev/null)
+    kill $PROGRESS_PID 2>/dev/null
+    wait $PROGRESS_PID 2>/dev/null
+
+    if [ -z "$RAW" ]; then
+        echo -e "${RED}$MODE | 测速失败${RESET}" | tee -a "$RESULT_FILE"
+        echo ""
+        return
+    fi
+
+    PING=$(echo "$RAW" | grep "Ping" | awk '{print $2}')
+    DOWNLOAD_MBPS=$(echo "$RAW" | grep "Download" | awk '{print $2}')
+    UPLOAD_MBPS=$(echo "$RAW" | grep "Upload" | awk '{print $2}')
+
+    echo -e "${MAGENTA}+----------------------+----------------+----------------+----------------+${RESET}"
+    echo -e "${MAGENTA}| 算法                 | Ping (ms)      | 下载 (Mbps)    | 上传 (Mbps)    |${RESET}"
+    echo -e "${MAGENTA}+----------------------+----------------+----------------+----------------+${RESET}"
+    printf "| %-20s | ${CYAN}%-14s${RESET} | ${GREEN}%-14s${RESET} | ${YELLOW}%-14s${RESET} |\n" "$MODE" "$PING" "$DOWNLOAD_MBPS" "$UPLOAD_MBPS" | tee -a "$RESULT_FILE"
+    echo -e "${MAGENTA}+----------------------+----------------+----------------+----------------+${RESET}"
+    echo ""
+}
 
 # -------------------------------
-
+# 循环测试
+# -------------------------------
 for MODE in "BBR" "BBR Plus" "BBRv2" "BBRv3"; do
-run_test "$MODE"
+    run_test "$MODE"
 done
 
-echo "=== 测试完成，结果汇总 ==="
+echo -e "\033[1;32m=== 测试完成，结果汇总 ===\033[0m"
 cat "$RESULT_FILE"
