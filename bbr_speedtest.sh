@@ -45,7 +45,7 @@ install_deps() {
         apt update -y
         apt install -y $PKGS
     elif [ -f /etc/redhat-release ]; then
-        yum install -y $PKGS
+        yum install -y $PKGS || dnf install -y $PKGS
     else
         echo "⚠️ 未知系统，请手动安装依赖: $PKGS"
         exit 1
@@ -123,7 +123,7 @@ show_menu() {
         echo "2) 退出"
         read -p "输入数字选择: " choice
         
-        case "$choice" 在
+        case "$choice" in
             1)
                 > "$RESULT_FILE"
                 for MODE in "BBR" "BBR Plus" "BBRv2" "BBRv3"; do
@@ -133,7 +133,7 @@ show_menu() {
                 cat "$RESULT_FILE"
                 echo ""
                 read -n1 -p "按 k 返回菜单或任意键继续..." key
-                if [[ $key == "k" ]]; 键，然后
+                if [[ "$key" == "k" ]] || [[ "$key" == "K" ]]; then
                     continue
                 fi
                 ;;
