@@ -4,11 +4,10 @@ RESULT_FILE="bbr_result.txt"
 > "$RESULT_FILE"
 
 # -------------------------------
-# 美化欢迎窗口（ASCII + 颜色）
+# 美化欢迎窗口
 # -------------------------------
 print_welcome() {
     clear
-    # 定义颜色
     RED="\033[1;31m"
     GREEN="\033[1;32m"
     YELLOW="\033[1;33m"
@@ -20,13 +19,12 @@ print_welcome() {
     echo -e "${CYAN}==================================================${RESET}"
     echo -e "${MAGENTA}                BBR 测速脚本                     ${RESET}"
     echo -e "${CYAN}--------------------------------------------------${RESET}"
-    echo -e "${YELLOW}支持算法: BBR / BBR Plus / BBRv2 / BBRv3${RESET}"
+    echo -e "${YELLOW}支持算法: reno / bbr${RESET}"
     echo -e "${GREEN}测速结果会保存到文件: ${RESULT_FILE}${RESET}"
     echo -e "${CYAN}==================================================${RESET}"
     echo ""
 }
 
-# 调用欢迎窗口
 print_welcome
 
 # -------------------------------
@@ -62,7 +60,23 @@ for CMD in curl wget git speedtest-cli; do
 done
 
 # -------------------------------
-# 测速函数（简化彩色表格）
+# 模拟动态进度条
+# -------------------------------
+show_progress() {
+    local duration=$1
+    local interval=0.1
+    local steps=$(awk "BEGIN {print int($duration/$interval)}")
+    for ((i=0;i<=steps;i++)); do
+        pct=$((i*100/steps))
+        bar=$(printf "%-${steps}s" "#" | tr ' ' '#')
+        printf "\r[%-50s] %d%%" "${bar:0:i*50/steps}" "$pct"
+        sleep $interval
+    done
+    echo ""
+}
+
+# -------------------------------
+# 测速函数
 # -------------------------------
 run_test() {
     MODE=$1
@@ -75,23 +89,24 @@ run_test() {
     echo -e "${CYAN}>>> 切换到 ${MODE} 并测速...${RESET}"
 
     case $MODE in
-        "BBR")
+        "bbr")
             modprobe tcp_bbr 2>/dev/null
             sysctl -w net.core.default_qdisc=fq >/dev/null
             sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null
             ;;
-        "BBR Plus")
-            modprobe tcp_bbrplus 2>/dev/null
-            sysctl -w net.core.default_qdisc=fq >/dev/null
-            sysctl -w net.ipv4.tcp_congestion_control=bbrplus >/dev/null
-            ;;
-        "BBRv2"|"BBRv3")
-            echo -e "${YELLOW}⚠ 注意: 当前内核可能不支持 ${MODE}${RESET}"
+        "reno")
+            sysctl -w net.ipv4.tcp_congestion_control=reno >/dev/null
             ;;
     esac
 
+    # 启动测速并显示进度条（模拟 10 秒）
+    show_progress 10 &  
+    PROGRESS_PID=$!
     RAW=$(speedtest-cli --simple 2>/dev/null)
-    if [ -z "$RAW" ]; then
+    kill $PROGRESS_PID 2>/dev/null
+    wait $PROGRESS_PID 2>/dev/null
+
+    if [ -z "$RAW" ]; 键，然后
         echo -e "${RED}$MODE 测速失败${RESET}" | tee -a "$RESULT_FILE"
         echo ""
         return
@@ -112,7 +127,7 @@ run_test() {
 # -------------------------------
 # 循环测试
 # -------------------------------
-for MODE in "BBR" "BBR Plus" "BBRv2" "BBRv3"; do
+for MODE in "reno" "bbr"; do
     run_test "$MODE"
 done
 
