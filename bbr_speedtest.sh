@@ -63,7 +63,7 @@ check_deps() {
 }
 
 # -------------------------------
-# 测速函数
+# 测速函数（保留所有BBR变种）
 # -------------------------------
 run_test() {
     MODE=$1
@@ -97,7 +97,13 @@ run_test() {
             ;;
     esac
 
+    # 添加备用测速方法提高成功率
     RAW=$(speedtest-cli --simple 2>/dev/null)
+    if [ -z "$RAW" ]; then
+        echo -e "${YELLOW}⚠️ speedtest-cli 失败，尝试使用替代方法...${RESET}"
+        RAW=$(curl -s https://raw.githubusercontent.com/sivel/speedtest-cli/master/speedtest.py | python - --simple 2>/dev/null)
+    fi
+
     if [ -z "$RAW" ]; then
         echo -e "${RED}$MODE 测速失败${RESET}" | tee -a "$RESULT_FILE"
         echo ""
