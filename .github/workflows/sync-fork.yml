@@ -1,0 +1,68 @@
+name: Sync Fork with bbr-speedtest Upstream
+
+on:
+  schedule:
+    # 每天UTC时间0点自动同步
+    - cron: '0 0 * * *'
+  workflow_dispatch:  # 允许手动触发
+  push:
+    branches: [ main ]
+    paths-ignore:  # 忽略某些文件的变更触发
+      - 'README.md'
+      - 'LICENSE'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出当前复刻仓库
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: main
+
+      - name: 配置Git用户信息
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+      - name: 添加原仓库为上游远程
+        run: |
+          git remote add upstream https://github.com/chengege666/bbr-speedtest.git
+          git fetch upstream
+
+      - name: 检查是否有更新
+        id: check
+        run: |
+          git fetch upstream main
+          if git log HEAD..upstream/main --oneline | grep -q .; then
+            echo "has_updates=true" >> $GITHUB_OUTPUT
+            echo "检测到上游仓库有更新"
+          else
+            echo "has_updates=false" >> $GITHUB_OUTPUT
+            echo "上游仓库无新更新"
+          fi
+
+      - name: 合并上游更改
+        if: steps.check.outputs.has_updates == 'true'
+        run: |
+          git checkout main
+          git merge upstream/main --no-edit
+          echo "成功合并上游更改"
+
+      - name: 推送更改到复刻仓库
+        if: steps.check.outputs.has_updates == 'true'
+        run: |
+          git push origin main
+          echo "更改已推送到复刻仓库"
+
+      - name: 同步标签
+        if: steps.check.outputs.has_updates == 'true'
+        run: |
+          git fetch upstream --tags
+          git push origin --tags
+          echo "标签同步完成"
+
+      - name: 无更新提示
+        if: steps.check.outputs.has_updates == 'false'
+        run: echo "无需同步，复刻仓库已是最新"
