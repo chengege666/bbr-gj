@@ -1,7 +1,6 @@
 #!/bin/bash
 
 RESULT_FILE="bbr_result.txt"
-> "$RESULT_FILE"
 
 # -------------------------------
 # 美化欢迎窗口
@@ -25,18 +24,18 @@ print_welcome() {
     echo ""
 }
 
-print_welcome
+# -------------------------------
+# root 检查
+# -------------------------------
+check_root() {
+    if [ "$(id -u)" -ne 0 ]; then
+        echo "错误：请使用 root 权限运行本脚本"
+        exit 1
+    fi
+}
 
 # -------------------------------
-# root 权限检查
-# -------------------------------
-if [ "$(id -u)" -ne 0 ]; then
-    echo "错误：请使用 root 权限运行本脚本"
-    exit 1
-fi
-
-# -------------------------------
-# 安装依赖（可选）
+# 安装依赖
 # -------------------------------
 install_deps() {
     PKGS="curl wget git speedtest-cli"
@@ -51,16 +50,18 @@ install_deps() {
     fi
 }
 
-for CMD in curl wget git speedtest-cli; do
-    if ! command -v $CMD >/dev/null 2>&1; then
-        echo "未检测到 $CMD，正在安装依赖..."
-        install_deps
-        break
-    fi
-done
+check_deps() {
+    for CMD in curl wget git speedtest-cli; do
+        if ! command -v $CMD >/dev/null 2>&1; then
+            echo "未检测到 $CMD，正在安装依赖..."
+            install_deps
+            break
+        fi
+    done
+}
 
 # -------------------------------
-# 模拟动态进度条
+# 动态进度条
 # -------------------------------
 show_progress() {
     local duration=$1
@@ -79,57 +80,89 @@ show_progress() {
 # 测速函数
 # -------------------------------
 run_test() {
-    MODE=$1
+    RESULT_FILE="bbr_result.txt"
+    > "$RESULT_FILE"
+
     CYAN="\033[1;36m"
     GREEN="\033[1;32m"
     YELLOW="\033[1;33m"
     MAGENTA="\033[1;35m"
+    RED="\033[1;31m"
     RESET="\033[0m"
 
-    echo -e "${CYAN}>>> 切换到 ${MODE} 并测速...${RESET}"
+    for MODE in "reno" "bbr"; do
+        echo -e "${CYAN}>>> 切换到 ${MODE} 并测速...${RESET}"
 
-    case $MODE in
-        "bbr")
-            modprobe tcp_bbr 2>/dev/null
-            sysctl -w net.core.default_qdisc=fq >/dev/null
-            sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null
-            ;;
-        "reno")
-            sysctl -w net.ipv4.tcp_congestion_control=reno >/dev/null
-            ;;
-    esac
+        case $MODE in
+            "bbr")
+                modprobe tcp_bbr 2>/dev/null
+                sysctl -w net.core.default_qdisc=fq >/dev/null
+                sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null
+                ;;
+            "reno")
+                sysctl -w net.ipv4.tcp_congestion_control=reno >/dev/null
+                ;;
+        esac
 
-    # 启动测速并显示进度条（模拟 10 秒）
-    show_progress 10 &  
-    PROGRESS_PID=$!
-    RAW=$(speedtest-cli --simple 2>/dev/null)
-    kill $PROGRESS_PID 2>/dev/null
-    wait $PROGRESS_PID 2>/dev/null
+        show_progress 10 &  
+        PROGRESS_PID=$!
+        RAW=$(speedtest-cli --simple 2>/dev/null)
+        kill $PROGRESS_PID 2>/dev/null
+        wait $PROGRESS_PID 2>/dev/null
 
-    if [ -z "$RAW" ]; 键，然后
-        echo -e "${RED}$MODE 测速失败${RESET}" | tee -a "$RESULT_FILE"
+        if [ -z "$RAW" ]; then
+            echo -e "${RED}$MODE 测速失败${RESET}" | tee -a "$RESULT_FILE"
+            echo ""
+            continue
+        fi
+
+        PING=$(echo "$RAW" | grep "Ping" | awk '{print $2}')
+        DOWNLOAD=$(echo "$RAW" | grep "Download" | awk '{print $2}')
+        UPLOAD=$(echo "$RAW" | grep "Upload" | awk '{print $2}')
+
+        echo -e "${MAGENTA}+----------------------+------------+------------+------------+${RESET}"
+        echo -e "${MAGENTA}| 算法                 | Ping(ms)   | 下载(Mbps) | 上传(Mbps) |${RESET}"
+        echo -e "${MAGENTA}+----------------------+------------+------------+------------+${RESET}"
+        printf "| %-20s | ${CYAN}%-10s${RESET} | ${GREEN}%-10s${RESET} | ${YELLOW}%-10s${RESET} |\n" "$MODE" "$PING" "$DOWNLOAD" "$UPLOAD" | tee -a "$RESULT_FILE"
+        echo -e "${MAGENTA}+----------------------+------------+------------+------------+${RESET}"
         echo ""
-        return
-    fi
+    done
 
-    PING=$(echo "$RAW" | grep "Ping" | awk '{print $2}')
-    DOWNLOAD=$(echo "$RAW" | grep "Download" | awk '{print $2}')
-    UPLOAD=$(echo "$RAW" | grep "Upload" | awk '{print $2}')
-
-    echo -e "${MAGENTA}+----------------------+------------+------------+------------+${RESET}"
-    echo -e "${MAGENTA}| 算法                 | Ping(ms)   | 下载(Mbps) | 上传(Mbps) |${RESET}"
-    echo -e "${MAGENTA}+----------------------+------------+------------+------------+${RESET}"
-    printf "| %-20s | ${CYAN}%-10s${RESET} | ${GREEN}%-10s${RESET} | ${YELLOW}%-10s${RESET} |\n" "$MODE" "$PING" "$DOWNLOAD" "$UPLOAD" | tee -a "$RESULT_FILE"
-    echo -e "${MAGENTA}+----------------------+------------+------------+------------+${RESET}"
-    echo ""
+    echo -e "${GREEN}=== 测试完成，结果汇总 ===${RESET}"
+    cat "$RESULT_FILE"
 }
 
 # -------------------------------
-# 循环测试
+# 菜单函数
 # -------------------------------
-for MODE in "reno" "bbr"; do
-    run_test "$MODE"
-done
+show_menu() {
+    while true; do
+        print_welcome
+        echo "请选择操作："
+        echo "1) 执行测速"
+        echo "2) 退出"
+        read -p "输入数字选择: " choice
+        case "$choice" in
+            1)
+                run_test
+                echo ""
+                read -n1 -p "按 k 返回菜单或任意键继续..." key
+                echo ""
+                ;;
+            2)
+                echo "退出脚本"
+                exit 0
+                ;;
+            *)
+                echo "无效选项，请输入 1 或 2"
+                ;;
+        esac
+    done
+}
 
-echo -e "${GREEN}=== 测试完成，结果汇总 ===${RESET}"
-cat "$RESULT_FILE"
+# -------------------------------
+# 主程序
+# -------------------------------
+check_root
+check_deps
+show_menu
