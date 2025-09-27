@@ -1,5 +1,5 @@
 #!/bin/bash
-# 自动切换 BBR 算法并测速对比（兼容 speedtest-cli）
+# 自动切换 BBR 算法并测速对比
 # GitHub: https://github.com/chengege666/bbr-speedtest
 
 RESULT_FILE="bbr_result.txt"
@@ -19,7 +19,7 @@ print_welcome() {
     echo -e "${CYAN}==================================================${RESET}"
     echo -e "${MAGENTA}                BBR 测速脚本                     ${RESET}"
     echo -e "${CYAN}--------------------------------------------------${RESET}"
-    echo -e "${YELLOW}支持算法: BBR / BBR Plus / BBRv2 / BBRv3${RESET}"
+    echo -e "${YELLOW}支持算法: BBR (其他变种需要自定义内核)${RESET}"
     echo -e "${GREEN}测速结果会保存到文件: ${RESULT_FILE}${RESET}"
     echo -e "${CYAN}==================================================${RESET}"
     echo ""
@@ -63,7 +63,7 @@ check_deps() {
 }
 
 # -------------------------------
-# 测速函数
+# 测速函数（改进版）
 # -------------------------------
 run_test() {
     MODE=$1
@@ -74,30 +74,28 @@ run_test() {
 
     echo -e "${CYAN}>>> 切换到 $MODE 并测速...${RESET}"
 
+    # 设置算法
     case $MODE in
         "BBR")
-            modprobe tcp_bbr 2>/dev/null
             sysctl -w net.core.default_qdisc=fq >/dev/null
-            sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
+            sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null
             ;;
-        "BBR Plus")
-            modprobe tcp_bbrplus 2>/dev/null
+        "BBR Plus"|"BBRv2"|"BBRv3")
+            echo -e "${YELLOW}⚠️ 注意: $MODE 需要自定义内核支持${RESET}"
+            echo -e "${YELLOW}⚠️ 当前系统可能不支持，使用原生BBR替代${RESET}"
             sysctl -w net.core.default_qdisc=fq >/dev/null
-            sysctl -w net.ipv4.tcp_congestion_control=bbrplus >/dev/null 2>&1
-            ;;
-        "BBRv2")
-            modprobe tcp_bbrv2 2>/dev/null
-            sysctl -w net.core.default_qdisc=fq >/dev/null
-            sysctl -w net.ipv4.tcp_congestion_control=bbrv2 >/dev/null 2>&1
-            ;;
-        "BBRv3")
-            modprobe tcp_bbrv3 2>/dev/null
-            sysctl -w net.core.default_qdisc=fq >/dev/null
-            sysctl -w net.ipv4.tcp_congestion_control=bbrv3 >/dev/null 2>&1
+            sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null
             ;;
     esac
 
+    # 使用两种测速方法提高成功率
     RAW=$(speedtest-cli --simple 2>/dev/null)
+    if [ -z "$RAW" ]; then
+        # 备用测速方法
+        echo -e "${YELLOW}⚠️ speedtest-cli 失败，尝试使用替代方法...${RESET}"
+        RAW=$(curl -s https://raw.githubusercontent.com/sivel/speedtest-cli/master/speedtest.py | python - --simple 2>/dev/null)
+    fi
+
     if [ -z "$RAW" ]; then
         echo -e "${RED}$MODE 测速失败${RESET}" | tee -a "$RESULT_FILE"
         echo ""
@@ -126,9 +124,17 @@ show_menu() {
         case "$choice" in
             1)
                 > "$RESULT_FILE"
-                for MODE in "BBR" "BBR Plus" "BBRv2" "BBRv3"; do
-                    run_test "$MODE"
-                done
+                # 只测试原生BBR，其他变种需要自定义内核
+                run_test "BBR"
+                
+                # 提供选项测试其他变种（但会提示需要自定义内核）
+                read -p "是否测试BBR变种？(y/n) [默认n]: " test_variants
+                if [[ "$test_variants" =~ [yY] ]]; then
+                    run_test "BBR Plus"
+                    run_test "BBRv2"
+                    run_test "BBRv3"
+                fi
+                
                 echo "=== 测试完成，结果汇总 ==="
                 cat "$RESULT_FILE"
                 echo ""
