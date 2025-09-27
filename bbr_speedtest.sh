@@ -3,7 +3,7 @@
 RESULT_FILE="bbr_result.txt"
 
 # -------------------------------
-# 美化欢迎窗口
+# 欢迎窗口
 # -------------------------------
 print_welcome() {
     clear
@@ -24,7 +24,7 @@ print_welcome() {
 }
 
 # -------------------------------
-# root 权限检查
+# Root 权限检查
 # -------------------------------
 check_root() {
     if [ "$(id -u)" -ne 0 ]; then
@@ -76,18 +76,30 @@ show_progress() {
 }
 
 # -------------------------------
-# 检测可用算法
+# 检测可用算法并尝试加载模块
 # -------------------------------
 detect_algos() {
-    AVAILABLE=$(sysctl net.ipv4.tcp_available_congestion_control 2>/dev/null | awk '{print $3}')
-    ALGOS=("reno" "bbr" "bbrplus" "bbrv2" "bbrv3")
+    local AVAILABLE=$(sysctl net.ipv4.tcp_available_congestion_control 2>/dev/null | awk '{print $3}')
+    local ALGOS=("reno" "bbr" "bbrplus" "bbrv2" "bbrv3")
     SUPPORTED_ALGOS=()
 
     for algo in "${ALGOS[@]}"; do
         if echo "$AVAILABLE" | grep -qw "$algo"; then
             SUPPORTED_ALGOS+=("$algo")
         else
-            SUPPORTED_ALGOS+=("$algo (不可用)")
+            # 尝试加载模块
+            case $algo in
+                "bbrplus") modprobe tcp_bbrplus 2>/dev/null ;;
+                "bbrv2")   modprobe tcp_bbrv2 2>/dev/null ;;
+                "bbrv3")   modprobe tcp_bbrv3 2>/dev/null ;;
+            esac
+            # 再次检测
+            AVAILABLE=$(sysctl net.ipv4.tcp_available_congestion_control 2>/dev/null | awk '{print $3}')
+            if echo "$AVAILABLE" | grep -qw "$algo"; then
+                SUPPORTED_ALGOS+=("$algo")
+            else
+                SUPPORTED_ALGOS+=("$algo (不可用)")
+            fi
         fi
     done
 }
@@ -96,7 +108,7 @@ detect_algos() {
 # 测速函数
 # -------------------------------
 run_test() {
-    > "$RESULT_FILE"  # 清空结果文件
+    > "$RESULT_FILE"
 
     CYAN="\033[1;36m"
     GREEN="\033[1;32m"
@@ -108,7 +120,6 @@ run_test() {
     for MODE in "${SUPPORTED_ALGOS[@]}"; do
         echo -e "\n${CYAN}================== 测试 $MODE ==================${RESET}\n"
 
-        # 判断是否可用
         if [[ "$MODE" == *"不可用"* ]]; then
             echo -e "${RED}$MODE 不支持，跳过测速${RESET}" | tee -a "$RESULT_FILE"
             continue
@@ -117,26 +128,11 @@ run_test() {
         echo -e "${CYAN}>>> 切换到 ${MODE} 并测速...${RESET}"
 
         case $MODE in
-            "bbr")
-                modprobe tcp_bbr 2>/dev/null
-                sysctl -w net.core.default_qdisc=fq >/dev/null
-                sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null
-                ;;
-            "reno")
-                sysctl -w net.ipv4.tcp_congestion_control=reno >/dev/null
-                ;;
-            "bbrplus")
-                modprobe tcp_bbrplus 2>/dev/null
-                sysctl -w net.ipv4.tcp_congestion_control=bbrplus >/dev/null 2>&1
-                ;;
-            "bbrv2")
-                modprobe tcp_bbrv2 2>/dev/null
-                sysctl -w net.ipv4.tcp_congestion_control=bbrv2 >/dev/null 2>&1
-                ;;
-            "bbrv3")
-                modprobe tcp_bbrv3 2>/dev/null
-                sysctl -w net.ipv4.tcp_congestion_control=bbrv3 >/dev/null 2>&1
-                ;;
+            "bbr") sysctl -w net.core.default_qdisc=fq >/dev/null; sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null ;;
+            "reno") sysctl -w net.ipv4.tcp_congestion_control=reno >/dev/null ;;
+            "bbrplus") sysctl -w net.ipv4.tcp_congestion_control=bbrplus >/dev/null ;;
+            "bbrv2") sysctl -w net.ipv4.tcp_congestion_control=bbrv2 >/dev/null ;;
+            "bbrv3") sysctl -w net.ipv4.tcp_congestion_control=bbrv3 >/dev/null ;;
         esac
 
         show_progress 10 &
@@ -166,7 +162,7 @@ run_test() {
 }
 
 # -------------------------------
-# 菜单函数
+# 菜单
 # -------------------------------
 show_menu() {
     while true; do
