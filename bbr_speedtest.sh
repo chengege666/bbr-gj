@@ -123,10 +123,10 @@ show_menu() {
         echo "2) 退出"
         read -p "输入数字选择: " choice
         
-        case "$choice" 在
+        case "$choice" in
             1)
                 > "$RESULT_FILE"
-                for MODE 在 "BBR" "BBR Plus" "BBRv2" "BBRv3"; do
+                for MODE in "BBR" "BBR Plus" "BBRv2" "BBRv3"; do
                     run_test "$MODE"
                 done
                 echo "=== 测试完成，结果汇总 ==="
