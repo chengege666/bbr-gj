@@ -1,5 +1,5 @@
 #!/bin/bash
-# 自动切换 BBR 算法并测速对比（兼容 speedtest-cli）
+# BBR 系列测速脚本（只测速 BBR 系列）
 # GitHub: https://github.com/chengege666/bbr-speedtest
 
 RESULT_FILE="bbr_result.txt"
@@ -26,12 +26,11 @@ print_welcome() {
 }
 
 # -------------------------------
-# root 权限检查
+# Root 检查
 # -------------------------------
 check_root() {
     if [ "$(id -u)" -ne 0 ]; then
         echo "❌ 错误：请使用 root 权限运行本脚本"
-        echo "👉 使用方法: sudo bash $0"
         exit 1
     fi
 }
@@ -45,7 +44,7 @@ install_deps() {
         apt update -y
         apt install -y $PKGS
     elif [ -f /etc/redhat-release ]; then
-        yum install -y $PKGS || dnf install -y $PKGS
+        yum install -y $PKGS
     else
         echo "⚠️ 未知系统，请手动安装依赖: $PKGS"
         exit 1
@@ -74,29 +73,33 @@ run_test() {
 
     echo -e "${CYAN}>>> 切换到 $MODE 并测速...${RESET}"
 
+    # 尝试加载模块
     case $MODE in
-        "BBR")
-            modprobe tcp_bbr 2>/dev/null
-            sysctl -w net.core.default_qdisc=fq >/dev/null
-            sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
-            ;;
-        "BBR Plus")
-            modprobe tcp_bbrplus 2>/dev/null
-            sysctl -w net.core.default_qdisc=fq >/dev/null
-            sysctl -w net.ipv4.tcp_congestion_control=bbrplus >/dev/null 2>&1
-            ;;
-        "BBRv2")
-            modprobe tcp_bbrv2 2>/dev/null
-            sysctl -w net.core.default_qdisc=fq >/dev/null
-            sysctl -w net.ipv4.tcp_congestion_control=bbrv2 >/dev/null 2>&1
-            ;;
-        "BBRv3")
-            modprobe tcp_bbrv3 2>/dev/null
-            sysctl -w net.core.default_qdisc=fq >/dev/null
-            sysctl -w net.ipv4.tcp_congestion_control=bbrv3 >/dev/null 2>&1
-            ;;
+        "BBR") modprobe tcp_bbr 2>/dev/null ;;
+        "BBR Plus") modprobe tcp_bbrplus 2>/dev/null ;;
+        "BBRv2") modprobe tcp_bbrv2 2>/dev/null ;;
+        "BBRv3") modprobe tcp_bbrv3 2>/dev/null ;;
     esac
 
+    # 检查算法是否可用
+    AVAILABLE=$(sysctl net.ipv4.tcp_available_congestion_control 2>/dev/null | awk '{print $3}')
+    NAME_LOWER=$(echo "$MODE" | tr ' ' '_' | tr '[:upper:]' '[:lower:]')
+    if ! echo "$AVAILABLE" | grep -qw "$NAME_LOWER"; then
+        echo -e "${RED}$MODE 不可用或内核不支持，跳过测速${RESET}" | tee -a "$RESULT_FILE"
+        echo ""
+        return
+    fi
+
+    # 设置 BBR 算法
+    sysctl -w net.core.default_qdisc=fq >/dev/null
+    case $NAME_LOWER in
+        "bbr") sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1 ;;
+        "bbr_plus") sysctl -w net.ipv4.tcp_congestion_control=bbrplus >/dev/null 2>&1 ;;
+        "bbrv2") sysctl -w net.ipv4.tcp_congestion_control=bbrv2 >/dev/null 2>&1 ;;
+        "bbrv3") sysctl -w net.ipv4.tcp_congestion_control=bbrv3 >/dev/null 2>&1 ;;
+    esac
+
+    # 执行测速
     RAW=$(speedtest-cli --simple 2>/dev/null)
     if [ -z "$RAW" ]; then
         echo -e "${RED}$MODE 测速失败${RESET}" | tee -a "$RESULT_FILE"
@@ -119,10 +122,9 @@ show_menu() {
     while true; do
         print_welcome
         echo "请选择操作："
-        echo "1) 执行 BBR 测速"
+        echo "1) 执行 BBR 系列测速"
         echo "2) 退出"
         read -p "输入数字选择: " choice
-        
         case "$choice" in
             1)
                 > "$RESULT_FILE"
@@ -133,9 +135,7 @@ show_menu() {
                 cat "$RESULT_FILE"
                 echo ""
                 read -n1 -p "按 k 返回菜单或任意键继续..." key
-                if [[ "$key" == "k" ]] || [[ "$key" == "K" ]]; then
-                    continue
-                fi
+                echo ""
                 ;;
             2)
                 echo "退出脚本"
@@ -143,7 +143,6 @@ show_menu() {
                 ;;
             *)
                 echo "无效选项，请输入 1 或 2"
-                sleep 1
                 ;;
         esac
     done
