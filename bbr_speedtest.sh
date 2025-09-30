@@ -119,6 +119,18 @@ run_test() {
 }
 
 # -------------------------------
+# 运行外部BBR切换脚本
+# -------------------------------
+run_bbr_switch() {
+    echo "正在下载并运行 BBR 切换脚本..."
+    wget -O tcp.sh "https://github.com/ylx2016/Linux-NetSpeed/raw/master/tcp.sh" && chmod +x tcp.sh && ./tcp.sh
+    if [ $? -ne 0 ]; then
+        echo "❌ 下载或运行脚本失败，请检查网络连接"
+        read -n1 -p "按任意键返回菜单..."
+    fi
+}
+
+# -------------------------------
 # 交互菜单
 # -------------------------------
 show_menu() {
@@ -126,7 +138,8 @@ show_menu() {
         print_welcome
         echo "请选择操作："
         echo "1) 执行 BBR 测速"
-        echo "2) 退出"
+        echo "2) 安装/切换 BBR 内核（运行外部脚本）"
+        echo "3) 退出"
         read -p "输入数字选择: " choice
         
         case "$choice" in
@@ -138,18 +151,18 @@ show_menu() {
                 echo "=== 测试完成，结果汇总 ==="
                 cat "$RESULT_FILE"
                 echo ""
-                read -n1 -p "按 k 返回菜单或任意键继续..." key
+                read -n1 -p "按任意键返回菜单..." key
                 echo ""
-                if [ "$key" = "k" ] || [ "$key" = "K" ]; then
-                    continue
-                fi
                 ;;
             2)
+                run_bbr_switch
+                ;;
+            3)
                 echo "退出脚本"
                 exit 0
                 ;;
             *)
-                echo "无效选项，请输入 1 或 2"
+                echo "无效选项，请输入 1-3"
                 sleep 2
                 ;;
         esac
