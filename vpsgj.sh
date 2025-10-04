@@ -73,7 +73,7 @@ run_test() {
     MODE=$1
     echo -e "${CYAN}>>> 切换到 $MODE 并测速...${RESET}"
 
-    # 尝试加载内核模块并切换拥塞控制算法 (NEW: added modprobe from bbr_speedtest.sh)
+    # 尝试加载内核模块并切换拥塞控制算法 (来自 bbr_speedtest.sh 的增强逻辑)
     case $MODE in
         "BBR") 
             modprobe tcp_bbr >/dev/null 2>&1 # 尝试加载模块
@@ -105,8 +105,8 @@ run_test() {
     if [ "$CURRENT" != "$CURRENT_ALG" ]; then
         echo -e "${RED}❌ 切换到 $MODE 失败，当前算法: $CURRENT${RESET}"
         
-        # 增加提示 (根据您的截图，这是最关键的一步)
-        if [[ "$MODE" == "BBRv2" || "$MODE" == "BBRv3" ]]; then
+        # 增加提示 (来自 image_4171ce.jpg 的改进)
+        if [[ "$CURRENT_ALG" == "bbrv2" || "$CURRENT_ALG" == "bbrv3" ]]; then
             echo -e "${YELLOW}提示: 切换 $MODE 失败通常是由于当前内核不支持。请尝试选项 2 安装新内核。${RESET}"
         fi
         
