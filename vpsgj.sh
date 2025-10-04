@@ -19,7 +19,7 @@ RESET="\033[0m"
 print_welcome() {
     clear
     echo -e "${CYAN}==================================================${RESET}"
-    echo -e "${MAGENTA}                 VPS 工具箱 v2.2                 ${RESET}"
+    echo -e "${MAGENTA}                VPS 工具箱 v2.2                ${RESET}"
     echo -e "${CYAN}--------------------------------------------------${RESET}"
     echo -e "${YELLOW}功能: BBR测速, 系统管理, Docker, SSH配置等${RESET}"
     echo -e "${GREEN}测速结果保存: ${RESULT_FILE}${RESET}"
@@ -32,7 +32,7 @@ print_welcome() {
 # -------------------------------
 check_root() {
     if [ "$(id -u)" -ne 0 ]; then
-        echo -e "${RED}❌ 错误：请使用 root 权限运行本脚本${RESET}"
+        echo -e "${RED}❌❌ 错误：请使用 root 权限运行本脚本${RESET}"
         echo "👉 使用方法: sudo bash $0"
         exit 1
     fi
@@ -67,13 +67,13 @@ check_deps() {
 }
 
 # -------------------------------
-# 核心功能：BBR 测速 (完整替换为 bbr_speedtest.sh 的逻辑，不带切换检查)
+# 核心功能：BBR 测速
 # -------------------------------
 run_test() {
     MODE=$1
     echo -e "${CYAN}>>> 切换到 $MODE 并测速...${RESET}" 
     
-    # 切换算法 (来自 bbr_speedtest.sh)
+    # 切换算法
     case $MODE in
         "BBR") 
             modprobe tcp_bbr >/dev/null 2>&1
@@ -97,7 +97,7 @@ run_test() {
             ;;
     esac
     
-    # 执行测速 (来自 bbr_speedtest.sh)
+    # 执行测速
     RAW=$(speedtest-cli --simple 2>/dev/null)
     if [ -z "$RAW" ]; then
         echo -e "${YELLOW}⚠️ speedtest-cli 失败，尝试替代方法...${RESET}" 
@@ -119,13 +119,13 @@ run_test() {
 }
 
 # -------------------------------
-# 功能 1: BBR 综合测速 (完整替换为 bbr_speedtest.sh 的循环逻辑)
+# 功能 1: BBR 综合测速
 # -------------------------------
 bbr_test_menu() {
     echo -e "${CYAN}=== 开始 BBR 综合测速 ===${RESET}"
     > "$RESULT_FILE"
     
-    # 无条件尝试所有算法 (来自 bbr_speedtest.sh)
+    # 无条件尝试所有算法
     for MODE in "BBR" "BBR Plus" "BBRv2" "BBRv3"; do
         run_test "$MODE"
     done
@@ -141,35 +141,76 @@ bbr_test_menu() {
 }
 
 # -------------------------------
-# 其余功能保持不变...
-# -------------------------------
-
 # 功能 2: 安装/切换 BBR 内核
+# -------------------------------
 run_bbr_switch() {
     echo -e "${CYAN}正在下载并运行 BBR 切换脚本... (来自 ylx2016/Linux-NetSpeed)${RESET}"
     wget -O tcp.sh "https://github.com/ylx2016/Linux-NetSpeed/raw/master/tcp.sh" && chmod +x tcp.sh && ./tcp.sh
     if [ $? -ne 0 ]; then
-        echo -e "${RED}❌ 下载或运行脚本失败，请检查网络连接${RESET}"
+        echo -e "${RED}❌❌ 下载或运行脚本失败，请检查网络连接${RESET}"
     fi
     read -n1 -p "按任意键返回菜单..."
 }
 
-# 功能 3: 系统信息
+# -------------------------------
+# 功能 3: 系统信息 (增强版，包含BBR类型显示)
+# -------------------------------
 show_sys_info() {
-    echo -e "${CYAN}=== 系统信息 ===${RESET}"
+    echo -e "${CYAN}=== 系统详细信息 ===${RESET}"
+    
+    # 操作系统信息
     echo -e "${GREEN}操作系统:${RESET} $(cat /etc/os-release | grep PRETTY_NAME | cut -d "=" -f 2 | tr -d '"' 2>/dev/null || echo '未知')"
+    echo -e "${GREEN}系统架构:${RESET} $(uname -m)"
     echo -e "${GREEN}内核版本:${RESET} $(uname -r)"
-    echo -e "${GREEN}CPU型号: ${RESET} $(grep -m1 'model name' /proc/cpuinfo | awk -F': ' '{print $2}' 2>/dev/null || echo '未知')"
-    echo -e "${GREEN}内存信息:${RESET} $(free -h | grep Mem | awk '{print $2}' 2>/dev/null || echo '未知')"
-    echo -e "${GREEN}Swap信息:${RESET} $(free -h | grep Swap | awk '{print $2}' 2>/dev/null || echo '未知')"
-    echo -e "${GREEN}磁盘空间:${RESET} $(df -h / | grep / | awk '{print $2}' 2>/dev/null || echo '未知') (已用: $(df -h / | grep / | awk '{print $5}' 2>/dev/null || echo '未知'))"
-    echo -e "${GREEN}当前IP: ${RESET} $(curl -s ifconfig.me 2>/dev/null || echo '获取失败')"
-    echo -e "${GREEN}系统运行时间:${RESET} $(uptime | awk '{print $3,$4,$5}' 2>/dev/null || echo '未知')"
+    echo -e "${GREEN}主机名:${RESET} $(hostname)"
+    
+    # CPU信息
+    echo -e "${GREEN}CPU型号:${RESET} $(grep -m1 'model name' /proc/cpuinfo | awk -F': ' '{print $2}' 2>/dev/null || echo '未知')"
+    echo -e "${GREEN}CPU核心数:${RESET} $(grep -c 'processor' /proc/cpuinfo 2>/dev/null || echo '未知')"
+    echo -e "${GREEN}CPU频率:${RESET} $(grep -m1 'cpu MHz' /proc/cpuinfo | awk -F': ' '{print $2}' 2>/dev/null || echo '未知') MHz"
+    
+    # 内存信息
+    MEM_TOTAL=$(free -h | grep Mem | awk '{print $2}' 2>/dev/null || echo '未知')
+    MEM_USED=$(free -h | grep Mem | awk '{print $3}' 2>/dev/null || echo '未知')
+    MEM_FREE=$(free -h | grep Mem | awk '{print $4}' 2>/dev/null || echo '未知')
+    echo -e "${GREEN}内存总量:${RESET} $MEM_TOTAL | ${GREEN}已用:${RESET} $MEM_USED | ${GREEN}可用:${RESET} $MEM_FREE"
+    
+    # Swap信息
+    SWAP_TOTAL=$(free -h | grep Swap | awk '{print $2}' 2>/dev/null || echo '未知')
+    SWAP_USED=$(free -h | grep Swap | awk '{print $3}' 2>/dev/null || echo '未知')
+    SWAP_FREE=$(free -h | grep Swap | awk '{print $4}' 2>/dev/null || echo '未知')
+    echo -e "${GREEN}Swap总量:${RESET} $SWAP_TOTAL | ${GREEN}已用:${RESET} $SWAP_USED | ${GREEN}可用:${RESET} $SWAP_FREE"
+    
+    # 磁盘信息
+    echo -e "${GREEN}磁盘使用情况:${RESET}"
+    df -h | grep -E '^(/dev/|Filesystem)' | head -5
+    
+    # 网络信息
+    echo -e "${GREEN}公网IPv4:${RESET} $(curl -s4 ifconfig.me 2>/dev/null || echo '获取失败')"
+    echo -e "${GREEN}公网IPv6:${RESET} $(curl -s6 ifconfig.me 2>/dev/null || echo '获取失败')"
+    echo -e "${GREEN}内网IP:${RESET} $(hostname -I 2>/dev/null || ip addr show | grep -E 'inet (192\.168|10\.|172\.)' | head -1 | awk '{print $2}' || echo '未知')"
+    
+    # BBR信息
+    CURRENT_BBR=$(sysctl net.ipv4.tcp_congestion_control 2>/dev/null | awk '{print $3}')
+    CURRENT_QDISC=$(sysctl net.core.default_qdisc 2>/dev/null | awk '{print $3}')
+    echo -e "${GREEN}当前拥塞控制算法:${RESET} $CURRENT_BBR"
+    echo -e "${GREEN}当前队列规则:${RESET} $CURRENT_QDISC"
+    
+    # 系统运行状态
+    echo -e "${GREEN}系统运行时间:${RESET} $(uptime -p 2>/dev/null || uptime | awk '{print $3,$4,$5}' | sed 's/,//g')"
+    echo -e "${GREEN}系统负载:${RESET} $(uptime | awk -F'load average: ' '{print $2}' 2>/dev/null || echo '未知')"
+    echo -e "${GREEN}当前登录用户:${RESET} $(who | wc -l 2>/dev/null || echo '未知')"
+    
+    # 进程信息
+    echo -e "${GREEN}运行进程数:${RESET} $(ps aux | wc -l 2>/dev/null || echo '未知')"
+    
     echo ""
     read -n1 -p "按任意键返回菜单..."
 }
 
+# -------------------------------
 # 功能 4: 系统更新
+# -------------------------------
 sys_update() {
     echo -e "${CYAN}=== 系统更新 ===${RESET}"
     echo -e "${GREEN}>>> 正在更新系统...${RESET}"
@@ -180,13 +221,15 @@ sys_update() {
     elif command -v dnf >/dev/null 2>&1; then
         dnf update -y
     else
-        echo -e "${RED}❌ 无法识别包管理器，请手动更新系统${RESET}"
+        echo -e "${RED}❌❌ 无法识别包管理器，请手动更新系统${RESET}"
     fi
     echo -e "${GREEN}系统更新操作完成。${RESET}"
     read -n1 -p "按任意键返回菜单..."
 }
 
+# -------------------------------
 # 功能 5: 系统清理
+# -------------------------------
 sys_cleanup() {
     echo -e "${CYAN}=== 系统清理 ===${RESET}"
     echo -e "${GREEN}>>> 正在清理缓存和旧内核...${RESET}"
@@ -203,13 +246,103 @@ sys_cleanup() {
         dnf clean all
         echo -e "${GREEN}DNF 清理完成${RESET}"
     else
-        echo -e "${RED}❌ 无法识别包管理器，请手动清理${RESET}"
+        echo -e "${RED}❌❌ 无法识别包管理器，请手动清理${RESET}"
     fi
     echo -e "${GREEN}系统清理操作完成。${RESET}"
     read -n1 -p "按任意键返回菜单..."
 }
 
-# 功能 6: Docker 管理
+# -------------------------------
+# 功能 6: IPv4/IPv6 切换
+# -------------------------------
+ip_version_switch() {
+    echo -e "${CYAN}=== IPv4/IPv6 切换 ===${RESET}"
+    echo "当前网络模式: $([ "$IP_VERSION" = "6" ] && echo "IPv6" || echo "IPv4")"
+    echo ""
+    echo "1) 使用 IPv4"
+    echo "2) 使用 IPv6"
+    echo "3) 返回主菜单"
+    read -p "请选择: " ip_choice
+    
+    case "$ip_choice" in
+        1) 
+            IP_VERSION="4"
+            echo -e "${GREEN}已切换到 IPv4 模式${RESET}"
+            ;;
+        2) 
+            IP_VERSION="6"
+            echo -e "${GREEN}已切换到 IPv6 模式${RESET}"
+            ;;
+        3) 
+            return
+            ;;
+        *)
+            echo -e "${RED}无效选择${RESET}"
+            ;;
+    esac
+    read -n1 -p "按任意键返回菜单..."
+}
+
+# -------------------------------
+# 功能 7: 系统时区调整
+# -------------------------------
+timezone_adjust() {
+    echo -e "${CYAN}=== 系统时区调整 ===${RESET}"
+    echo -e "${YELLOW}当前系统时区:${RESET}"
+    timedatectl status | grep "Time zone"
+    echo ""
+    echo "1) 设置时区为上海 (Asia/Shanghai)"
+    echo "2) 设置时区为纽约 (America/New_York)"
+    echo "3) 手动输入时区"
+    echo "4) 返回主菜单"
+    read -p "请选择: " tz_choice
+    
+    case "$tz_choice" in
+        1)
+            timedatectl set-timezone Asia/Shanghai
+            echo -e "${GREEN}已设置时区为 Asia/Shanghai${RESET}"
+            ;;
+        2)
+            timedatectl set-timezone America/New_York
+            echo -e "${GREEN}已设置时区为 America/New_York${RESET}"
+            ;;
+        3)
+            read -p "请输入时区 (如 Asia/Tokyo): " custom_tz
+            if timedatectl set-timezone "$custom_tz" 2>/dev/null; then
+                echo -e "${GREEN}已设置时区为 $custom_tz${RESET}"
+            else
+                echo -e "${RED}无效的时区，请检查输入${RESET}"
+            fi
+            ;;
+        4)
+            return
+            ;;
+        *)
+            echo -e "${RED}无效选择${RESET}"
+            ;;
+    esac
+    read -n1 -p "按任意键返回菜单..."
+}
+
+# -------------------------------
+# 功能 8: 系统重启
+# -------------------------------
+system_reboot() {
+    echo -e "${CYAN}=== 系统重启 ===${RESET}"
+    echo -e "${RED}警告：这将立即重启系统！${RESET}"
+    read -p "确定要重启系统吗？(y/N): " confirm_reboot
+    if [[ "$confirm_reboot" == "y" || "$confirm_reboot" == "Y" ]]; then
+        echo -e "${GREEN}正在重启系统...${RESET}"
+        reboot
+    else
+        echo -e "${GREEN}已取消重启${RESET}"
+        read -n1 -p "按任意键返回菜单..."
+    fi
+}
+
+# -------------------------------
+# 功能 9: Docker 管理
+# -------------------------------
 docker_install() {
     echo -e "${CYAN}正在安装 Docker...${RESET}"
     curl -fsSL https://get.docker.com -o get-docker.sh
@@ -220,7 +353,7 @@ docker_install() {
     if command -v docker >/dev/null 2>&1; then
         echo -e "${GREEN}✅ Docker 安装并启动成功！${RESET}"
     else
-        echo -e "${RED}❌ Docker 安装失败，请检查日志。${RESET}"
+        echo -e "${RED}❌❌ Docker 安装失败，请检查日志。${RESET}"
     fi
 }
 
@@ -255,11 +388,13 @@ docker_menu() {
     read -n1 -p "按任意键返回菜单..."
 }
 
-# 功能 7: SSH 配置修改
+# -------------------------------
+# 功能 10: SSH 配置修改
+# -------------------------------
 ssh_config_menu() {
     SSH_CONFIG="/etc/ssh/sshd_config"
     if [ ! -f "$SSH_CONFIG" ]; then
-        echo -e "${RED}❌ 未找到 SSH 配置文件 ($SSH_CONFIG)。${RESET}"
+        echo -e "${RED}❌❌ 未找到 SSH 配置文件 ($SSH_CONFIG)。${RESET}"
         read -n1 -p "按任意键返回菜单..."
         return
     fi
@@ -274,7 +409,7 @@ ssh_config_menu() {
             sed -i "s/^#\?Port\s\+.*$/Port $new_port/" "$SSH_CONFIG"
             echo -e "${GREEN}✅ SSH 端口已修改为 $new_port${RESET}"
         else
-            echo -e "${RED}❌ 端口输入无效。${RESET}"
+            echo -e "${RED}❌❌ 端口输入无效。${RESET}"
         fi
     fi
 
@@ -286,7 +421,7 @@ ssh_config_menu() {
         if [ $? -eq 0 ]; then
             echo -e "${GREEN}✅ root 密码修改成功${RESET}"
         else
-            echo -e "${RED}❌ root 密码修改失败${RESET}"
+            echo -e "${RED}❌❌ root 密码修改失败${RESET}"
         fi
     fi
 
@@ -300,7 +435,9 @@ ssh_config_menu() {
     read -n1 -p "按任意键返回菜单..."
 }
 
-# 功能 8: 卸载脚本
+# -------------------------------
+# 功能 11: 卸载脚本
+# -------------------------------
 uninstall_script() {
     read -p "确定要卸载本脚本并清理相关文件吗 (y/n)? ${RED}此操作不可逆!${RESET}: " confirm_uninstall
     if [[ "$confirm_uninstall" == "y" || "$confirm_uninstall" == "Y" ]]; then
@@ -337,7 +474,7 @@ uninstall_script() {
             elif command -v dnf >/dev/null 2>&1; then
                 dnf remove -y curl wget git speedtest-cli net-tools
             else
-                echo -e "${RED}❌ 无法识别包管理器，请手动清理${RESET}"
+                echo -e "${RED}❌❌ 无法识别包管理器，请手动清理${RESET}"
             fi
             echo -e "${GREEN}✅ 依赖包清理完成${RESET}"
         fi
@@ -353,6 +490,11 @@ uninstall_script() {
 # 交互菜单
 # -------------------------------
 show_menu() {
+    # 初始化IP版本变量
+    if [ -z "$IP_VERSION" ]; then
+        IP_VERSION="4"
+    fi
+    
     while true; do
         print_welcome
         echo -e "请选择操作："
@@ -360,14 +502,18 @@ show_menu() {
         echo "1) BBR 综合测速 (BBR/BBR Plus/BBRv2/BBRv3 对比)"
         echo "2) 安装/切换 BBR 内核"
         echo -e "${GREEN}--- VPS 系统管理 ---${RESET}"
-        echo "3) 查看系统信息 (OS/CPU/内存/IP)"
+        echo "3) 查看系统信息 (OS/CPU/内存/IP/BBR)"
         echo "4) 系统更新"
         echo "5) 系统清理"
-        echo "6) Docker 容器管理"
-        echo "7) SSH 端口与密码修改"
+        echo "6) IPv4/IPv6 切换 (当前: IPv$IP_VERSION)"
+        echo "7) 系统时区调整"
+        echo "8) 系统重启"
+        echo -e "${GREEN}--- 服务管理 ---${RESET}"
+        echo "9) Docker 容器管理"
+        echo "10) SSH 端口与密码修改"
         echo -e "${GREEN}--- 其他 ---${RESET}"
-        echo "8) 卸载脚本及残留文件"
-        echo "9) 退出"
+        echo "11) 卸载脚本及残留文件"
+        echo "12) 退出"
         echo ""
         read -p "输入数字选择: " choice
         
@@ -377,12 +523,15 @@ show_menu() {
             3) show_sys_info ;;
             4) sys_update ;;
             5) sys_cleanup ;;
-            6) docker_menu ;;
-            7) ssh_config_menu ;;
-            8) uninstall_script ;;
-            9) echo -e "${CYAN}感谢使用，再见！${RESET}"; exit 0 ;;
-            *) echo -e "${RED}无效选项，请输入 1-9${RESET}"; sleep 2 ;;
-        esac  # 修正了 'end' 为 'esac'
+            6) ip_version_switch ;;
+            7) timezone_adjust ;;
+            8) system_reboot ;;
+            9) docker_menu ;;
+            10) ssh_config_menu ;;
+            11) uninstall_script ;;
+            12) echo -e "${CYAN}感谢使用，再见！${RESET}"; exit 0 ;;
+            *) echo -e "${RED}无效选项，请输入 1-12${RESET}"; sleep 2 ;;
+        esac
     done
 }
 
