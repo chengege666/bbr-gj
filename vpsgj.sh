@@ -32,7 +32,7 @@ print_welcome() {
 # -------------------------------
 check_root() {
     if [ "$(id -u)" -ne 0 ]; then
-        echo -e "${RED}❌ 错误：请使用 root 权限运行本脚本${RESET}"
+        echo -e "${RED}❌❌ 错误：请使用 root 权限运行本脚本${RESET}"
         echo "👉 使用方法: sudo bash $0"
         exit 1
     fi
@@ -135,7 +135,7 @@ run_bbr_switch() {
     echo -e "${CYAN}正在下载并运行 BBR 切换脚本... (来自 ylx2016/Linux-NetSpeed)${RESET}"
     wget -O tcp.sh "https://github.com/ylx2016/Linux-NetSpeed/raw/master/tcp.sh" && chmod +x tcp.sh && ./tcp.sh
     if [ $? -ne 0 ]; then
-        echo -e "${RED}❌ 下载或运行脚本失败，请检查网络连接${RESET}"
+        echo -e "${RED}❌❌ 下载或运行脚本失败，请检查网络连接${RESET}"
     fi
     read -n1 -p "按任意键返回菜单..."
 }
@@ -163,14 +163,14 @@ show_sys_info() {
 sys_update() {
     echo -e "${CYAN}=== 系统更新 ===${RESET}"
     echo -e "${GREEN}>>> 正在更新系统...${RESET}"
-    if command -v apt >/dev/null 2>&1; 键，然后
+    if command -v apt >/dev/null 2>&1; then
         apt update -y && apt upgrade -y
-    elif command -v yum >/dev/null 2>&1; 键，然后
+    elif command -v yum >/dev/null 2>&1; then
         yum update -y
-    elif command -v dnf >/dev/null 2>&1; 键，然后
+    elif command -v dnf >/dev/null 2>&1; then
         dnf update -y
     else
-        echo -e "${RED}❌ 无法识别包管理器，请手动更新系统${RESET}"
+        echo -e "${RED}❌❌ 无法识别包管理器，请手动更新系统${RESET}"
     fi
     echo -e "${GREEN}系统更新操作完成。${RESET}"
     read -n1 -p "按任意键返回菜单..."
@@ -195,7 +195,7 @@ sys_cleanup() {
         dnf clean all
         echo -e "${GREEN}DNF 清理完成${RESET}"
     else
-        echo -e "${RED}❌ 无法识别包管理器，请手动清理${RESET}"
+        echo -e "${RED}❌❌ 无法识别包管理器，请手动清理${RESET}"
     fi
     echo -e "${GREEN}系统清理操作完成。${RESET}"
     read -n1 -p "按任意键返回菜单..."
@@ -214,7 +214,7 @@ docker_install() {
     if command -v docker >/dev/null 2>&1; then
         echo -e "${GREEN}✅ Docker 安装并启动成功！${RESET}"
     else
-        echo -e "${RED}❌ Docker 安装失败，请检查日志。${RESET}"
+        echo -e "${RED}❌❌ Docker 安装失败，请检查日志。${RESET}"
     fi
 }
 
@@ -255,7 +255,7 @@ docker_menu() {
 ssh_config_menu() {
     SSH_CONFIG="/etc/ssh/sshd_config"
     if [ ! -f "$SSH_CONFIG" ]; then
-        echo -e "${RED}❌ 未找到 SSH 配置文件 ($SSH_CONFIG)。${RESET}"
+        echo -e "${RED}❌❌ 未找到 SSH 配置文件 ($SSH_CONFIG)。${RESET}"
         read -n1 -p "按任意键返回菜单..."
         return
     fi
@@ -269,7 +269,7 @@ ssh_config_menu() {
             sed -i "s/^#\?Port\s\+.*$/Port $new_port/" "$SSH_CONFIG"
             echo -e "${GREEN}✅ SSH 端口已修改为 $new_port${RESET}"
         else
-            echo -e "${RED}❌ 端口输入无效。${RESET}"
+            echo -e "${RED}❌❌ 端口输入无效。${RESET}"
         fi
     fi
 
@@ -281,7 +281,7 @@ ssh_config_menu() {
         if [ $? -eq 0 ]; then
             echo -e "${GREEN}✅ root 密码修改成功${RESET}"
         else
-            echo -e "${RED}❌ root 密码修改失败${RESET}"
+            echo -e "${RED}❌❌ root 密码修改失败${RESET}"
         fi
     fi
 
@@ -334,7 +334,7 @@ uninstall_script() {
             elif command -v dnf >/dev/null 2>&1; then
                 dnf remove -y curl wget git speedtest-cli net-tools
             else
-                echo -e "${RED}❌ 无法识别包管理器，请手动清理${RESET}"
+                echo -e "${RED}❌❌ 无法识别包管理器，请手动清理${RESET}"
             fi
             echo -e "${GREEN}✅ 依赖包清理完成${RESET}"
         fi
