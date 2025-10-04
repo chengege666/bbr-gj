@@ -19,7 +19,7 @@ RESET="\033[0m"
 print_welcome() {
     clear
     echo -e "${CYAN}==================================================${RESET}"
-    echo -e "${MAGENTA}                 VPS 工具箱 v2.0                 ${RESET}"
+    echo -e "${MAGENTA}                 VPS 工具箱 v2.1                 ${RESET}"
     echo -e "${CYAN}--------------------------------------------------${RESET}"
     echo -e "${YELLOW}功能: BBR测速, 系统管理, Docker, SSH配置等${RESET}"
     echo -e "${GREEN}测速结果保存: ${RESULT_FILE}${RESET}"
@@ -67,13 +67,12 @@ check_deps() {
 }
 
 # -------------------------------
-# 核心功能：BBR 测速
+# 核心功能：BBR 测速 (保持不变)
 # -------------------------------
 run_test() {
     MODE=$1
     echo -e "${CYAN}>>> 切换到 $MODE 并测速...${RESET}"
 
-    # 尝试切换拥塞控制算法
     case $MODE in
         "BBR") sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1 ;;
         "BBR Plus") sysctl -w net.ipv4.tcp_congestion_control=bbrplus >/dev/null 2>&1 ;;
@@ -81,7 +80,6 @@ run_test() {
         "BBRv3") sysctl -w net.ipv4.tcp_congestion_control=bbrv3 >/dev/null 2>&1 ;;
     esac
     
-    # 强制设置队列
     sysctl -w net.core.default_qdisc=fq >/dev/null 2>&1
 
     RAW=$(speedtest-cli --simple 2>/dev/null)
@@ -111,7 +109,6 @@ bbr_test_menu() {
     echo -e "${CYAN}=== 开始 BBR 综合测速 ===${RESET}"
     > "$RESULT_FILE"
     
-    # 检查内核是否支持这些算法
     for ALGO in bbrplus bbrv2 bbrv3; do
         if ! grep -q "$ALGO" /proc/sys/net/ipv4/tcp_available_congestion_controls; then
             echo -e "${YELLOW}⚠️ 当前内核不支持 $ALGO，将跳过测试.${RESET}"
@@ -141,8 +138,102 @@ run_bbr_switch() {
 }
 
 # -------------------------------
-# 功能 3: 系统信息
+# 功能 4: 系统更新
 # -------------------------------
+sys_update() {
+    echo -e "${CYAN}=== 系统更新 (Update & Upgrade) ===${RESET}"
+    echo -e "${GREEN}>>> 正在更新系统...${RESET}"
+    if command -v apt >/dev/null 2>&1; then
+        apt update -y && apt upgrade -y
+    elif command -v yum >/dev/null 2>&1; then
+        yum update -y
+    elif command -v dnf >/dev/null 2>&1; then
+        dnf update -y
+    else
+        echo -e "${RED}❌ 无法识别包管理器，请手动更新系统${RESET}"
+    fi
+    echo -e "${GREEN}系统更新操作完成。${RESET}"
+    read -n1 -p "按任意键返回菜单..."
+}
+
+# -------------------------------
+# 功能 5: 系统清理
+# -------------------------------
+sys_cleanup() {
+    echo -e "${CYAN}=== 系统清理 (Cache & Autoremove) ===${RESET}"
+    echo -e "${GREEN}>>> 正在清理缓存和无用依赖...${RESET}"
+    if command -v apt >/dev/null 2>&1; then
+        apt autoremove -y
+        apt clean
+        echo -e "${GREEN}APT 缓存和无用依赖清理完成${RESET}"
+    elif command -v yum >/dev/null 2>&1; then
+        yum autoremove -y
+        yum clean all
+        echo -e "${GREEN}YUM 缓存和无用依赖清理完成${RESET}"
+    elif command -v dnf >/dev/null 2>&1; then
+        dnf autoremove -y
+        dnf clean all
+        echo -e "${GREEN}DNF 缓存和无用依赖清理完成${RESET}"
+    else
+        echo -e "${RED}❌ 无法识别包管理器，请手动清理${RESET}"
+    fi
+    echo -e "${GREEN}系统清理操作完成。${RESET}"
+    read -n1 -p "按任意键返回菜单..."
+}
+
+# -------------------------------
+# 功能 8: 卸载脚本
+# -------------------------------
+uninstall_script() {
+    read -p "确定要卸载本脚本并清理相关文件吗 (y/n)? ${RED}此操作不可逆!${RESET}: " confirm_uninstall
+    if [[ "$confirm_uninstall" != "y" && "$confirm_uninstall" != "Y" ]]; then
+        return
+    fi
+    
+    DEPENDENCIES="speedtest-cli git wget curl net-tools"
+    
+    echo -e "${YELLOW}正在清理 ${SCRIPT_FILE}, ${RESULT_FILE}, tcp.sh 等文件...${RESET}"
+    rm -f "$SCRIPT_FILE" "$RESULT_FILE" tcp.sh
+    
+    # 尝试自动卸载依赖
+    read -p "是否同时卸载脚本安装的依赖包 ($DEPENDENCIES)? (y/n): " uninstall_deps
+    if [[ "$uninstall_deps" == "y" || "$uninstall_deps" == "Y" ]]; then
+        echo -e "${GREEN}>>> 正在尝试卸载依赖包...${RESET}"
+        if command -v apt >/dev/null 2>&1; then
+            apt purge -y $DEPENDENCIES
+            echo -e "${GREEN}✅ 依赖包使用 ${YELLOW}apt purge${GREEN} 卸载完成。${RESET}"
+        elif command -v yum >/dev/null 2>&1; then
+            yum remove -y $DEPENDENCIES
+            echo -e "${GREEN}✅ 依赖包使用 ${YELLOW}yum remove${GREEN} 卸载完成。${RESET}"
+        elif command -v dnf >/dev/null 2>&1; then
+            dnf remove -y $DEPENDENCIES
+            echo -e "${GREEN}✅ 依赖包使用 ${YELLOW}dnf remove${GREEN} 卸载完成。${RESET}"
+        else
+            echo -e "${RED}❌ 无法自动卸载依赖。${RESET}"
+        fi
+    fi
+
+    # 记录卸载成功
+    echo "Script uninstalled on $(date)" > "$UNINSTALL_NOTE"
+    
+    echo -e "${GREEN}✅ 脚本卸载完成。${RESET}"
+    if [[ "$uninstall_deps" != "y" && "$uninstall_deps" != "Y" ]]; then
+        echo -e "${CYAN}请注意: 如果您选择不自动卸载，请手动执行以下命令清理依赖：${RESET}"
+        if command -v apt >/dev/null 2>&1; then
+            echo -e "    ${YELLOW}apt purge -y $DEPENDENCIES${RESET}"
+        elif command -v yum >/dev/null 2>&1; 键，然后
+            echo -e "    ${YELLOW}yum remove -y $DEPENDENCIES${RESET}"
+        elif command -v dnf >/dev/null 2>&1; then
+            echo -e "    ${YELLOW}dnf remove -y $DEPENDENCIES${RESET}"
+        fi
+    fi
+    exit 0
+}
+
+# -------------------------------
+# 其它功能 (3, 6, 7 - 保持不变)
+# -------------------------------
+# ... (show_sys_info, docker_menu, ssh_config_menu 函数代码省略，与 v2.0 保持一致) ...
 show_sys_info() {
     echo -e "${CYAN}=== 系统信息 ===${RESET}"
     echo -e "${GREEN}操作系统:${RESET} $(cat /etc/os-release | grep PRETTY_NAME | cut -d "=" -f 2 | tr -d '"')"
@@ -157,47 +248,6 @@ show_sys_info() {
     read -n1 -p "按任意键返回菜单..."
 }
 
-# -------------------------------
-# 功能 4: 系统更新与清理
-# -------------------------------
-sys_update_cleanup() {
-    echo -e "${CYAN}=== 系统更新与清理 ===${RESET}"
-    read -p "是否执行系统更新 (Update & Upgrade)? (y/n): " do_update
-    if [[ "$do_update" == "y" || "$do_update" == "Y" ]]; then
-        echo -e "${GREEN}>>> 正在更新系统...${RESET}"
-        if command -v apt >/dev/null 2>&1; then
-            apt update -y && apt upgrade -y
-            apt autoremove -y
-        elif command -v yum >/dev/null 2>&1; then
-            yum update -y
-        elif command -v dnf >/dev/null 2>&1; then
-            dnf update -y
-        else
-            echo -e "${RED}❌ 无法识别包管理器，请手动更新系统${RESET}"
-        fi
-    fi
-    
-    read -p "是否清理旧的内核和软件包缓存 (Cleanup)? (y/n): " do_cleanup
-    if [[ "$do_cleanup" == "y" || "$do_cleanup" == "Y" ]]; then
-        echo -e "${GREEN}>>> 正在清理缓存...${RESET}"
-        if command -v apt >/dev/null 2>&1; then
-            apt clean
-            echo -e "${GREEN}APT 清理完成${RESET}"
-        elif command -v yum >/dev/null 2>&1; then
-            yum clean all
-            echo -e "${GREEN}YUM 清理完成${RESET}"
-        elif command -v dnf >/dev/null 2>&1; then
-            dnf clean all
-            echo -e "${GREEN}DNF 清理完成${RESET}"
-        fi
-    fi
-    echo -e "${GREEN}系统更新和清理操作完成。${RESET}"
-    read -n1 -p "按任意键返回菜单..."
-}
-
-# -------------------------------
-# 功能 5: Docker 管理
-# -------------------------------
 docker_install() {
     echo -e "${CYAN}正在安装 Docker...${RESET}"
     curl -fsSL https://get.docker.com -o get-docker.sh
@@ -243,9 +293,6 @@ docker_menu() {
     read -n1 -p "按任意键返回菜单..."
 }
 
-# -------------------------------
-# 功能 6: SSH 配置修改
-# -------------------------------
 ssh_config_menu() {
     SSH_CONFIG="/etc/ssh/sshd_config"
     if [ ! -f "$SSH_CONFIG" ]; then
@@ -256,7 +303,6 @@ ssh_config_menu() {
 
     echo -e "${CYAN}=== SSH 配置修改 ===${RESET}"
     
-    # 端口修改
     read -p "输入新的 SSH 端口 (留空跳过，当前端口: $(grep -E '^Port' $SSH_CONFIG | awk '{print $2}')): " new_port
     if [ ! -z "$new_port" ]; then
         if [[ "$new_port" =~ ^[0-9]+$ ]] && [ "$new_port" -ge 1 ] && [ "$new_port" -le 65535 ]; then
@@ -267,7 +313,6 @@ ssh_config_menu() {
         fi
     fi
 
-    # 密码修改
     read -p "是否修改 root 用户密码? (y/n): " change_pass
     if [[ "$change_pass" == "y" || "$change_pass" == "Y" ]]; then
         echo -e "${YELLOW}请设置新的 root 密码:${RESET}"
@@ -289,23 +334,6 @@ ssh_config_menu() {
     read -n1 -p "按任意键返回菜单..."
 }
 
-# -------------------------------
-# 功能 7: 卸载脚本
-# -------------------------------
-uninstall_script() {
-    read -p "确定要卸载本脚本并清理相关文件吗 (y/n)? ${RED}此操作不可逆!${RESET}: " confirm_uninstall
-    if [[ "$confirm_uninstall" == "y" || "$confirm_uninstall" == "Y" ]]; then
-        echo -e "${YELLOW}正在清理 ${SCRIPT_FILE}, ${RESULT_FILE} 等文件...${RESET}"
-        rm -f "$SCRIPT_FILE" "$RESULT_FILE" tcp.sh
-        
-        # 记录卸载成功
-        echo "Script uninstalled on $(date)" > "$UNINSTALL_NOTE"
-        
-        echo -e "${GREEN}✅ 脚本卸载完成。${RESET}"
-        echo "为了完全清理，您可能需要手动删除您下载的其他依赖包（如 speedtest-cli）。"
-        exit 0
-    fi
-}
 
 # -------------------------------
 # 交互菜单
@@ -316,15 +344,16 @@ show_menu() {
         echo -e "请选择操作："
         echo -e "${GREEN}--- BBR 测速与切换 ---${RESET}"
         echo "1) BBR 综合测速 (BBR/BBR Plus/BBRv2/BBRv3 对比)"
-        echo "2) 安装/切换 BBR 内核 (运行外部脚本)"
+        echo "2) 安装/切换 BBR 内核"
         echo -e "${GREEN}--- VPS 系统管理 ---${RESET}"
         echo "3) 查看系统信息 (OS/CPU/内存/IP)"
-        echo "4) 系统更新与清理"
-        echo "5) Docker 容器管理"
-        echo "6) SSH 端口与密码修改"
+        echo "4) 系统更新 (Update & Upgrade)"
+        echo "5) 系统清理 (Cache & Autoremove)"
+        echo "6) Docker 容器管理"
+        echo "7) SSH 端口与密码修改"
         echo -e "${GREEN}--- 其他 ---${RESET}"
-        echo "7) 卸载脚本及残留文件"
-        echo "8) 退出"
+        echo "8) 卸载脚本及残留文件"
+        echo "9) 退出"
         echo ""
         read -p "输入数字选择: " choice
         
@@ -332,12 +361,13 @@ show_menu() {
             1) bbr_test_menu ;;
             2) run_bbr_switch ;;
             3) show_sys_info ;;
-            4) sys_update_cleanup ;;
-            5) docker_menu ;;
-            6) ssh_config_menu ;;
-            7) uninstall_script ;;
-            8) echo -e "${CYAN}感谢使用，再见！${RESET}"; exit 0 ;;
-            *) echo -e "${RED}无效选项，请输入 1-8${RESET}"; sleep 2 ;;
+            4) sys_update ;; # 分离的更新
+            5) sys_cleanup ;; # 分离的清理
+            6) docker_menu ;;
+            7) ssh_config_menu ;;
+            8) uninstall_script ;;
+            9) echo -e "${CYAN}感谢使用，再见！${RESET}"; exit 0 ;;
+            *) echo -e "${RED}无效选项，请输入 1-9${RESET}"; sleep 2 ;;
         esac
     done
 }
