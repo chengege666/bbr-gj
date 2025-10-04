@@ -17,7 +17,7 @@ CYAN="\033[1;36m"
 RESET="\033[0m"
 
 # -------------------------------
-# 欢迎窗口 (已更新菜单项和脚本名)
+# 欢迎窗口
 # -------------------------------
 print_welcome() {
     clear
@@ -72,7 +72,7 @@ check_deps() {
 }
 
 # -------------------------------
-# 测速函数（保持不变）
+# 测速函数
 # -------------------------------
 run_test() {
     MODE=$1
@@ -152,7 +152,7 @@ download_bbr_switch() {
 }
 
 # -------------------------------
-# 系统信息函数（保持不变）
+# 系统信息函数
 # -------------------------------
 show_system_info() {
     clear
@@ -181,7 +181,7 @@ show_system_info() {
 }
 
 # -------------------------------
-# 系统更新函数（保持不变）
+# 系统更新函数
 # -------------------------------
 run_system_update() {
     clear
@@ -204,7 +204,7 @@ run_system_update() {
 }
 
 # -------------------------------
-# 系统清理函数（保持不变）
+# 系统清理函数
 # -------------------------------
 run_system_clean() {
     clear
@@ -215,7 +215,7 @@ run_system_clean() {
     if [ -f /etc/debian_version ]; then
         echo -e "${GREEN}>>> 正在清理 APT 缓存和不再需要的软件包...${RESET}"
         apt autoremove -y && apt clean
-    elif [ -f /etc/redhat-release ]; 键，然后
+    elif [ -f /etc/redhat-release ]; then
         echo -e "${GREEN}>>> 正在清理 YUM/DNF 缓存...${RESET}"
         yum clean all || dnf clean all
     else
@@ -227,7 +227,7 @@ run_system_clean() {
 }
 
 # -------------------------------
-# Docker 管理/安装函数（保持不变）
+# Docker 管理/安装函数 (已修正语法)
 # -------------------------------
 docker_menu() {
     clear
@@ -235,6 +235,7 @@ docker_menu() {
     echo -e "${MAGENTA}                 Docker 管理                      ${RESET}"
     echo -e "${CYAN}==================================================${RESET}"
 
+    # 检查 Docker 是否安装
     if ! command -v docker >/dev/null 2>&1; then
         echo -e "${RED}⚠️ Docker 未安装！${RESET}"
         echo -e "1) ${GREEN}安装 Docker${RESET}"
@@ -254,13 +255,14 @@ docker_menu() {
                 ;;
         esac
     else
+        # Docker 已安装的菜单
         echo -e "${GREEN}✅ Docker 已安装。${RESET}"
         echo "1) 查看运行中的容器"
         echo "2) 查看所有容器"
         echo "3) 清理 Docker 悬空数据 (docker system prune)"
         echo "4) 返回主菜单"
         read -p "输入数字选择: " docker_choice
-        case "$docker_choice" 在
+        case "$docker_choice" in
             1)
                 echo -e "${YELLOW}运行中的容器:${RESET}"
                 docker ps
@@ -318,7 +320,7 @@ install_docker() {
 }
 
 # -------------------------------
-# 卸载脚本功能 (新增)
+# 卸载脚本功能
 # -------------------------------
 uninstall_script() {
     clear
@@ -341,7 +343,7 @@ uninstall_script() {
 }
 
 # -------------------------------
-# 交互菜单 (已更新编号和选项 2)
+# 交互菜单
 # -------------------------------
 show_menu() {
     while true; do
@@ -349,7 +351,7 @@ show_menu() {
         echo "请选择操作："
         echo "--- BBR 测速/切换 ---"
         echo "1) 执行 BBR 测速"
-        echo "2) 安装/切换 BBR 内核 (下载外部脚本)" # 已移除括号
+        echo "2) 安装/切换 BBR 内核 (下载外部脚本)"
         echo "--- 系统管理 ---"
         echo "3) 查看系统信息"
         echo "4) 系统更新 (Update & Upgrade)"
@@ -357,7 +359,7 @@ show_menu() {
         echo "6) Docker 管理/安装"
         echo "--- 退出 ---"
         echo "7) 退出脚本"
-        echo "8) 卸载此脚本" # 新增卸载功能
+        echo "8) 卸载此脚本"
         
         read -p "输入数字选择: " choice
         
@@ -374,7 +376,7 @@ show_menu() {
                 echo ""
                 ;;
             2)
-                download_bbr_switch # 修改为下载脚本
+                download_bbr_switch
                 ;;
             3)
                 show_system_info
@@ -393,7 +395,7 @@ show_menu() {
                 exit 0
                 ;;
             8)
-                uninstall_script # 调用卸载功能
+                uninstall_script
                 ;;
             *)
                 echo -e "${RED}无效选项，请输入 1-8${RESET}"
@@ -407,5 +409,5 @@ show_menu() {
 # 主程序
 # -------------------------------
 check_root
-check_deps # 检查并安装 curl/wget/git/speedtest-cli
+check_deps
 show_menu
