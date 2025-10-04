@@ -1,26 +1,28 @@
 #!/bin/bash
-# 自动切换 BBR 算法并测速对比（兼容 speedtest-cli）
+# 自动切换 BBR 算法并测速对比 / VPS 工具箱
 # GitHub: https://github.com/chengege666/bbr-gj
 
 RESULT_FILE="bbr_result.txt"
+SCRIPT_FILE="vpsgj.sh"
+UNINSTALL_NOTE="vpsgj_uninstall_done.txt"
 
 # -------------------------------
-# 欢迎窗口
+# 颜色定义与欢迎窗口
 # -------------------------------
+RED="\033[1;31m"
+GREEN="\033[1;32m"
+YELLOW="\033[1;33m"
+MAGENTA="\033[1;35m"
+CYAN="\033[1;36m"
+RESET="\033[0m"
+
 print_welcome() {
     clear
-    RED="\033[1;31m"
-    GREEN="\033[1;32m"
-    YELLOW="\033[1;33m"
-    MAGENTA="\033[1;35m"
-    CYAN="\033[1;36m"
-    RESET="\033[0m"
-
     echo -e "${CYAN}==================================================${RESET}"
-    echo -e "${MAGENTA}                BBR 测速脚本                     ${RESET}"
+    echo -e "${MAGENTA}                 VPS 工具箱 v2.0                 ${RESET}"
     echo -e "${CYAN}--------------------------------------------------${RESET}"
-    echo -e "${YELLOW}支持算法: BBR / BBR Plus / BBRv2 / BBRv3${RESET}"
-    echo -e "${GREEN}测速结果会保存到文件: ${RESULT_FILE}${RESET}"
+    echo -e "${YELLOW}功能: BBR测速, 系统管理, Docker, SSH配置等${RESET}"
+    echo -e "${GREEN}测速结果保存: ${RESULT_FILE}${RESET}"
     echo -e "${CYAN}==================================================${RESET}"
     echo ""
 }
@@ -30,32 +32,34 @@ print_welcome() {
 # -------------------------------
 check_root() {
     if [ "$(id -u)" -ne 0 ]; then
-        echo "❌ 错误：请使用 root 权限运行本脚本"
+        echo -e "${RED}❌ 错误：请使用 root 权限运行本脚本${RESET}"
         echo "👉 使用方法: sudo bash $0"
         exit 1
     fi
 }
 
 # -------------------------------
-# 安装依赖
+# 依赖安装
 # -------------------------------
 install_deps() {
-    PKGS="curl wget git speedtest-cli"
-    if [ -f /etc/debian_version ]; then
+    PKGS="curl wget git speedtest-cli net-tools"
+    if command -v apt >/dev/null 2>&1; then
         apt update -y
         apt install -y $PKGS
-    elif [ -f /etc/redhat-release ]; then
-        yum install -y $PKGS 2>/dev/null || dnf install -y $PKGS
+    elif command -v yum >/dev/null 2>&1; then
+        yum install -y $PKGS
+    elif command -v dnf >/dev/null 2>&1; then
+        dnf install -y $PKGS
     else
-        echo "⚠️ 未知系统，请手动安装依赖: $PKGS"
-        exit 1
+        echo -e "${YELLOW}⚠️ 未知系统，请手动安装依赖: $PKGS${RESET}"
+        read -n1 -p "按任意键继续菜单..."
     fi
 }
 
 check_deps() {
     for CMD in curl wget git speedtest-cli; do
         if ! command -v $CMD >/dev/null 2>&1; then
-            echo "未检测到 $CMD，正在安装依赖..."
+            echo -e "${YELLOW}未检测到 $CMD，正在尝试安装依赖...${RESET}"
             install_deps
             break
         fi
@@ -63,44 +67,26 @@ check_deps() {
 }
 
 # -------------------------------
-# 测速函数（保留所有BBR变种）
+# 核心功能：BBR 测速
 # -------------------------------
 run_test() {
     MODE=$1
-    RED="\033[1;31m"
-    GREEN="\033[1;32m"
-    CYAN="\033[1;36m"
-    RESET="\033[0m"
-
     echo -e "${CYAN}>>> 切换到 $MODE 并测速...${RESET}"
 
+    # 尝试切换拥塞控制算法
     case $MODE in
-        "BBR")
-            modprobe tcp_bbr 2>/dev/null
-            sysctl -w net.core.default_qdisc=fq >/dev/null
-            sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
-            ;;
-        "BBR Plus")
-            modprobe tcp_bbrplus 2>/dev/null
-            sysctl -w net.core.default_qdisc=fq >/dev/null
-            sysctl -w net.ipv4.tcp_congestion_control=bbrplus >/dev/null 2>&1
-            ;;
-        "BBRv2")
-            modprobe tcp_bbrv2 2>/dev/null
-            sysctl -w net.core.default_qdisc=fq >/dev/null
-            sysctl -w net.ipv4.tcp_congestion_control=bbrv2 >/dev/null 2>&1
-            ;;
-        "BBRv3")
-            modprobe tcp_bbrv3 2>/dev/null
-            sysctl -w net.core.default_qdisc=fq >/dev/null
-            sysctl -w net.ipv4.tcp_congestion_control=bbrv3 >/dev/null 2>&1
-            ;;
+        "BBR") sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1 ;;
+        "BBR Plus") sysctl -w net.ipv4.tcp_congestion_control=bbrplus >/dev/null 2>&1 ;;
+        "BBRv2") sysctl -w net.ipv4.tcp_congestion_control=bbrv2 >/dev/null 2>&1 ;;
+        "BBRv3") sysctl -w net.ipv4.tcp_congestion_control=bbrv3 >/dev/null 2>&1 ;;
     esac
+    
+    # 强制设置队列
+    sysctl -w net.core.default_qdisc=fq >/dev/null 2>&1
 
-    # 添加备用测速方法提高成功率
     RAW=$(speedtest-cli --simple 2>/dev/null)
     if [ -z "$RAW" ]; then
-        echo -e "${YELLOW}⚠️ speedtest-cli 失败，尝试使用替代方法...${RESET}"
+        echo -e "${YELLOW}⚠️ speedtest-cli 失败，尝试替代方法...${RESET}"
         RAW=$(curl -s https://raw.githubusercontent.com/sivel/speedtest-cli/master/speedtest.py | python - --simple 2>/dev/null)
     fi
 
@@ -114,19 +100,210 @@ run_test() {
     DOWNLOAD=$(echo "$RAW" | grep "Download" | awk '{print $2}')
     UPLOAD=$(echo "$RAW" | grep "Upload" | awk '{print $2}')
 
-    echo "$MODE | Ping: ${PING}ms | Down: ${DOWNLOAD} Mbps | Up: ${UPLOAD} Mbps" | tee -a "$RESULT_FILE"
+    echo -e "${GREEN}$MODE | Ping: ${PING}ms | Down: ${DOWNLOAD} Mbps | Up: ${UPLOAD} Mbps${RESET}" | tee -a "$RESULT_FILE"
     echo ""
 }
 
 # -------------------------------
-# 运行外部BBR切换脚本
+# 功能 1: BBR 综合测速
+# -------------------------------
+bbr_test_menu() {
+    echo -e "${CYAN}=== 开始 BBR 综合测速 ===${RESET}"
+    > "$RESULT_FILE"
+    
+    # 检查内核是否支持这些算法
+    for ALGO in bbrplus bbrv2 bbrv3; do
+        if ! grep -q "$ALGO" /proc/sys/net/ipv4/tcp_available_congestion_controls; then
+            echo -e "${YELLOW}⚠️ 当前内核不支持 $ALGO，将跳过测试.${RESET}"
+        fi
+    done
+
+    for MODE in "BBR" "BBR Plus" "BBRv2" "BBRv3"; do
+        run_test "$MODE"
+    done
+    
+    echo -e "${CYAN}=== 测试完成，结果汇总 (${RESULT_FILE}) ===${RESET}"
+    cat "$RESULT_FILE"
+    echo ""
+    read -n1 -p "按任意键返回菜单..."
+}
+
+# -------------------------------
+# 功能 2: 安装/切换 BBR 内核
 # -------------------------------
 run_bbr_switch() {
-    echo "正在下载并运行 BBR 切换脚本..."
+    echo -e "${CYAN}正在下载并运行 BBR 切换脚本... (来自 ylx2016/Linux-NetSpeed)${RESET}"
     wget -O tcp.sh "https://github.com/ylx2016/Linux-NetSpeed/raw/master/tcp.sh" && chmod +x tcp.sh && ./tcp.sh
     if [ $? -ne 0 ]; then
-        echo "❌ 下载或运行脚本失败，请检查网络连接"
+        echo -e "${RED}❌ 下载或运行脚本失败，请检查网络连接${RESET}"
+    fi
+    read -n1 -p "按任意键返回菜单..."
+}
+
+# -------------------------------
+# 功能 3: 系统信息
+# -------------------------------
+show_sys_info() {
+    echo -e "${CYAN}=== 系统信息 ===${RESET}"
+    echo -e "${GREEN}操作系统:${RESET} $(cat /etc/os-release | grep PRETTY_NAME | cut -d "=" -f 2 | tr -d '"')"
+    echo -e "${GREEN}内核版本:${RESET} $(uname -r)"
+    echo -e "${GREEN}CPU型号: ${RESET} $(grep -m1 'model name' /proc/cpuinfo | awk -F': ' '{print $2}')"
+    echo -e "${GREEN}内存信息:${RESET} $(free -h | grep Mem | awk '{print $2}')"
+    echo -e "${GREEN}Swap信息:${RESET} $(free -h | grep Swap | awk '{print $2}')"
+    echo -e "${GREEN}磁盘空间:${RESET} $(df -h / | grep / | awk '{print $2}') (已用: $(df -h / | grep / | awk '{print $5}'))"
+    echo -e "${GREEN}当前IP: ${RESET} $(curl -s ifconfig.me || echo '获取失败')"
+    echo -e "${GREEN}系统运行时间:${RESET} $(uptime | awk '{print $3,$4,$5}')"
+    echo ""
+    read -n1 -p "按任意键返回菜单..."
+}
+
+# -------------------------------
+# 功能 4: 系统更新与清理
+# -------------------------------
+sys_update_cleanup() {
+    echo -e "${CYAN}=== 系统更新与清理 ===${RESET}"
+    read -p "是否执行系统更新 (Update & Upgrade)? (y/n): " do_update
+    if [[ "$do_update" == "y" || "$do_update" == "Y" ]]; then
+        echo -e "${GREEN}>>> 正在更新系统...${RESET}"
+        if command -v apt >/dev/null 2>&1; then
+            apt update -y && apt upgrade -y
+            apt autoremove -y
+        elif command -v yum >/dev/null 2>&1; then
+            yum update -y
+        elif command -v dnf >/dev/null 2>&1; then
+            dnf update -y
+        else
+            echo -e "${RED}❌ 无法识别包管理器，请手动更新系统${RESET}"
+        fi
+    fi
+    
+    read -p "是否清理旧的内核和软件包缓存 (Cleanup)? (y/n): " do_cleanup
+    if [[ "$do_cleanup" == "y" || "$do_cleanup" == "Y" ]]; then
+        echo -e "${GREEN}>>> 正在清理缓存...${RESET}"
+        if command -v apt >/dev/null 2>&1; then
+            apt clean
+            echo -e "${GREEN}APT 清理完成${RESET}"
+        elif command -v yum >/dev/null 2>&1; then
+            yum clean all
+            echo -e "${GREEN}YUM 清理完成${RESET}"
+        elif command -v dnf >/dev/null 2>&1; then
+            dnf clean all
+            echo -e "${GREEN}DNF 清理完成${RESET}"
+        fi
+    fi
+    echo -e "${GREEN}系统更新和清理操作完成。${RESET}"
+    read -n1 -p "按任意键返回菜单..."
+}
+
+# -------------------------------
+# 功能 5: Docker 管理
+# -------------------------------
+docker_install() {
+    echo -e "${CYAN}正在安装 Docker...${RESET}"
+    curl -fsSL https://get.docker.com -o get-docker.sh
+    sh get-docker.sh --mirror Aliyun
+    rm get-docker.sh
+    systemctl enable docker
+    systemctl start docker
+    if command -v docker >/dev/null 2>&1; then
+        echo -e "${GREEN}✅ Docker 安装并启动成功！${RESET}"
+    else
+        echo -e "${RED}❌ Docker 安装失败，请检查日志。${RESET}"
+    fi
+}
+
+docker_menu() {
+    if ! command -v docker >/dev/null 2>&1; then
+        echo -e "${RED}未检测到 Docker！${RESET}"
+        read -p "是否现在安装 Docker? (y/n): " install_docker
+        if [[ "$install_docker" == "y" || "$install_docker" == "Y" ]]; then
+            docker_install
+        fi
         read -n1 -p "按任意键返回菜单..."
+        return
+    fi
+
+    echo -e "${CYAN}=== Docker 容器管理 ===${RESET}"
+    echo -e "${YELLOW}当前运行的容器:${RESET}"
+    docker ps --format "table {{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}"
+    echo ""
+    echo "1) 查看所有容器"
+    echo "2) 重启所有容器"
+    echo "3) 返回主菜单"
+    read -p "请选择操作: " docker_choice
+    
+    case "$docker_choice" in
+        1) docker ps -a ;;
+        2) 
+            echo -e "${GREEN}正在重启所有容器...${RESET}"
+            docker restart $(docker ps -a -q)
+            ;;
+        *) return ;;
+    esac
+    read -n1 -p "按任意键返回菜单..."
+}
+
+# -------------------------------
+# 功能 6: SSH 配置修改
+# -------------------------------
+ssh_config_menu() {
+    SSH_CONFIG="/etc/ssh/sshd_config"
+    if [ ! -f "$SSH_CONFIG" ]; then
+        echo -e "${RED}❌ 未找到 SSH 配置文件 ($SSH_CONFIG)。${RESET}"
+        read -n1 -p "按任意键返回菜单..."
+        return
+    fi
+
+    echo -e "${CYAN}=== SSH 配置修改 ===${RESET}"
+    
+    # 端口修改
+    read -p "输入新的 SSH 端口 (留空跳过，当前端口: $(grep -E '^Port' $SSH_CONFIG | awk '{print $2}')): " new_port
+    if [ ! -z "$new_port" ]; then
+        if [[ "$new_port" =~ ^[0-9]+$ ]] && [ "$new_port" -ge 1 ] && [ "$new_port" -le 65535 ]; then
+            sed -i "s/^#\?Port\s\+.*$/Port $new_port/" "$SSH_CONFIG"
+            echo -e "${GREEN}✅ SSH 端口已修改为 $new_port${RESET}"
+        else
+            echo -e "${RED}❌ 端口输入无效。${RESET}"
+        fi
+    fi
+
+    # 密码修改
+    read -p "是否修改 root 用户密码? (y/n): " change_pass
+    if [[ "$change_pass" == "y" || "$change_pass" == "Y" ]]; then
+        echo -e "${YELLOW}请设置新的 root 密码:${RESET}"
+        passwd root
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}✅ root 密码修改成功${RESET}"
+        else
+            echo -e "${RED}❌ root 密码修改失败${RESET}"
+        fi
+    fi
+
+    echo -e "${GREEN}>>> 正在重启 SSH 服务以应用更改...${RESET}"
+    if command -v systemctl >/dev/null 2>&1; then
+        systemctl restart sshd
+    else
+        /etc/init.d/sshd restart
+    fi
+    echo -e "${YELLOW}请注意: 如果您更改了 SSH 端口，请立即使用新端口重新连接！${RESET}"
+    read -n1 -p "按任意键返回菜单..."
+}
+
+# -------------------------------
+# 功能 7: 卸载脚本
+# -------------------------------
+uninstall_script() {
+    read -p "确定要卸载本脚本并清理相关文件吗 (y/n)? ${RED}此操作不可逆!${RESET}: " confirm_uninstall
+    if [[ "$confirm_uninstall" == "y" || "$confirm_uninstall" == "Y" ]]; then
+        echo -e "${YELLOW}正在清理 ${SCRIPT_FILE}, ${RESULT_FILE} 等文件...${RESET}"
+        rm -f "$SCRIPT_FILE" "$RESULT_FILE" tcp.sh
+        
+        # 记录卸载成功
+        echo "Script uninstalled on $(date)" > "$UNINSTALL_NOTE"
+        
+        echo -e "${GREEN}✅ 脚本卸载完成。${RESET}"
+        echo "为了完全清理，您可能需要手动删除您下载的其他依赖包（如 speedtest-cli）。"
+        exit 0
     fi
 }
 
@@ -136,35 +313,31 @@ run_bbr_switch() {
 show_menu() {
     while true; do
         print_welcome
-        echo "请选择操作："
-        echo "1) 执行 BBR 测速"
-        echo "2) 安装/切换 BBR 内核（运行外部脚本）"
-        echo "3) 退出"
+        echo -e "请选择操作："
+        echo -e "${GREEN}--- BBR 测速与切换 ---${RESET}"
+        echo "1) BBR 综合测速 (BBR/BBR Plus/BBRv2/BBRv3 对比)"
+        echo "2) 安装/切换 BBR 内核 (运行外部脚本)"
+        echo -e "${GREEN}--- VPS 系统管理 ---${RESET}"
+        echo "3) 查看系统信息 (OS/CPU/内存/IP)"
+        echo "4) 系统更新与清理"
+        echo "5) Docker 容器管理"
+        echo "6) SSH 端口与密码修改"
+        echo -e "${GREEN}--- 其他 ---${RESET}"
+        echo "7) 卸载脚本及残留文件"
+        echo "8) 退出"
+        echo ""
         read -p "输入数字选择: " choice
         
         case "$choice" in
-            1)
-                > "$RESULT_FILE"
-                for MODE in "BBR" "BBR Plus" "BBRv2" "BBRv3"; do
-                    run_test "$MODE"
-                done
-                echo "=== 测试完成，结果汇总 ==="
-                cat "$RESULT_FILE"
-                echo ""
-                read -n1 -p "按任意键返回菜单..." key
-                echo ""
-                ;;
-            2)
-                run_bbr_switch
-                ;;
-            3)
-                echo "退出脚本"
-                exit 0
-                ;;
-            *)
-                echo "无效选项，请输入 1-3"
-                sleep 2
-                ;;
+            1) bbr_test_menu ;;
+            2) run_bbr_switch ;;
+            3) show_sys_info ;;
+            4) sys_update_cleanup ;;
+            5) docker_menu ;;
+            6) ssh_config_menu ;;
+            7) uninstall_script ;;
+            8) echo -e "${CYAN}感谢使用，再见！${RESET}"; exit 0 ;;
+            *) echo -e "${RED}无效选项，请输入 1-8${RESET}"; sleep 2 ;;
         esac
     done
 }
