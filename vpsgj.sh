@@ -19,7 +19,7 @@ RESET="\033[0m"
 print_welcome() {
     clear
     echo -e "${CYAN}==================================================${RESET}"
-    echo -e "${MAGENTA}                 VPS 工具箱 v2.1                 ${RESET}"
+    echo -e "${MAGENTA}              VPS 工具箱 v2.1                   ${RESET}"
     echo -e "${CYAN}--------------------------------------------------${RESET}"
     echo -e "${YELLOW}功能: BBR测速, 系统管理, Docker, SSH配置等${RESET}"
     echo -e "${GREEN}测速结果保存: ${RESULT_FILE}${RESET}"
@@ -341,11 +341,11 @@ uninstall_script() {
     if [[ "$uninstall_deps" != "y" && "$uninstall_deps" != "Y" ]]; then
         echo -e "${CYAN}请注意: 如果您选择不自动卸载，请手动执行以下命令清理依赖：${RESET}"
         if command -v apt >/dev/null 2>&1; then
-            echo -e "    ${YELLOW}apt purge -y $DEPENDENCIES${RESET}"
+            echo -e "    ${YELLOW}apt purge -y $DEPENDENCIES${RESET}"
         elif command -v yum >/dev/null 2>&1; then
-            echo -e "    ${YELLOW}yum remove -y $DEPENDENCIES${RESET}"
+            echo -e "    ${YELLOW}yum remove -y $DEPENDENCIES${RESET}"
         elif command -v dnf >/dev/null 2>&1; then
-            echo -e "    ${YELLOW}dnf remove -y $DEPENDENCIES${RESET}"
+            echo -e "    ${YELLOW}dnf remove -y $DEPENDENCIES${RESET}"
         fi
     fi
     exit 0
