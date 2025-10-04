@@ -42,17 +42,6 @@ bash <(curl -L -s https://raw.githubusercontent.com/chengege666/bbr-gj/main/vpsg
 
 ---
 
-### 手动运行
-
-```bash
-git clone https://github.com/chengege666/bbr-speedtest.git
-cd bbr-speedtest
-chmod +x bbr_speedtest.sh
-sudo ./bbr_speedtest.sh
-```
-
----
-
 ## 输出示例
 
 ```
