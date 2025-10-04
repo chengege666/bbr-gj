@@ -67,46 +67,39 @@ check_deps() {
 }
 
 # -------------------------------
-# 核心功能：BBR 测速
+# 核心功能：BBR 测速（使用您提供的能正常工作的版本）
 # -------------------------------
 run_test() {
     MODE=$1
     echo -e "${CYAN}>>> 切换到 $MODE 并测速...${RESET}"
 
-    # 尝试切换拥塞控制算法
     case $MODE in
-        "BBR") 
+        "BBR")
+            modprobe tcp_bbr 2>/dev/null
+            sysctl -w net.core.default_qdisc=fq >/dev/null
             sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
-            CURRENT_ALG="bbr"
             ;;
-        "BBR Plus") 
+        "BBR Plus")
+            modprobe tcp_bbrplus 2>/dev/null
+            sysctl -w net.core.default_qdisc=fq >/dev/null
             sysctl -w net.ipv4.tcp_congestion_control=bbrplus >/dev/null 2>&1
-            CURRENT_ALG="bbrplus"
             ;;
-        "BBRv2") 
+        "BBRv2")
+            modprobe tcp_bbrv2 2>/dev/null
+            sysctl -w net.core.default_qdisc=fq >/dev/null
             sysctl -w net.ipv4.tcp_congestion_control=bbrv2 >/dev/null 2>&1
-            CURRENT_ALG="bbrv2"
             ;;
-        "BBRv3") 
+        "BBRv3")
+            modprobe tcp_bbrv3 2>/dev/null
+            sysctl -w net.core.default_qdisc=fq >/dev/null
             sysctl -w net.ipv4.tcp_congestion_control=bbrv3 >/dev/null 2>&1
-            CURRENT_ALG="bbrv3"
             ;;
     esac
-    
-    # 强制设置队列
-    sysctl -w net.core.default_qdisc=fq >/dev/null 2>&1
 
-    # 检查是否切换成功
-    CURRENT=$(sysctl -n net.ipv4.tcp_congestion_control 2>/dev/null || echo "unknown")
-    if [ "$CURRENT" != "$CURRENT_ALG" ]; then
-        echo -e "${RED}❌ 切换到 $MODE 失败，当前算法: $CURRENT${RESET}"
-        echo ""
-        return
-    fi
-
+    # 添加备用测速方法提高成功率
     RAW=$(speedtest-cli --simple 2>/dev/null)
     if [ -z "$RAW" ]; then
-        echo -e "${YELLOW}⚠️ speedtest-cli 失败，尝试替代方法...${RESET}"
+        echo -e "${YELLOW}⚠️ speedtest-cli 失败，尝试使用替代方法...${RESET}"
         RAW=$(curl -s https://raw.githubusercontent.com/sivel/speedtest-cli/master/speedtest.py | python - --simple 2>/dev/null)
     fi
 
@@ -131,55 +124,26 @@ bbr_test_menu() {
     echo -e "${CYAN}=== 开始 BBR 综合测速 ===${RESET}"
     > "$RESULT_FILE"
     
-    # 检查拥塞控制算法文件是否存在
-    if [ ! -f "/proc/sys/net/ipv4/tcp_available_congestion_controls" ]; then
-        echo -e "${YELLOW}⚠️ 无法检测可用拥塞控制算法，将尝试所有模式测试${RESET}"
-        # 如果文件不存在，设置所有算法为可测试状态
-        ALGO_STATUS=("BBR" "BBR Plus" "BBRv2" "BBRv3")
-    else
-        # 检查内核是否支持这些算法
-        ALGO_STATUS=()
-        for ALGO in "bbr" "bbrplus" "bbrv2" "bbrv3"; do
-            if grep -q "$ALGO" /proc/sys/net/ipv4/tcp_available_congestion_controls 2>/dev/null; then
-                case $ALGO in
-                    "bbr") ALGO_STATUS+=("BBR") ;;
-                    "bbrplus") ALGO_STATUS+=("BBR Plus") ;;
-                    "bbrv2") ALGO_STATUS+=("BBRv2") ;;
-                    "bbrv3") ALGO_STATUS+=("BBRv3") ;;
-                esac
-            else
-                echo -e "${YELLOW}⚠️ 当前内核不支持 $ALGO，将跳过测试${RESET}"
-            fi
-        done
-    fi
+    # 检查内核是否支持这些算法
+    for ALGO in bbrplus bbrv2 bbrv3; do
+        if ! grep -q "$ALGO" /proc/sys/net/ipv4/tcp_available_congestion_controls 2>/dev/null; then
+            echo -e "${YELLOW}⚠️ 当前内核不支持 $ALGO，将跳过测试.${RESET}"
+        fi
+    done
 
-    # 如果没有可用的算法，提示用户
-    if [ ${#ALGO_STATUS[@]} -eq 0 ]; then
-        echo -e "${RED}❌ 没有可用的 BBR 算法进行测试${RESET}"
-        read -n1 -p "按任意键返回菜单..."
-        return
-    fi
-
-    # 进行测速
-    for MODE in "${ALGO_STATUS[@]}"; do
+    for MODE in "BBR" "BBR Plus" "BBRv2" "BBRv3"; do
         run_test "$MODE"
     done
     
     echo -e "${CYAN}=== 测试完成，结果汇总 (${RESULT_FILE}) ===${RESET}"
-    if [ -f "$RESULT_FILE" ] && [ -s "$RESULT_FILE" ]; then
-        cat "$RESULT_FILE"
-    else
-        echo -e "${YELLOW}无测速结果${RESET}"
-    fi
+    cat "$RESULT_FILE"
     echo ""
     read -n1 -p "按任意键返回菜单..."
 }
 
 # -------------------------------
-# 其余功能保持不变...
-# -------------------------------
-
 # 功能 2: 安装/切换 BBR 内核
+# -------------------------------
 run_bbr_switch() {
     echo -e "${CYAN}正在下载并运行 BBR 切换脚本... (来自 ylx2016/Linux-NetSpeed)${RESET}"
     wget -O tcp.sh "https://github.com/ylx2016/Linux-NetSpeed/raw/master/tcp.sh" && chmod +x tcp.sh && ./tcp.sh
@@ -189,22 +153,26 @@ run_bbr_switch() {
     read -n1 -p "按任意键返回菜单..."
 }
 
+# -------------------------------
 # 功能 3: 系统信息
+# -------------------------------
 show_sys_info() {
     echo -e "${CYAN}=== 系统信息 ===${RESET}"
-    echo -e "${GREEN}操作系统:${RESET} $(cat /etc/os-release | grep PRETTY_NAME | cut -d "=" -f 2 | tr -d '"' 2>/dev/null || echo '未知')"
+    echo -e "${GREEN}操作系统:${RESET} $(cat /etc/os-release | grep PRETTY_NAME | cut -d "=" -f 2 | tr -d '"')"
     echo -e "${GREEN}内核版本:${RESET} $(uname -r)"
-    echo -e "${GREEN}CPU型号: ${RESET} $(grep -m1 'model name' /proc/cpuinfo | awk -F': ' '{print $2}' 2>/dev/null || echo '未知')"
-    echo -e "${GREEN}内存信息:${RESET} $(free -h | grep Mem | awk '{print $2}' 2>/dev/null || echo '未知')"
-    echo -e "${GREEN}Swap信息:${RESET} $(free -h | grep Swap | awk '{print $2}' 2>/dev/null || echo '未知')"
-    echo -e "${GREEN}磁盘空间:${RESET} $(df -h / | grep / | awk '{print $2}' 2>/dev/null || echo '未知') (已用: $(df -h / | grep / | awk '{print $5}' 2>/dev/null || echo '未知'))"
-    echo -e "${GREEN}当前IP: ${RESET} $(curl -s ifconfig.me 2>/dev/null || echo '获取失败')"
-    echo -e "${GREEN}系统运行时间:${RESET} $(uptime | awk '{print $3,$4,$5}' 2>/dev/null || echo '未知')"
+    echo -e "${GREEN}CPU型号: ${RESET} $(grep -m1 'model name' /proc/cpuinfo | awk -F': ' '{print $2}')"
+    echo -e "${GREEN}内存信息:${RESET} $(free -h | grep Mem | awk '{print $2}')"
+    echo -e "${GREEN}Swap信息:${RESET} $(free -h | grep Swap | awk '{print $2}')"
+    echo -e "${GREEN}磁盘空间:${RESET} $(df -h / | grep / | awk '{print $2}') (已用: $(df -h / | grep / | awk '{print $5}'))"
+    echo -e "${GREEN}当前IP: ${RESET} $(curl -s ifconfig.me || echo '获取失败')"
+    echo -e "${GREEN}系统运行时间:${RESET} $(uptime | awk '{print $3,$4,$5}')"
     echo ""
     read -n1 -p "按任意键返回菜单..."
 }
 
+# -------------------------------
 # 功能 4: 系统更新
+# -------------------------------
 sys_update() {
     echo -e "${CYAN}=== 系统更新 ===${RESET}"
     echo -e "${GREEN}>>> 正在更新系统...${RESET}"
@@ -221,7 +189,9 @@ sys_update() {
     read -n1 -p "按任意键返回菜单..."
 }
 
+# -------------------------------
 # 功能 5: 系统清理
+# -------------------------------
 sys_cleanup() {
     echo -e "${CYAN}=== 系统清理 ===${RESET}"
     echo -e "${GREEN}>>> 正在清理缓存和旧内核...${RESET}"
@@ -244,7 +214,9 @@ sys_cleanup() {
     read -n1 -p "按任意键返回菜单..."
 }
 
+# -------------------------------
 # 功能 6: Docker 管理
+# -------------------------------
 docker_install() {
     echo -e "${CYAN}正在安装 Docker...${RESET}"
     curl -fsSL https://get.docker.com -o get-docker.sh
@@ -260,7 +232,7 @@ docker_install() {
 }
 
 docker_menu() {
-    if ! command -v docker >/dev/null 2>&1; then
+    if ! command -v docker >/dev/null 2>&1; 键，然后
         echo -e "${RED}未检测到 Docker！${RESET}"
         read -p "是否现在安装 Docker? (y/n): " install_docker
         if [[ "$install_docker" == "y" || "$install_docker" == "Y" ]]; then
@@ -272,25 +244,27 @@ docker_menu() {
 
     echo -e "${CYAN}=== Docker 容器管理 ===${RESET}"
     echo -e "${YELLOW}当前运行的容器:${RESET}"
-    docker ps --format "table {{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}" 2>/dev/null || echo -e "${YELLOW}无运行中的容器${RESET}"
+    docker ps --format "table {{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}"
     echo ""
     echo "1) 查看所有容器"
     echo "2) 重启所有容器"
     echo "3) 返回主菜单"
     read -p "请选择操作: " docker_choice
     
-    case "$docker_choice" in
-        1) docker ps -a 2>/dev/null || echo -e "${YELLOW}Docker 命令执行失败${RESET}" ;;
+    case "$docker_choice" 在
+        1) docker ps -a ;;
         2) 
             echo -e "${GREEN}正在重启所有容器...${RESET}"
-            docker restart $(docker ps -a -q) 2>/dev/null && echo -e "${GREEN}容器重启完成${RESET}" || echo -e "${YELLOW}无容器可重启${RESET}"
+            docker restart $(docker ps -a -q)
             ;;
         *) return ;;
     esac
     read -n1 -p "按任意键返回菜单..."
 }
 
+# -------------------------------
 # 功能 7: SSH 配置修改
+# -------------------------------
 ssh_config_menu() {
     SSH_CONFIG="/etc/ssh/sshd_config"
     if [ ! -f "$SSH_CONFIG" ]; then
@@ -302,8 +276,7 @@ ssh_config_menu() {
     echo -e "${CYAN}=== SSH 配置修改 ===${RESET}"
     
     # 端口修改
-    CURRENT_PORT=$(grep -E '^Port' "$SSH_CONFIG" 2>/dev/null | awk '{print $2}' || echo "22")
-    read -p "输入新的 SSH 端口 (留空跳过，当前端口: $CURRENT_PORT): " new_port
+    read -p "输入新的 SSH 端口 (留空跳过，当前端口: $(grep -E '^Port' $SSH_CONFIG | awk '{print $2}')): " new_port
     if [ ! -z "$new_port" ]; then
         if [[ "$new_port" =~ ^[0-9]+$ ]] && [ "$new_port" -ge 1 ] && [ "$new_port" -le 65535 ]; then
             sed -i "s/^#\?Port\s\+.*$/Port $new_port/" "$SSH_CONFIG"
@@ -335,7 +308,9 @@ ssh_config_menu() {
     read -n1 -p "按任意键返回菜单..."
 }
 
+# -------------------------------
 # 功能 8: 卸载脚本
+# -------------------------------
 uninstall_script() {
     read -p "确定要卸载本脚本并清理相关文件吗 (y/n)? ${RED}此操作不可逆!${RESET}: " confirm_uninstall
     if [[ "$confirm_uninstall" == "y" || "$confirm_uninstall" == "Y" ]]; then
