@@ -11,7 +11,7 @@ UNINSTALL_NOTE="vpsgj_uninstall_done.txt"
 # -------------------------------
 RED="\033[1;31m"
 GREEN="\033[1;32m"
-YELLOW="极速器[1;33m"
+YELLOW="\033[1;33m"
 MAGENTA="\033[1;35m"
 CYAN="\033[1;36m"
 RESET="\033[0m"
@@ -19,10 +19,10 @@ RESET="\033[0m"
 print_welcome() {
     clear
     echo -e "${CYAN}==================================================${RESET}"
-    echo -e "${MAGENTA}                VPS 工具箱 v2.0                ${RESET}"
+    echo -e "${MAGENTA}                 VPS 工具箱 v2.0                 ${RESET}"
     echo -e "${CYAN}--------------------------------------------------${RESET}"
     echo -e "${YELLOW}功能: BBR测速, 系统管理, Docker, SSH配置等${RESET}"
-    echo极速器测速结果保存: ${RESULT_FILE}${RESET}"
+    echo -e "${GREEN}测速结果保存: ${RESULT_FILE}${RESET}"
     echo -e "${CYAN}==================================================${RESET}"
     echo ""
 }
@@ -32,7 +32,7 @@ print_welcome() {
 # -------------------------------
 check_root() {
     if [ "$(id -u)" -ne 0 ]; then
-        echo -e "${RED}❌❌ 错误：请使用 root 权限极速器行本脚本${RESET}"
+        echo -e "${RED}❌ 错误：请使用 root 权限运行本脚本${RESET}"
         echo "👉 使用方法: sudo bash $0"
         exit 1
     fi
@@ -48,8 +48,8 @@ install_deps() {
         apt install -y $PKGS
     elif command -v yum >/dev/null 2>&1; then
         yum install -y $PKGS
-    elif command -v dnf >/dev/null 2>&极速器 then
-        dnf install -y $极速器
+    elif command -v dnf >/dev/null 2>&1; then
+        dnf install -y $PKGS
     else
         echo -e "${YELLOW}⚠️ 未知系统，请手动安装依赖: $PKGS${RESET}"
         read -n1 -p "按任意键继续菜单..."
@@ -75,14 +75,34 @@ run_test() {
 
     # 尝试切换拥塞控制算法
     case $MODE in
-        "BBR") sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1 ;;
-        "BBR Plus") sysctl -w net.ipv4.tcp_congestion_control=bbrplus >/dev/null 2>&1 ;;
-        "BBRv2") sysctl -w net.ip极速器.tcp_congestion_control=bbrv2 >/dev/null 2>&1 ;;
-        "BBRv3") sysctl -w net.ipv4.tcp_congestion_control=bbrv3 >/dev/null 2>&1 ;;
+        "BBR") 
+            sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
+            CURRENT_ALG="bbr"
+            ;;
+        "BBR Plus") 
+            sysctl -w net.ipv4.tcp_congestion_control=bbrplus >/dev/null 2>&1
+            CURRENT_ALG="bbrplus"
+            ;;
+        "BBRv2") 
+            sysctl -w net.ipv4.tcp_congestion_control=bbrv2 >/dev/null 2>&1
+            CURRENT_ALG="bbrv2"
+            ;;
+        "BBRv3") 
+            sysctl -w net.ipv4.tcp_congestion_control=bbrv3 >/dev/null 2>&1
+            CURRENT_ALG="bbrv3"
+            ;;
     esac
     
     # 强制设置队列
     sysctl -w net.core.default_qdisc=fq >/dev/null 2>&1
+
+    # 检查是否切换成功
+    CURRENT=$(sysctl -n net.ipv4.tcp_congestion_control 2>/dev/null || echo "unknown")
+    if [ "$CURRENT" != "$CURRENT_ALG" ]; then
+        echo -e "${RED}❌ 切换到 $MODE 失败，当前算法: $CURRENT${RESET}"
+        echo ""
+        return
+    fi
 
     RAW=$(speedtest-cli --simple 2>/dev/null)
     if [ -z "$RAW" ]; then
@@ -90,7 +110,7 @@ run_test() {
         RAW=$(curl -s https://raw.githubusercontent.com/sivel/speedtest-cli/master/speedtest.py | python - --simple 2>/dev/null)
     fi
 
-    if [极速器"$RAW" ]; then
+    if [ -z "$RAW" ]; then
         echo -e "${RED}$MODE 测速失败${RESET}" | tee -a "$RESULT_FILE"
         echo ""
         return
@@ -111,55 +131,80 @@ bbr_test_menu() {
     echo -e "${CYAN}=== 开始 BBR 综合测速 ===${RESET}"
     > "$RESULT_FILE"
     
-    # 检查内核是否支持这些算法
-    for ALGO in bbrplus bbr极速器 bbrv3; do
-        if ! grep -q "$ALGO" /proc/sys/net/ipv4/tcp_available_congestion_controls; then
-            echo -e "${YELLOW}⚠️ 当前内核不支持 $ALGO，将跳过测试.${RESET}"
-        fi
-    done
+    # 检查拥塞控制算法文件是否存在
+    if [ ! -f "/proc/sys/net/ipv4/tcp_available_congestion_controls" ]; then
+        echo -e "${YELLOW}⚠️ 无法检测可用拥塞控制算法，将尝试所有模式测试${RESET}"
+        # 如果文件不存在，设置所有算法为可测试状态
+        ALGO_STATUS=("BBR" "BBR Plus" "BBRv2" "BBRv3")
+    else
+        # 检查内核是否支持这些算法
+        ALGO_STATUS=()
+        for ALGO in "bbr" "bbrplus" "bbrv2" "bbrv3"; do
+            if grep -q "$ALGO" /proc/sys/net/ipv4/tcp_available_congestion_controls 2>/dev/null; then
+                case $ALGO in
+                    "bbr") ALGO_STATUS+=("BBR") ;;
+                    "bbrplus") ALGO_STATUS+=("BBR Plus") ;;
+                    "bbrv2") ALGO_STATUS+=("BBRv2") ;;
+                    "bbrv3") ALGO_STATUS+=("BBRv3") ;;
+                esac
+            else
+                echo -e "${YELLOW}⚠️ 当前内核不支持 $ALGO，将跳过测试${RESET}"
+            fi
+        done
+    fi
 
-    for MODE in "BBR" "BBR Plus" "BBRv2" "BBRv3"; do
+    # 如果没有可用的算法，提示用户
+    if [ ${#ALGO_STATUS[@]} -eq 0 ]; then
+        echo -e "${RED}❌ 没有可用的 BBR 算法进行测试${RESET}"
+        read -n1 -p "按任意键返回菜单..."
+        return
+    fi
+
+    # 进行测速
+    for MODE in "${ALGO_STATUS[@]}"; do
         run_test "$MODE"
     done
     
     echo -e "${CYAN}=== 测试完成，结果汇总 (${RESULT_FILE}) ===${RESET}"
-    cat "$RESULT_FILE"
+    if [ -f "$RESULT_FILE" ] && [ -s "$RESULT_FILE" ]; then
+        cat "$RESULT_FILE"
+    else
+        echo -e "${YELLOW}无测速结果${RESET}"
+    fi
     echo ""
     read -n1 -p "按任意键返回菜单..."
 }
 
 # -------------------------------
-# 功能 2: 安装/切换 BBR 内核
+# 其余功能保持不变...
 # -------------------------------
+
+# 功能 2: 安装/切换 BBR 内核
 run_bbr_switch() {
-    echo -e "${CYAN}正在下载并运行 BBR 切换脚本... (来自 ylx2016/Linux-NetSpeed)极速器"
-    wget -O tcp.sh "https://github.com/ylx2016/Linux-N极速器Speed/raw/master/tcp.sh" && chmod +x tcp.sh && ./tcp.sh
+    echo -e "${CYAN}正在下载并运行 BBR 切换脚本... (来自 ylx2016/Linux-NetSpeed)${RESET}"
+    wget -O tcp.sh "https://github.com/ylx2016/Linux-NetSpeed/raw/master/tcp.sh" && chmod +x tcp.sh && ./tcp.sh
     if [ $? -ne 0 ]; then
-        echo -e "${RED}❌❌ 下载或运行脚本失败，请检查网络连接${RESET}"
+        echo -e "${RED}❌ 下载或运行脚本失败，请检查网络连接${RESET}"
     fi
-    read -n极速器-p "按任意键返回菜单..."
+    read -n1 -p "按任意键返回菜单..."
 }
 
-# -------------------------------
 # 功能 3: 系统信息
-# -------------------------------
 show_sys_info() {
     echo -e "${CYAN}=== 系统信息 ===${RESET}"
-    echo -e "${GREEN}操作系统:${RESET} $(cat /etc/os-release | grep PRETTY_NAME | cut -d "=" -f 2 | tr -d '"')"
+    echo -e "${GREEN}操作系统:${RESET} $(cat /etc/os-release | grep PRETTY_NAME | cut -d "=" -f 2 | tr -d '"' 2>/dev/null || echo '未知')"
     echo -e "${GREEN}内核版本:${RESET} $(uname -r)"
-    echo -e "${GREEN}CPU型号: ${RESET} $(grep -m1 'model name' /proc/cpuinfo | awk -F': ' '{print $2}')"
-    echo -e "${GREEN}内存信息:${RESET极速器 $(free -h | grep Mem | awk '{print $2}')"
-    echo -e "${GREEN}Swap信息:${RESET} $(free极速器h | grep Swap | awk '{print $2}')"
-    echo -e "${GREEN}磁盘空间:${RESET} $(df -h / | grep / | awk '{print $2}') (已用: $(df -h / | grep / | awk '{print $5}'))"
-    echo -e "${GREEN}当前IP: ${RESET} $(curl -s ifconfig.me || echo '获取失败')"
-    echo -e "${GREEN}系统运行时间:${RESET} $(uptime | awk '{print $3,$4,$5}')"
+    echo -e "${GREEN}CPU型号: ${RESET} $(grep -m1 'model name' /proc/cpuinfo | awk -F': ' '{print $2}' 2>/dev/null || echo '未知')"
+    echo -e "${GREEN}内存信息:${RESET} $(free -h | grep Mem | awk '{print $2}' 2>/dev/null || echo '未知')"
+    echo -e "${GREEN}Swap信息:${RESET} $(free -h | grep Swap | awk '{print $2}' 2>/dev/null || echo '未知')"
+    echo -e "${GREEN}磁盘空间:${RESET} $(df -h / | grep / | awk '{print $2}' 2>/dev/null || echo '未知') (已用: $(df -h / | grep / | awk '{print $5}' 2>/dev/null || echo '未知'))"
+    echo -e "${GREEN}当前IP: ${RESET} $(curl -s ifconfig.me 2>/dev/null || echo '获取失败')"
+    echo -e "${GREEN}系统运行时间:${RESET} $(uptime | awk '{print $3,$4,$5}' 2>/dev/null || echo '未知')"
     echo ""
     read -n1 -p "按任意键返回菜单..."
 }
 
-# -------------------------------
 # 功能 4: 系统更新
-# -------------------------------
 sys_update() {
     echo -e "${CYAN}=== 系统更新 ===${RESET}"
     echo -e "${GREEN}>>> 正在更新系统...${RESET}"
@@ -170,22 +215,20 @@ sys_update() {
     elif command -v dnf >/dev/null 2>&1; then
         dnf update -y
     else
-        echo -e "${RED}❌❌ 无法识别包管理器，请手动更新系统${RESET}"
+        echo -e "${RED}❌ 无法识别包管理器，请手动更新系统${RESET}"
     fi
     echo -e "${GREEN}系统更新操作完成。${RESET}"
     read -n1 -p "按任意键返回菜单..."
 }
 
-# -------------------------------
 # 功能 5: 系统清理
-# -------------------------------
 sys_cleanup() {
-    echo -e "${极速器=== 系统清理 ===${RESET}"
+    echo -e "${CYAN}=== 系统清理 ===${RESET}"
     echo -e "${GREEN}>>> 正在清理缓存和旧内核...${RESET}"
     if command -v apt >/dev/null 2>&1; then
         apt autoremove -y
         apt clean
-        echo -极速器{GREEN}APT 清理完成${RESET}"
+        echo -e "${GREEN}APT 清理完成${RESET}"
     elif command -v yum >/dev/null 2>&1; then
         yum autoremove -y
         yum clean all
@@ -195,15 +238,13 @@ sys_cleanup() {
         dnf clean all
         echo -e "${GREEN}DNF 清理完成${RESET}"
     else
-        echo -e "${RED}❌❌ 无法识别包管理器，请手动清理${RESET}"
+        echo -e "${RED}❌ 无法识别包管理器，请手动清理${RESET}"
     fi
-    echo -e "${GREEN}系统清理操作完成。极速器"
+    echo -e "${GREEN}系统清理操作完成。${RESET}"
     read -n1 -p "按任意键返回菜单..."
 }
 
-# -------------------------------
 # 功能 6: Docker 管理
-# -------------------------------
 docker_install() {
     echo -e "${CYAN}正在安装 Docker...${RESET}"
     curl -fsSL https://get.docker.com -o get-docker.sh
@@ -214,14 +255,14 @@ docker_install() {
     if command -v docker >/dev/null 2>&1; then
         echo -e "${GREEN}✅ Docker 安装并启动成功！${RESET}"
     else
-        echo -e "${RED}❌❌ Docker 安装失败，请检查日志。${RESET}"
+        echo -e "${RED}❌ Docker 安装失败，请检查日志。${RESET}"
     fi
 }
 
 docker_menu() {
     if ! command -v docker >/dev/null 2>&1; then
         echo -e "${RED}未检测到 Docker！${RESET}"
-        read -p "是否现在安装 Docker? (极速器): " install_docker
+        read -p "是否现在安装 Docker? (y/n): " install_docker
         if [[ "$install_docker" == "y" || "$install_docker" == "Y" ]]; then
             docker_install
         fi
@@ -231,45 +272,44 @@ docker_menu() {
 
     echo -e "${CYAN}=== Docker 容器管理 ===${RESET}"
     echo -e "${YELLOW}当前运行的容器:${RESET}"
-    docker ps --format "table {{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}"
+    docker ps --format "table {{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}" 2>/dev/null || echo -e "${YELLOW}无运行中的容器${RESET}"
     echo ""
     echo "1) 查看所有容器"
     echo "2) 重启所有容器"
-    echo "极速器) 返回主菜单"
+    echo "3) 返回主菜单"
     read -p "请选择操作: " docker_choice
     
     case "$docker_choice" in
-        1) docker ps -a ;;
+        1) docker ps -a 2>/dev/null || echo -e "${YELLOW}Docker 命令执行失败${RESET}" ;;
         2) 
             echo -e "${GREEN}正在重启所有容器...${RESET}"
-            docker restart $(docker ps -a -q)
+            docker restart $(docker ps -a -q) 2>/dev/null && echo -e "${GREEN}容器重启完成${RESET}" || echo -e "${YELLOW}无容器可重启${RESET}"
             ;;
         *) return ;;
     esac
     read -n1 -p "按任意键返回菜单..."
 }
 
-# -------------------------------
 # 功能 7: SSH 配置修改
-# -------------------------------
-ssh_config_menu极速器) {
+ssh_config_menu() {
     SSH_CONFIG="/etc/ssh/sshd_config"
     if [ ! -f "$SSH_CONFIG" ]; then
-        echo -e "${RED}❌❌ 未找到 SSH 配置文件 ($SSH_CONFIG)。${RESET}"
-        read -n1 -极速器按任意键返回菜单..."
+        echo -e "${RED}❌ 未找到 SSH 配置文件 ($SSH_CONFIG)。${RESET}"
+        read -n1 -p "按任意键返回菜单..."
         return
     fi
 
     echo -e "${CYAN}=== SSH 配置修改 ===${RESET}"
     
     # 端口修改
-    read -p "输入新的 SSH 端口 (留空跳过，当前端口: $(grep -E '^Port' $SSH_CONFIG | awk '{print $2}')): " new_port
+    CURRENT_PORT=$(grep -E '^Port' "$SSH_CONFIG" 2>/dev/null | awk '{print $2}' || echo "22")
+    read -p "输入新的 SSH 端口 (留空跳过，当前端口: $CURRENT_PORT): " new_port
     if [ ! -z "$new_port" ]; then
         if [[ "$new_port" =~ ^[0-9]+$ ]] && [ "$new_port" -ge 1 ] && [ "$new_port" -le 65535 ]; then
             sed -i "s/^#\?Port\s\+.*$/Port $new_port/" "$SSH_CONFIG"
             echo -e "${GREEN}✅ SSH 端口已修改为 $new_port${RESET}"
         else
-            echo -e "${RED}❌❌ 端口输入无效。${RESET}"
+            echo -e "${RED}❌ 端口输入无效。${RESET}"
         fi
     fi
 
@@ -281,12 +321,12 @@ ssh_config_menu极速器) {
         if [ $? -eq 0 ]; then
             echo -e "${GREEN}✅ root 密码修改成功${RESET}"
         else
-            echo -e "${RED}�极速器 root 密码修改失败${RES极速器"
+            echo -e "${RED}❌ root 密码修改失败${RESET}"
         fi
     fi
 
     echo -e "${GREEN}>>> 正在重启 SSH 服务以应用更改...${RESET}"
-    if command -v systemctl >/dev/null 2>&极速器 then
+    if command -v systemctl >/dev/null 2>&1; then
         systemctl restart sshd
     else
         /etc/init.d/sshd restart
@@ -295,9 +335,7 @@ ssh_config_menu极速器) {
     read -n1 -p "按任意键返回菜单..."
 }
 
-# -------------------------------
 # 功能 8: 卸载脚本
-# -------------------------------
 uninstall_script() {
     read -p "确定要卸载本脚本并清理相关文件吗 (y/n)? ${RED}此操作不可逆!${RESET}: " confirm_uninstall
     if [[ "$confirm_uninstall" == "y" || "$confirm_uninstall" == "Y" ]]; then
@@ -309,13 +347,13 @@ uninstall_script() {
         
         echo -e "${GREEN}✅ 脚本卸载完成。${RESET}"
         echo -e "${YELLOW}为了完全清理，您可能需要手动删除下载的其他依赖包:${RESET}"
-        echo -e "${CYAN}可以运行以下命令清理依赖极速器"
+        echo -e "${CYAN}可以运行以下命令清理依赖包:${RESET}"
         echo ""
         echo "Debian/Ubuntu:"
         echo "  apt remove --purge curl wget git speedtest-cli net-tools"
         echo "  apt autoremove -y"
         echo ""
-        echo "CentOS/RHE极速器"
+        echo "CentOS/RHEL:"
         echo "  yum remove curl wget git speedtest-cli net-tools"
         echo ""
         echo "Fedora:"
@@ -327,14 +365,14 @@ uninstall_script() {
         if [[ "$auto_clean" == "y" || "$auto_clean" == "Y" ]]; then
             echo -e "${CYAN}>>> 正在尝试自动清理依赖包...${RESET}"
             if command -v apt >/dev/null 2>&1; then
-                apt remove --purge -y curl wget git speedtest-cli net-tools极速器
+                apt remove --purge -y curl wget git speedtest-cli net-tools
                 apt autoremove -y
             elif command -v yum >/dev/null 2>&1; then
                 yum remove -y curl wget git speedtest-cli net-tools
             elif command -v dnf >/dev/null 2>&1; then
                 dnf remove -y curl wget git speedtest-cli net-tools
             else
-                echo -e "${RED}❌❌ 无法识别包管理器，请手动清理${RESET}"
+                echo -e "${RED}❌ 无法识别包管理器，请手动清理${RESET}"
             fi
             echo -e "${GREEN}✅ 依赖包清理完成${RESET}"
         fi
@@ -356,11 +394,11 @@ show_menu() {
         echo -e "${GREEN}--- BBR 测速与切换 ---${RESET}"
         echo "1) BBR 综合测速 (BBR/BBR Plus/BBRv2/BBRv3 对比)"
         echo "2) 安装/切换 BBR 内核"
-        echo -e "${GREEN}--- VPS 系统管理 ---极速器"
+        echo -e "${GREEN}--- VPS 系统管理 ---${RESET}"
         echo "3) 查看系统信息 (OS/CPU/内存/IP)"
-       极速器"4) 系统更新"
+        echo "4) 系统更新"
         echo "5) 系统清理"
-        echo "极速器) Docker 容器管理"
+        echo "6) Docker 容器管理"
         echo "7) SSH 端口与密码修改"
         echo -e "${GREEN}--- 其他 ---${RESET}"
         echo "8) 卸载脚本及残留文件"
