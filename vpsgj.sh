@@ -67,45 +67,46 @@ check_deps() {
 }
 
 # -------------------------------
-# 核心功能：BBR 测速 (已合并 bbr_speedtest.sh 的 modprobe 逻辑)
+# 核心功能：BBR 测速 (最终合并逻辑)
 # -------------------------------
 run_test() {
     MODE=$1
     echo -e "${CYAN}>>> 切换到 $MODE 并测速...${RESET}"
 
-    # 尝试加载内核模块并切换拥塞控制算法 (来自 bbr_speedtest.sh 的增强逻辑)
+    # 尝试加载内核模块并切换拥塞控制算法 (严格按照 bbr_speedtest.sh 的顺序: modprobe -> fq -> cc)
     case $MODE in
         "BBR") 
-            modprobe tcp_bbr >/dev/null 2>&1 # 尝试加载模块
+            modprobe tcp_bbr >/dev/null 2>&1
+            sysctl -w net.core.default_qdisc=fq >/dev/null 2>&1
             sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
             CURRENT_ALG="bbr"
             ;;
         "BBR Plus") 
-            modprobe tcp_bbrplus >/dev/null 2>&1 # 尝试加载模块
+            modprobe tcp_bbrplus >/dev/null 2>&1
+            sysctl -w net.core.default_qdisc=fq >/dev/null 2>&1
             sysctl -w net.ipv4.tcp_congestion_control=bbrplus >/dev/null 2>&1
             CURRENT_ALG="bbrplus"
             ;;
         "BBRv2") 
-            modprobe tcp_bbrv2 >/dev/null 2>&1 # 尝试加载模块
+            modprobe tcp_bbrv2 >/dev/null 2>&1
+            sysctl -w net.core.default_qdisc=fq >/dev/null 2>&1
             sysctl -w net.ipv4.tcp_congestion_control=bbrv2 >/dev/null 2>&1
             CURRENT_ALG="bbrv2"
             ;;
         "BBRv3") 
-            modprobe tcp_bbrv3 >/dev/null 2>&1 # 尝试加载模块
+            modprobe tcp_bbrv3 >/dev/null 2>&1
+            sysctl -w net.core.default_qdisc=fq >/dev/null 2>&1
             sysctl -w net.ipv4.tcp_congestion_control=bbrv3 >/dev/null 2>&1
             CURRENT_ALG="bbrv3"
             ;;
     esac
     
-    # 强制设置队列
-    sysctl -w net.core.default_qdisc=fq >/dev/null 2>&1
-
-    # 检查是否切换成功 (保留 vpsgj.sh 的检查逻辑)
+    # 检查是否切换成功 (保留 vpsgj.sh 的关键检查逻辑)
     CURRENT=$(sysctl -n net.ipv4.tcp_congestion_control 2>/dev/null || echo "unknown")
     if [ "$CURRENT" != "$CURRENT_ALG" ]; then
         echo -e "${RED}❌ 切换到 $MODE 失败，当前算法: $CURRENT${RESET}"
         
-        # 增加提示 (来自 image_4171ce.jpg 的改进)
+        # 增加提示
         if [[ "$CURRENT_ALG" == "bbrv2" || "$CURRENT_ALG" == "bbrv3" ]]; then
             echo -e "${YELLOW}提示: 切换 $MODE 失败通常是由于当前内核不支持。请尝试选项 2 安装新内核。${RESET}"
         fi
