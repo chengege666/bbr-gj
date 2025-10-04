@@ -158,45 +158,51 @@ show_sys_info() {
 }
 
 # -------------------------------
-# 功能 4: 系统更新与清理
+# 功能 4: 系统更新
 # -------------------------------
-sys_update_cleanup() {
-    echo -e "${CYAN}=== 系统更新与清理 ===${RESET}"
-    read -p "是否执行系统更新 (Update & Upgrade)? (y/n): " do_update
-    if [[ "$do_update" == "y" || "$do_update" == "Y" ]]; then
-        echo -e "${GREEN}>>> 正在更新系统...${RESET}"
-        if command -v apt >/dev/null 2>&1; then
-            apt update -y && apt upgrade -y
-            apt autoremove -y
-        elif command -v yum >/dev/null 2>&1; then
-            yum update -y
-        elif command -v dnf >/dev/null 2>&1; then
-            dnf update -y
-        else
-            echo -e "${RED}❌ 无法识别包管理器，请手动更新系统${RESET}"
-        fi
+sys_update() {
+    echo -e "${CYAN}=== 系统更新 ===${RESET}"
+    echo -e "${GREEN}>>> 正在更新系统...${RESET}"
+    if command -v apt >/dev/null 2>&1; 键，然后
+        apt update -y && apt upgrade -y
+    elif command -v yum >/dev/null 2>&1; 键，然后
+        yum update -y
+    elif command -v dnf >/dev/null 2>&1; 键，然后
+        dnf update -y
+    else
+        echo -e "${RED}❌ 无法识别包管理器，请手动更新系统${RESET}"
     fi
-    
-    read -p "是否清理旧的内核和软件包缓存 (Cleanup)? (y/n): " do_cleanup
-    if [[ "$do_cleanup" == "y" || "$do_cleanup" == "Y" ]]; then
-        echo -e "${GREEN}>>> 正在清理缓存...${RESET}"
-        if command -v apt >/dev/null 2>&1; then
-            apt clean
-            echo -e "${GREEN}APT 清理完成${RESET}"
-        elif command -v yum >/dev/null 2>&1; then
-            yum clean all
-            echo -e "${GREEN}YUM 清理完成${RESET}"
-        elif command -v dnf >/dev/null 2>&1; then
-            dnf clean all
-            echo -e "${GREEN}DNF 清理完成${RESET}"
-        fi
-    fi
-    echo -e "${GREEN}系统更新和清理操作完成。${RESET}"
+    echo -e "${GREEN}系统更新操作完成。${RESET}"
     read -n1 -p "按任意键返回菜单..."
 }
 
 # -------------------------------
-# 功能 5: Docker 管理
+# 功能 5: 系统清理
+# -------------------------------
+sys_cleanup() {
+    echo -e "${CYAN}=== 系统清理 ===${RESET}"
+    echo -e "${GREEN}>>> 正在清理缓存和旧内核...${RESET}"
+    if command -v apt >/dev/null 2>&1; then
+        apt autoremove -y
+        apt clean
+        echo -e "${GREEN}APT 清理完成${RESET}"
+    elif command -v yum >/dev/null 2>&1; then
+        yum autoremove -y
+        yum clean all
+        echo -e "${GREEN}YUM 清理完成${RESET}"
+    elif command -v dnf >/dev/null 2>&1; then
+        dnf autoremove -y
+        dnf clean all
+        echo -e "${GREEN}DNF 清理完成${RESET}"
+    else
+        echo -e "${RED}❌ 无法识别包管理器，请手动清理${RESET}"
+    fi
+    echo -e "${GREEN}系统清理操作完成。${RESET}"
+    read -n1 -p "按任意键返回菜单..."
+}
+
+# -------------------------------
+# 功能 6: Docker 管理
 # -------------------------------
 docker_install() {
     echo -e "${CYAN}正在安装 Docker...${RESET}"
@@ -244,7 +250,7 @@ docker_menu() {
 }
 
 # -------------------------------
-# 功能 6: SSH 配置修改
+# 功能 7: SSH 配置修改
 # -------------------------------
 ssh_config_menu() {
     SSH_CONFIG="/etc/ssh/sshd_config"
@@ -290,7 +296,7 @@ ssh_config_menu() {
 }
 
 # -------------------------------
-# 功能 7: 卸载脚本
+# 功能 8: 卸载脚本
 # -------------------------------
 uninstall_script() {
     read -p "确定要卸载本脚本并清理相关文件吗 (y/n)? ${RED}此操作不可逆!${RESET}: " confirm_uninstall
@@ -302,7 +308,40 @@ uninstall_script() {
         echo "Script uninstalled on $(date)" > "$UNINSTALL_NOTE"
         
         echo -e "${GREEN}✅ 脚本卸载完成。${RESET}"
-        echo "为了完全清理，您可能需要手动删除您下载的其他依赖包（如 speedtest-cli）。"
+        echo -e "${YELLOW}为了完全清理，您可能需要手动删除下载的其他依赖包:${RESET}"
+        echo -e "${CYAN}可以运行以下命令清理依赖包:${RESET}"
+        echo ""
+        echo "Debian/Ubuntu:"
+        echo "  apt remove --purge curl wget git speedtest-cli net-tools"
+        echo "  apt autoremove -y"
+        echo ""
+        echo "CentOS/RHEL:"
+        echo "  yum remove curl wget git speedtest-cli net-tools"
+        echo ""
+        echo "Fedora:"
+        echo "  dnf remove curl wget git speedtest-cli net-tools"
+        echo ""
+        echo -e "${YELLOW}或者您希望自动执行清理命令吗？${RESET}"
+        read -p "自动清理依赖包? (y/n): " auto_clean
+        
+        if [[ "$auto_clean" == "y" || "$auto_clean" == "Y" ]]; then
+            echo -e "${CYAN}>>> 正在尝试自动清理依赖包...${RESET}"
+            if command -v apt >/dev/null 2>&1; then
+                apt remove --purge -y curl wget git speedtest-cli net-tools
+                apt autoremove -y
+            elif command -v yum >/dev/null 2>&1; then
+                yum remove -y curl wget git speedtest-cli net-tools
+            elif command -v dnf >/dev/null 2>&1; then
+                dnf remove -y curl wget git speedtest-cli net-tools
+            else
+                echo -e "${RED}❌ 无法识别包管理器，请手动清理${RESET}"
+            fi
+            echo -e "${GREEN}✅ 依赖包清理完成${RESET}"
+        fi
+        
+        echo -e "${CYAN}==================================================${RESET}"
+        echo -e "${GREEN}卸载完成！感谢使用 VPS 工具箱${RESET}"
+        echo -e "${CYAN}==================================================${RESET}"
         exit 0
     fi
 }
@@ -316,15 +355,16 @@ show_menu() {
         echo -e "请选择操作："
         echo -e "${GREEN}--- BBR 测速与切换 ---${RESET}"
         echo "1) BBR 综合测速 (BBR/BBR Plus/BBRv2/BBRv3 对比)"
-        echo "2) 安装/切换 BBR 内核 (运行外部脚本)"
+        echo "2) 安装/切换 BBR 内核"
         echo -e "${GREEN}--- VPS 系统管理 ---${RESET}"
         echo "3) 查看系统信息 (OS/CPU/内存/IP)"
-        echo "4) 系统更新与清理"
-        echo "5) Docker 容器管理"
-        echo "6) SSH 端口与密码修改"
+        echo "4) 系统更新"
+        echo "5) 系统清理"
+        echo "6) Docker 容器管理"
+        echo "7) SSH 端口与密码修改"
         echo -e "${GREEN}--- 其他 ---${RESET}"
-        echo "7) 卸载脚本及残留文件"
-        echo "8) 退出"
+        echo "8) 卸载脚本及残留文件"
+        echo "9) 退出"
         echo ""
         read -p "输入数字选择: " choice
         
@@ -332,12 +372,13 @@ show_menu() {
             1) bbr_test_menu ;;
             2) run_bbr_switch ;;
             3) show_sys_info ;;
-            4) sys_update_cleanup ;;
-            5) docker_menu ;;
-            6) ssh_config_menu ;;
-            7) uninstall_script ;;
-            8) echo -e "${CYAN}感谢使用，再见！${RESET}"; exit 0 ;;
-            *) echo -e "${RED}无效选项，请输入 1-8${RESET}"; sleep 2 ;;
+            4) sys_update ;;
+            5) sys_cleanup ;;
+            6) docker_menu ;;
+            7) ssh_config_menu ;;
+            8) uninstall_script ;;
+            9) echo -e "${CYAN}感谢使用，再见！${RESET}"; exit 0 ;;
+            *) echo -e "${RED}无效选项，请输入 1-9${RESET}"; sleep 2 ;;
         esac
     done
 }
