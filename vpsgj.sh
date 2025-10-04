@@ -67,7 +67,7 @@ check_deps() {
 }
 
 # -------------------------------
-# 核心功能：BBR 测速 (直接替换为 bbr_speedtest.sh 的逻辑，不进行成功检查)
+# 核心功能：BBR 测速 (完整替换为 bbr_speedtest.sh 的逻辑，不带切换检查)
 # -------------------------------
 run_test() {
     MODE=$1
@@ -119,7 +119,7 @@ run_test() {
 }
 
 # -------------------------------
-# 功能 1: BBR 综合测速 (直接替换为 bbr_speedtest.sh 的循环逻辑)
+# 功能 1: BBR 综合测速 (完整替换为 bbr_speedtest.sh 的循环逻辑)
 # -------------------------------
 bbr_test_menu() {
     echo -e "${CYAN}=== 开始 BBR 综合测速 ===${RESET}"
@@ -382,7 +382,7 @@ show_menu() {
             8) uninstall_script ;;
             9) echo -e "${CYAN}感谢使用，再见！${RESET}"; exit 0 ;;
             *) echo -e "${RED}无效选项，请输入 1-9${RESET}"; sleep 2 ;;
-        end
+        esac  # 修正了 'end' 为 'esac'
     done
 }
 
