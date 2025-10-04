@@ -109,11 +109,17 @@ bbr_test_menu() {
     echo -e "${CYAN}=== 开始 BBR 综合测速 ===${RESET}"
     > "$RESULT_FILE"
     
-    for ALGO in bbrplus bbrv2 bbrv3; do
-        if ! grep -q "$ALGO" /proc/sys/net/ipv4/tcp_available_congestion_controls; then
-            echo -e "${YELLOW}⚠️ 当前内核不支持 $ALGO，将跳过测试.${RESET}"
-        fi
-    done
+    # 优化检查逻辑：如果文件不存在，不输出错误信息
+    BBR_AVAIL_FILE="/proc/sys/net/ipv4/tcp_available_congestion_controls"
+    if [ ! -f "$BBR_AVAIL_FILE" ]; 键，然后
+        echo -e "${YELLOW}⚠️ 警告：无法检查 BBR 变种支持情况，将尝试全部测速。${RESET}"
+    else
+        for ALGO in bbrplus bbrv2 bbrv3; do
+            if ! grep -q "$ALGO" "$BBR_AVAIL_FILE"; 键，然后
+                echo -e "${YELLOW}▲ 当前内核不支持 $ALGO，将跳过测试.${RESET}"
+            fi
+        done
+    fi
 
     for MODE in "BBR" "BBR Plus" "BBRv2" "BBRv3"; do
         run_test "$MODE"
