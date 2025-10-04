@@ -1,8 +1,10 @@
 #!/bin/bash
-# 自动切换 BBR 算法并测速对比（兼容 speedtest-cli）
-# 并在菜单中增加系统信息、系统更新、系统清理和Docker管理功能。
+# 文件名: vpsgj.sh
+# 自动切换 BBR 算法并测速对比，并集成系统管理和Docker功能。
+# 增加本地下载 BBR 切换脚本和卸载功能。
 
 RESULT_FILE="bbr_result.txt"
+SCRIPT_NAME="vpsgj.sh" # 脚本名称
 
 # -------------------------------
 # 颜色定义
@@ -15,7 +17,7 @@ CYAN="\033[1;36m"
 RESET="\033[0m"
 
 # -------------------------------
-# 欢迎窗口 (已更新菜单项)
+# 欢迎窗口 (已更新菜单项和脚本名)
 # -------------------------------
 print_welcome() {
     clear
@@ -34,7 +36,7 @@ print_welcome() {
 check_root() {
     if [ "$(id -u)" -ne 0 ]; then
         echo -e "${RED}❌ 错误：请使用 root 权限运行本脚本${RESET}"
-        echo "👉 使用方法: sudo bash $0"
+        echo "👉 使用方法: sudo bash $SCRIPT_NAME"
         exit 1
     fi
 }
@@ -70,13 +72,13 @@ check_deps() {
 }
 
 # -------------------------------
-# 测速函数（保留所有BBR变种）
+# 测速函数（保持不变）
 # -------------------------------
 run_test() {
     MODE=$1
     echo -e "${CYAN}>>> 切换到 $MODE 并测速...${RESET}"
 
-    # ... (BBR 切换逻辑保持不变) ...
+    # BBR 切换逻辑
     case $MODE in
         "BBR")
             modprobe tcp_bbr 2>/dev/null
@@ -100,7 +102,7 @@ run_test() {
             ;;
     esac
 
-    # 添加备用测速方法提高成功率
+    # 测速逻辑
     RAW=$(speedtest-cli --simple 2>/dev/null)
     if [ -z "$RAW" ]; then
         echo -e "${YELLOW}⚠️ speedtest-cli 失败，尝试使用替代方法...${RESET}"
@@ -122,22 +124,36 @@ run_test() {
 }
 
 # -------------------------------
-# 运行外部BBR切换脚本
+# 运行外部BBR切换脚本 (修改为先下载)
 # -------------------------------
-run_bbr_switch() {
-    echo -e "${GREEN}正在下载并运行 BBR 切换脚本...${RESET}"
-    wget -O tcp.sh "https://github.com/ylx2016/Linux-NetSpeed/raw/master/tcp.sh" && chmod +x tcp.sh && ./tcp.sh
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}❌ 下载或运行脚本失败，请检查网络连接${RESET}"
+download_bbr_switch() {
+    clear
+    echo -e "${CYAN}==================================================${RESET}"
+    echo -e "${MAGENTA}              BBR 内核切换脚本下载                ${RESET}"
+    echo -e "${CYAN}==================================================${RESET}"
+    
+    BBR_SCRIPT="tcp.sh"
+    BBR_URL="https://github.com/ylx2016/Linux-NetSpeed/raw/master/tcp.sh"
+
+    echo -e "${GREEN}>>> 正在下载 BBR 切换脚本到本地: ${BBR_SCRIPT}${RESET}"
+    wget -O "$BBR_SCRIPT" "$BBR_URL"
+    
+    if [ $? -eq 0 ]; then
+        chmod +x "$BBR_SCRIPT"
+        echo -e "${GREEN}✅ BBR 切换脚本 ($BBR_SCRIPT) 已成功下载到当前目录。${RESET}"
+        echo -e "${YELLOW}👉 请手动运行以下命令来安装或切换内核：${RESET}"
+        echo -e "${YELLOW}   bash ${BBR_SCRIPT}${RESET}"
+        echo -e "${YELLOW}   脚本执行完毕后可能需要重启服务器。${RESET}"
+    else
+        echo -e "${RED}❌ 下载脚本失败，请检查网络连接或 $BBR_URL 是否可用。${RESET}"
     fi
+
     read -n1 -p "按任意键返回菜单..."
 }
 
 # -------------------------------
-# 新增功能区
+# 系统信息函数（保持不变）
 # -------------------------------
-
-## 查看系统信息
 show_system_info() {
     clear
     echo -e "${CYAN}==================================================${RESET}"
@@ -164,7 +180,9 @@ show_system_info() {
     read -n1 -p "按任意键返回菜单..."
 }
 
-## 系统更新
+# -------------------------------
+# 系统更新函数（保持不变）
+# -------------------------------
 run_system_update() {
     clear
     echo -e "${CYAN}==================================================${RESET}"
@@ -185,7 +203,9 @@ run_system_update() {
     read -n1 -p "按任意键返回菜单..."
 }
 
-## 系统清理
+# -------------------------------
+# 系统清理函数（保持不变）
+# -------------------------------
 run_system_clean() {
     clear
     echo -e "${CYAN}==================================================${RESET}"
@@ -195,7 +215,7 @@ run_system_clean() {
     if [ -f /etc/debian_version ]; then
         echo -e "${GREEN}>>> 正在清理 APT 缓存和不再需要的软件包...${RESET}"
         apt autoremove -y && apt clean
-    elif [ -f /etc/redhat-release ]; then
+    elif [ -f /etc/redhat-release ]; 键，然后
         echo -e "${GREEN}>>> 正在清理 YUM/DNF 缓存...${RESET}"
         yum clean all || dnf clean all
     else
@@ -206,7 +226,9 @@ run_system_clean() {
     read -n1 -p "按任意键返回菜单..."
 }
 
-## Docker 管理菜单
+# -------------------------------
+# Docker 管理/安装函数（保持不变）
+# -------------------------------
 docker_menu() {
     clear
     echo -e "${CYAN}==================================================${RESET}"
@@ -238,7 +260,7 @@ docker_menu() {
         echo "3) 清理 Docker 悬空数据 (docker system prune)"
         echo "4) 返回主菜单"
         read -p "输入数字选择: " docker_choice
-        case "$docker_choice" in
+        case "$docker_choice" 在
             1)
                 echo -e "${YELLOW}运行中的容器:${RESET}"
                 docker ps
@@ -270,14 +292,12 @@ docker_menu() {
     fi
 }
 
-## 安装 Docker
 install_docker() {
     clear
     echo -e "${CYAN}==================================================${RESET}"
     echo -e "${MAGENTA}                 正在安装 Docker                  ${RESET}"
     echo -e "${CYAN}==================================================${RESET}"
     
-    # 使用官方推荐脚本安装 Docker Engine
     if curl -fsSL https://get.docker.com -o get-docker.sh; then
         sh get-docker.sh
         if [ $? -eq 0 ]; then
@@ -292,14 +312,36 @@ install_docker() {
         echo -e "${RED}❌ 无法下载 Docker 安装脚本。请检查网络。${RESET}"
     fi
 
-    rm -f get-docker.sh # 清理脚本
+    rm -f get-docker.sh
     read -n1 -p "按任意键返回 Docker 管理菜单..."
     docker_menu
 }
 
+# -------------------------------
+# 卸载脚本功能 (新增)
+# -------------------------------
+uninstall_script() {
+    clear
+    echo -e "${CYAN}==================================================${RESET}"
+    echo -e "${MAGENTA}               卸载 ${SCRIPT_NAME} 脚本             ${RESET}"
+    echo -e "${CYAN}==================================================${RESET}"
+    
+    read -r -p "⚠️ 警告：这将删除当前目录下的 ${SCRIPT_NAME} 和 ${RESULT_FILE} 文件。是否继续? (y/N) " confirm
+    
+    if [[ "$confirm" =~ ^[Yy]$ ]]; then
+        rm -f "$SCRIPT_NAME" "$RESULT_FILE"
+        echo -e "${GREEN}✅ ${SCRIPT_NAME} 和 ${RESULT_FILE} 已成功删除。${RESET}"
+        echo -e "${YELLOW}您可能需要手动删除 BBR 切换脚本 (tcp.sh) 或 Docker 安装脚本 (get-docker.sh)（如果存在）。${RESET}"
+        echo "退出脚本..."
+        exit 0
+    else
+        echo -e "${YELLOW}操作取消，返回主菜单。${RESET}"
+        sleep 2
+    fi
+}
 
 # -------------------------------
-# 交互菜单 (已更新)
+# 交互菜单 (已更新编号和选项 2)
 # -------------------------------
 show_menu() {
     while true; do
@@ -307,14 +349,15 @@ show_menu() {
         echo "请选择操作："
         echo "--- BBR 测速/切换 ---"
         echo "1) 执行 BBR 测速"
-        echo "2) 安装/切换 BBR 内核"
+        echo "2) 安装/切换 BBR 内核 (下载外部脚本)" # 已移除括号
         echo "--- 系统管理 ---"
         echo "3) 查看系统信息"
-        echo "4) 系统更新"
-        echo "5) 系统清理"
+        echo "4) 系统更新 (Update & Upgrade)"
+        echo "5) 系统清理 (Cache & Autoremove)"
         echo "6) Docker 管理/安装"
         echo "--- 退出 ---"
         echo "7) 退出脚本"
+        echo "8) 卸载此脚本" # 新增卸载功能
         
         read -p "输入数字选择: " choice
         
@@ -331,7 +374,7 @@ show_menu() {
                 echo ""
                 ;;
             2)
-                run_bbr_switch
+                download_bbr_switch # 修改为下载脚本
                 ;;
             3)
                 show_system_info
@@ -349,8 +392,11 @@ show_menu() {
                 echo "退出脚本"
                 exit 0
                 ;;
+            8)
+                uninstall_script # 调用卸载功能
+                ;;
             *)
-                echo -e "${RED}无效选项，请输入 1-7${RESET}"
+                echo -e "${RED}无效选项，请输入 1-8${RESET}"
                 sleep 2
                 ;;
         esac
