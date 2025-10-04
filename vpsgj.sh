@@ -73,25 +73,25 @@ run_test() {
     MODE=$1
     echo -e "${CYAN}>>> 切换到 $MODE 并测速...${RESET}"
 
-    # 尝试加载内核模块并切换拥塞控制算法
+    # 尝试加载内核模块并切换拥塞控制算法 (NEW: added modprobe from bbr_speedtest.sh)
     case $MODE in
         "BBR") 
-            modprobe tcp_bbr >/dev/null 2>&1
+            modprobe tcp_bbr >/dev/null 2>&1 # 尝试加载模块
             sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
             CURRENT_ALG="bbr"
             ;;
         "BBR Plus") 
-            modprobe tcp_bbrplus >/dev/null 2>&1
+            modprobe tcp_bbrplus >/dev/null 2>&1 # 尝试加载模块
             sysctl -w net.ipv4.tcp_congestion_control=bbrplus >/dev/null 2>&1
             CURRENT_ALG="bbrplus"
             ;;
         "BBRv2") 
-            modprobe tcp_bbrv2 >/dev/null 2>&1
+            modprobe tcp_bbrv2 >/dev/null 2>&1 # 尝试加载模块
             sysctl -w net.ipv4.tcp_congestion_control=bbrv2 >/dev/null 2>&1
             CURRENT_ALG="bbrv2"
             ;;
         "BBRv3") 
-            modprobe tcp_bbrv3 >/dev/null 2>&1
+            modprobe tcp_bbrv3 >/dev/null 2>&1 # 尝试加载模块
             sysctl -w net.ipv4.tcp_congestion_control=bbrv3 >/dev/null 2>&1
             CURRENT_ALG="bbrv3"
             ;;
@@ -100,12 +100,12 @@ run_test() {
     # 强制设置队列
     sysctl -w net.core.default_qdisc=fq >/dev/null 2>&1
 
-    # 检查是否切换成功
+    # 检查是否切换成功 (保留 vpsgj.sh 的检查逻辑)
     CURRENT=$(sysctl -n net.ipv4.tcp_congestion_control 2>/dev/null || echo "unknown")
     if [ "$CURRENT" != "$CURRENT_ALG" ]; then
         echo -e "${RED}❌ 切换到 $MODE 失败，当前算法: $CURRENT${RESET}"
         
-        # 增加提示
+        # 增加提示 (根据您的截图，这是最关键的一步)
         if [[ "$MODE" == "BBRv2" || "$MODE" == "BBRv3" ]]; then
             echo -e "${YELLOW}提示: 切换 $MODE 失败通常是由于当前内核不支持。请尝试选项 2 安装新内核。${RESET}"
         fi
@@ -395,7 +395,7 @@ uninstall_script() {
 }
 
 # -------------------------------
-# 交互菜单 (保持不变)
+# 交互菜单
 # -------------------------------
 show_menu() {
     while true; do
@@ -432,7 +432,7 @@ show_menu() {
 }
 
 # -------------------------------
-# 主程序 (保持不变)
+# 主程序
 # -------------------------------
 check_root
 check_deps
