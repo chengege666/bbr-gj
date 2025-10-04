@@ -19,7 +19,7 @@ RESET="\033[0m"
 print_welcome() {
     clear
     echo -e "${CYAN}==================================================${RESET}"
-    echo -e "${MAGENTA}                 VPS 工具箱 v2.1                ${RESET}"
+    echo -e "${MAGENTA}                 VPS 工具箱 v2.0                 ${RESET}"
     echo -e "${CYAN}--------------------------------------------------${RESET}"
     echo -e "${YELLOW}功能: BBR测速, 系统管理, Docker, SSH配置等${RESET}"
     echo -e "${GREEN}测速结果保存: ${RESULT_FILE}${RESET}"
@@ -67,62 +67,45 @@ check_deps() {
 }
 
 # -------------------------------
-# 核心功能：BBR 测速 (最终合并逻辑)
+# 核心功能：BBR 测速 (直接替换为 bbr_speedtest.sh 的逻辑，不进行成功检查)
 # -------------------------------
 run_test() {
     MODE=$1
-    echo -e "${CYAN}>>> 切换到 $MODE 并测速...${RESET}"
-
-    # 尝试加载内核模块并切换拥塞控制算法 (严格按照 bbr_speedtest.sh 的顺序: modprobe -> fq -> cc)
+    echo -e "${CYAN}>>> 切换到 $MODE 并测速...${RESET}" 
+    
+    # 切换算法 (来自 bbr_speedtest.sh)
     case $MODE in
         "BBR") 
             modprobe tcp_bbr >/dev/null 2>&1
             sysctl -w net.core.default_qdisc=fq >/dev/null 2>&1
             sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
-            CURRENT_ALG="bbr"
             ;;
         "BBR Plus") 
             modprobe tcp_bbrplus >/dev/null 2>&1
             sysctl -w net.core.default_qdisc=fq >/dev/null 2>&1
             sysctl -w net.ipv4.tcp_congestion_control=bbrplus >/dev/null 2>&1
-            CURRENT_ALG="bbrplus"
             ;;
         "BBRv2") 
             modprobe tcp_bbrv2 >/dev/null 2>&1
             sysctl -w net.core.default_qdisc=fq >/dev/null 2>&1
             sysctl -w net.ipv4.tcp_congestion_control=bbrv2 >/dev/null 2>&1
-            CURRENT_ALG="bbrv2"
             ;;
         "BBRv3") 
             modprobe tcp_bbrv3 >/dev/null 2>&1
             sysctl -w net.core.default_qdisc=fq >/dev/null 2>&1
             sysctl -w net.ipv4.tcp_congestion_control=bbrv3 >/dev/null 2>&1
-            CURRENT_ALG="bbrv3"
             ;;
     esac
     
-    # 检查是否切换成功 (保留 vpsgj.sh 的关键检查逻辑)
-    CURRENT=$(sysctl -n net.ipv4.tcp_congestion_control 2>/dev/null || echo "unknown")
-    if [ "$CURRENT" != "$CURRENT_ALG" ]; then
-        echo -e "${RED}❌ 切换到 $MODE 失败，当前算法: $CURRENT${RESET}"
-        
-        # 增加提示
-        if [[ "$CURRENT_ALG" == "bbrv2" || "$CURRENT_ALG" == "bbrv3" ]]; then
-            echo -e "${YELLOW}提示: 切换 $MODE 失败通常是由于当前内核不支持。请尝试选项 2 安装新内核。${RESET}"
-        fi
-        
-        echo ""
-        return
-    fi
-
+    # 执行测速 (来自 bbr_speedtest.sh)
     RAW=$(speedtest-cli --simple 2>/dev/null)
     if [ -z "$RAW" ]; then
-        echo -e "${YELLOW}⚠️ speedtest-cli 失败，尝试替代方法...${RESET}"
+        echo -e "${YELLOW}⚠️ speedtest-cli 失败，尝试替代方法...${RESET}" 
         RAW=$(curl -s https://raw.githubusercontent.com/sivel/speedtest-cli/master/speedtest.py | python - --simple 2>/dev/null)
     fi
 
     if [ -z "$RAW" ]; then
-        echo -e "${RED}$MODE 测速失败${RESET}" | tee -a "$RESULT_FILE"
+        echo -e "${RED}$MODE 测速失败${RESET}" | tee -a "$RESULT_FILE" 
         echo ""
         return
     fi
@@ -131,48 +114,19 @@ run_test() {
     DOWNLOAD=$(echo "$RAW" | grep "Download" | awk '{print $2}')
     UPLOAD=$(echo "$RAW" | grep "Upload" | awk '{print $2}')
 
-    echo -e "${GREEN}$MODE | Ping: ${PING}ms | Down: ${DOWNLOAD} Mbps | Up: ${UPLOAD} Mbps${RESET}" | tee -a "$RESULT_FILE"
+    echo -e "${GREEN}$MODE | Ping: ${PING}ms | Down: ${DOWNLOAD} Mbps | Up: ${UPLOAD} Mbps${RESET}" | tee -a "$RESULT_FILE" 
     echo ""
 }
 
 # -------------------------------
-# 功能 1: BBR 综合测速 (保持不变)
+# 功能 1: BBR 综合测速 (直接替换为 bbr_speedtest.sh 的循环逻辑)
 # -------------------------------
 bbr_test_menu() {
     echo -e "${CYAN}=== 开始 BBR 综合测速 ===${RESET}"
     > "$RESULT_FILE"
     
-    # 检查拥塞控制算法文件是否存在
-    if [ ! -f "/proc/sys/net/ipv4/tcp_available_congestion_controls" ]; then
-        echo -e "${YELLOW}⚠️ 无法检测可用拥塞控制算法，将尝试所有模式测试${RESET}"
-        # 如果文件不存在，设置所有算法为可测试状态
-        ALGO_STATUS=("BBR" "BBR Plus" "BBRv2" "BBRv3")
-    else
-        # 检查内核是否支持这些算法
-        ALGO_STATUS=()
-        for ALGO in "bbr" "bbrplus" "bbrv2" "bbrv3"; do
-            if grep -q "$ALGO" /proc/sys/net/ipv4/tcp_available_congestion_controls 2>/dev/null; then
-                case $ALGO in
-                    "bbr") ALGO_STATUS+=("BBR") ;;
-                    "bbrplus") ALGO_STATUS+=("BBR Plus") ;;
-                    "bbrv2") ALGO_STATUS+=("BBRv2") ;;
-                    "bbrv3") ALGO_STATUS+=("BBRv3") ;;
-                esac
-            else
-                echo -e "${YELLOW}⚠️ 当前内核不支持 $ALGO，将跳过测试${RESET}"
-            fi
-        done
-    fi
-
-    # 如果没有可用的算法，提示用户
-    if [ ${#ALGO_STATUS[@]} -eq 0 ]; then
-        echo -e "${RED}❌ 没有可用的 BBR 算法进行测试${RESET}"
-        read -n1 -p "按任意键返回菜单..."
-        return
-    fi
-
-    # 进行测速
-    for MODE in "${ALGO_STATUS[@]}"; do
+    # 无条件尝试所有算法 (来自 bbr_speedtest.sh)
+    for MODE in "BBR" "BBR Plus" "BBRv2" "BBRv3"; do
         run_test "$MODE"
     done
     
@@ -428,7 +382,7 @@ show_menu() {
             8) uninstall_script ;;
             9) echo -e "${CYAN}感谢使用，再见！${RESET}"; exit 0 ;;
             *) echo -e "${RED}无效选项，请输入 1-9${RESET}"; sleep 2 ;;
-        esac
+        end
     done
 }
 
