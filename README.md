@@ -30,7 +30,7 @@
 在 VPS 上执行：
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/chengege666/bbr-speedtest/main/bbr_speedtest.sh)
+bash <(curl -L -s https://raw.githubusercontent.com/chengege666/bbr-gj/main/vpsgj.sh)
 ```
 
 脚本会自动：
