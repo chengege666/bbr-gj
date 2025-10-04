@@ -67,27 +67,31 @@ check_deps() {
 }
 
 # -------------------------------
-# 核心功能：BBR 测速
+# 核心功能：BBR 测速 (已合并 bbr_speedtest.sh 的 modprobe 逻辑)
 # -------------------------------
 run_test() {
     MODE=$1
     echo -e "${CYAN}>>> 切换到 $MODE 并测速...${RESET}"
 
-    # 尝试切换拥塞控制算法
+    # 尝试加载内核模块并切换拥塞控制算法
     case $MODE in
         "BBR") 
+            modprobe tcp_bbr >/dev/null 2>&1
             sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
             CURRENT_ALG="bbr"
             ;;
         "BBR Plus") 
+            modprobe tcp_bbrplus >/dev/null 2>&1
             sysctl -w net.ipv4.tcp_congestion_control=bbrplus >/dev/null 2>&1
             CURRENT_ALG="bbrplus"
             ;;
         "BBRv2") 
+            modprobe tcp_bbrv2 >/dev/null 2>&1
             sysctl -w net.ipv4.tcp_congestion_control=bbrv2 >/dev/null 2>&1
             CURRENT_ALG="bbrv2"
             ;;
         "BBRv3") 
+            modprobe tcp_bbrv3 >/dev/null 2>&1
             sysctl -w net.ipv4.tcp_congestion_control=bbrv3 >/dev/null 2>&1
             CURRENT_ALG="bbrv3"
             ;;
@@ -100,6 +104,12 @@ run_test() {
     CURRENT=$(sysctl -n net.ipv4.tcp_congestion_control 2>/dev/null || echo "unknown")
     if [ "$CURRENT" != "$CURRENT_ALG" ]; then
         echo -e "${RED}❌ 切换到 $MODE 失败，当前算法: $CURRENT${RESET}"
+        
+        # 增加提示
+        if [[ "$MODE" == "BBRv2" || "$MODE" == "BBRv3" ]]; then
+            echo -e "${YELLOW}提示: 切换 $MODE 失败通常是由于当前内核不支持。请尝试选项 2 安装新内核。${RESET}"
+        fi
+        
         echo ""
         return
     fi
@@ -125,7 +135,7 @@ run_test() {
 }
 
 # -------------------------------
-# 功能 1: BBR 综合测速
+# 功能 1: BBR 综合测速 (保持不变)
 # -------------------------------
 bbr_test_menu() {
     echo -e "${CYAN}=== 开始 BBR 综合测速 ===${RESET}"
@@ -176,7 +186,7 @@ bbr_test_menu() {
 }
 
 # -------------------------------
-# 其余功能
+# 其余功能保持不变...
 # -------------------------------
 
 # 功能 2: 安装/切换 BBR 内核
@@ -385,7 +395,7 @@ uninstall_script() {
 }
 
 # -------------------------------
-# 交互菜单
+# 交互菜单 (保持不变)
 # -------------------------------
 show_menu() {
     while true; do
@@ -422,7 +432,7 @@ show_menu() {
 }
 
 # -------------------------------
-# 主程序
+# 主程序 (保持不变)
 # -------------------------------
 check_root
 check_deps
