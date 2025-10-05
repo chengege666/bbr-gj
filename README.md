@@ -1,23 +1,84 @@
+
 -----
 
-# 🚀  VPS 工具箱 v3.0
+## 🚀 其他一键运行命令选项
+
+我已将您提供的命令和以下常用的替代方案整合到最终的自述文档中，为用户提供多种选择。
+
+### 1\. 使用 `curl` 通过管道 (`|`) 传递给 `bash` (最常见替代方案)
+
+这是最经典且最广泛兼容的一键执行远程脚本的方法。
+
+```bash
+curl -L -s https://raw.githubusercontent.com/chengege666/bbr-gj/main/vpsgj.sh | bash
+```
+
+**说明:**
+
+  * `curl ...`：下载脚本内容到标准输出 (`stdout`)。
+  * `|`：**管道**（Pipe），将前一个命令 (`curl`) 的输出作为后一个命令 (`bash`) 的输入。
+  * `bash`：从标准输入 (`stdin`) 读取并执行脚本内容。
+
+### 2\. 使用 `wget` 通过管道 (`|`) 传递给 `bash`
+
+如果某些系统没有安装 `curl`，但安装了 `wget`，则可以使用此命令。
+
+```bash
+wget -qO- https://raw.githubusercontent.com/chengege666/bbr-gj/main/vpsgj.sh | bash
+```
+
+**说明:**
+
+  * `wget -qO-`：
+      * `-q`：安静模式（Quiet），不显示下载信息。
+      * `-O-`：将下载内容输出到标准输出 (`stdout`)，而不是保存到文件。
+
+### 3\. 使用 `curl` 配合 `sh` 执行 (通用性强)
+
+您的脚本是 Bash 脚本，但由于它使用了 `#!/bin/bash` 且是标准的 Shell 语法，用 `sh`（通常是 `/bin/sh` 的软链接）执行通常也是可行的。
+
+```bash
+curl -L -s https://raw.githubusercontent.com/chengege666/bbr-gj/main/vpsgj.sh | sh
+```
+
+-----
+
+## 完整的自述文档 (更新版本)
+
+以下是整合了所有运行命令的最终版自述文档：
+
+# 🚀 增强版 VPS 工具箱 v3.0
 
 **GitHub:** `https://github.com/chengege666/bbr-gj`
 
-一个多功能 Shell 脚本工具箱，专为 VPS 用户设计。它集成了 **BBR 拥塞控制优化**、**系统维护**、**服务管理 (Docker/SSH)** 以及 **关键组件 (GLIBC)** 的查询与管理功能，旨在简化日常操作和性能调优。
+一个多功能 Shell 脚本工具箱，专为 VPS 用户设计，集成了 **BBR 拥塞控制优化**、**系统维护**、**服务管理 (Docker/SSH)** 以及 **关键组件 (GLIBC)** 的查询与管理功能，旨在简化日常操作和性能调优。
 
 ## 📥 如何运行 (一键运行)
 
-最简单、最快的运行方式是直接通过 `curl` 下载并使用 `bash` 执行。此方法无需手动保存文件。
+请确保您拥有 **root 权限**（或使用 `sudo`），您可以选择以下任何一个命令来下载并运行脚本：
 
-### **执行命令**
+### **推荐命令 (使用进程替换)**
 
-请确保您拥有 **root 权限**，并执行以下命令：
+这种方法通常更加优雅，且避免将脚本内容直接写入历史记录。
 
-
-# 运行脚本
 ```bash
 bash <(curl -L -s https://raw.githubusercontent.com/chengege666/bbr-gj/main/vpsgj.sh)
+```
+
+### **替代命令 (使用管道)**
+
+这是最常见、最通用的远程执行方式，适用于大多数 Linux 系统。
+
+**选项 A: 使用 `curl`**
+
+```bash
+curl -L -s https://raw.githubusercontent.com/chengege666/bbr-gj/main/vpsgj.sh | bash
+```
+
+**选项 B: 使用 `wget`**
+
+```bash
+wget -qO- https://raw.githubusercontent.com/chengege666/bbr-gj/main/vpsgj.sh | bash
 ```
 
 > **提示：** 脚本运行后，如果检测到依赖缺失，会自动尝试安装必要的工具，如 `speedtest-cli`、`curl`、`wget` 等。
