@@ -1,5 +1,5 @@
 #!/bin/bash
-# 增强版VPS工具箱 v1.0
+# 增强版VPS工具箱 v1.1
 # GitHub: https://github.com/chengege666/bbr-gj
 
 RESULT_FILE="bbr_result.txt"
@@ -19,9 +19,9 @@ RESET="\033[0m"
 print_welcome() {
     clear
     echo -e "${CYAN}==================================================${RESET}"
-    echo -e "${MAGENTA}                VPS 工具箱 v1.0                ${RESET}"
+    echo -e "${MAGENTA}                VPS 工具箱 v1.1                ${RESET}"
     echo -e "${CYAN}--------------------------------------------------${RESET}"
-    echo -e "${YELLOW}功能: BBR测速, 系统管理, GLIBC管理, Docker, SSH配置等${RESET}"
+    echo -e "${YELLOW}功能: BBR测速, 系统管理, 防火墙, GLIBC, Docker等${RESET}"
     echo -e "${GREEN}测速结果保存: ${RESULT_FILE}${RESET}"
     echo -e "${CYAN}==================================================${RESET}"
     echo ""
@@ -549,7 +549,162 @@ full_system_upgrade() {
 }
 
 # -------------------------------
-# 功能 13: 卸载脚本
+# 功能 13: 防火墙管理
+# -------------------------------
+firewall_menu() {
+    echo -e "${CYAN}=== 防火墙管理 ===${RESET}"
+    
+    # 检测防火墙类型
+    if command -v ufw >/dev/null 2>&1; then
+        FIREWALL_TYPE="ufw"
+    elif command -v firewalld >/dev/null 2>&1; then
+        FIREWALL_TYPE="firewalld"
+    elif command -v iptables >/dev/null 2>&1; then
+        FIREWALL_TYPE="iptables"
+    else
+        echo -e "${YELLOW}未检测到常见防火墙工具 (ufw/firewalld/iptables)${RESET}"
+        echo -e "${RED}请手动配置防火墙${RESET}"
+        read -n1 -p "按任意键返回菜单..."
+        return
+    fi
+    
+    echo -e "${GREEN}检测到防火墙类型: ${FIREWALL_TYPE}${RESET}"
+    
+    while true; do
+        echo ""
+        echo -e "${CYAN}=== 防火墙管理菜单 ===${RESET}"
+        echo "1) 查看防火墙状态"
+        echo "2) 开启防火墙"
+        echo "3) 关闭防火墙"
+        echo "4) 添加端口规则"
+        echo "5) 删除端口规则"
+        echo "6) 查看当前规则"
+        echo "7) 返回主菜单"
+        read -p "请选择操作: " fw_choice
+        
+        case "$fw_choice" in
+            1) # 查看状态
+                case "$FIREWALL_TYPE" in
+                    "ufw")
+                        ufw status verbose
+                        ;;
+                    "firewalld")
+                        firewall-cmd --state
+                        firewall-cmd --list-all
+                        ;;
+                    "iptables")
+                        iptables -L -n -v
+                        ;;
+                esac
+                ;;
+            2) # 开启防火墙
+                case "$FIREWALL_TYPE" in
+                    "ufw")
+                        ufw enable
+                        echo -e "${GREEN}UFW 防火墙已开启${RESET}"
+                        ;;
+                    "firewalld")
+                        systemctl start firewalld
+                        systemctl enable firewalld
+                        echo -e "${GREEN}Firewalld 已启动并设置为开机自启${RESET}"
+                        ;;
+                    "iptables")
+                        echo -e "${YELLOW}iptables 需要手动配置持久化规则${RESET}"
+                        echo -e "${YELLOW}建议使用 'iptables-save > /etc/iptables/rules.v4' 保存规则${RESET}"
+                        ;;
+                esac
+                ;;
+            3) # 关闭防火墙
+                case "$FIREWALL_TYPE" in
+                    "ufw")
+                        ufw disable
+                        echo -e "${GREEN}UFW 防火墙已关闭${RESET}"
+                        ;;
+                    "firewalld")
+                        systemctl stop firewalld
+                        systemctl disable firewalld
+                        echo -e "${GREEN}Firewalld 已停止并禁用开机自启${RESET}"
+                        ;;
+                    "iptables")
+                        iptables -F
+                        iptables -X
+                        iptables -Z
+                        echo -e "${GREEN}iptables 规则已清空${RESET}"
+                        echo -e "${YELLOW}请手动保存规则以确保重启后生效${RESET}"
+                        ;;
+                esac
+                ;;
+            4) # 添加端口规则
+                read -p "请输入要开放的端口 (如 80,443): " port
+                read -p "请输入协议 (tcp/udp, 默认 tcp): " protocol
+                protocol=${protocol:-tcp}
+                
+                case "$FIREWALL_TYPE" in
+                    "ufw")
+                        ufw allow $port/$protocol
+                        echo -e "${GREEN}已开放端口 $port/$protocol${RESET}"
+                        ;;
+                    "firewalld")
+                        firewall-cmd --permanent --add-port=$port/$protocol
+                        firewall-cmd --reload
+                        echo -e "${GREEN}已永久开放端口 $port/$protocol${RESET}"
+                        ;;
+                    "iptables")
+                        iptables -A INPUT -p $protocol --dport $port -j ACCEPT
+                        echo -e "${GREEN}已添加规则允许 $port/$protocol${RESET}"
+                        echo -e "${YELLOW}请手动保存规则以确保重启后生效${RESET}"
+                        ;;
+                esac
+                ;;
+            5) # 删除端口规则
+                read -p "请输入要关闭的端口 (如 80,443): " port
+                read -p "请输入协议 (tcp/udp, 默认 tcp): " protocol
+                protocol=${protocol:-tcp}
+                
+                case "$FIREWALL_TYPE" in
+                    "ufw")
+                        ufw delete allow $port/$protocol
+                        echo -e "${GREEN}已关闭端口 $port/$protocol${RESET}"
+                        ;;
+                    "firewalld")
+                        firewall-cmd --permanent --remove-port=$port/$protocol
+                        firewall-cmd --reload
+                        echo -e "${GREEN}已永久关闭端口 $port/$protocol${RESET}"
+                        ;;
+                    "iptables")
+                        iptables -D INPUT -p $protocol --dport $port -j ACCEPT
+                        echo -e "${GREEN}已删除规则允许 $port/$protocol${RESET}"
+                        echo -e "${YELLOW}请手动保存规则以确保重启后生效${RESET}"
+                        ;;
+                esac
+                ;;
+            6) # 查看当前规则
+                case "$FIREWALL_TYPE" in
+                    "ufw")
+                        ufw status numbered
+                        ;;
+                    "firewalld")
+                        firewall-cmd --list-ports
+                        firewall-cmd --list-services
+                        ;;
+                    "iptables")
+                        iptables -L -n -v
+                        ;;
+                esac
+                ;;
+            7) # 返回主菜单
+                return
+                ;;
+            *)
+                echo -e "${RED}无效选择${RESET}"
+                ;;
+        esac
+        read -n1 -p "按任意键继续..."
+    done
+}
+
+# -------------------------------
+# 功能 14: 卸载脚本
 # -------------------------------
 uninstall_script() {
     read -p "确定要卸载本脚本并清理相关文件吗 (y/n)? ${RED}此操作不可逆!${RESET}: " confirm_uninstall
@@ -626,8 +781,9 @@ show_menu() {
         echo -e "${GREEN}--- 服务管理 ---${RESET}"
         echo "11) Docker 容器管理"
         echo "12) SSH 端口与密码修改"
+        echo "13) 防火墙管理"
         echo -e "${GREEN}--- 其他 ---${RESET}"
-        echo "13) 卸载脚本及残留文件"
+        echo "14) 卸载脚本及残留文件"
         echo "0) 退出脚本" # 退出选项改为0
         echo ""
         read -p "输入数字选择: " choice
@@ -645,9 +801,10 @@ show_menu() {
             10) full_system_upgrade ;;
             11) docker_menu ;;
             12) ssh_config_menu ;;
-            13) uninstall_script ;;
+            13) firewall_menu ;;
+            14) uninstall_script ;;
             0) echo -e "${CYAN}感谢使用，再见！${RESET}"; exit 0 ;; # case语句处理0
-            *) echo -e "${RED}无效选项，请输入 0-13${RESET}"; sleep 2 ;; # 提示信息更新为0-13
+            *) echo -e "${RED}无效选项，请输入 0-14${RESET}"; sleep 2 ;; # 提示信息更新为0-14
         esac
     done
 }
