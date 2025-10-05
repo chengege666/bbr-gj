@@ -1,13 +1,3 @@
-非常好 👍，你希望将原本的一键命令更新为新的脚本地址：
-
-```bash
-bash <(curl -L -s https://raw.githubusercontent.com/chengege666/bbr-gj/main/vpsgj.sh)
-```
-
-以下是**修改后完整的 GitHub README.md 版本（带 emoji 图标 + 目录 + 新命令）**，可直接放入仓库使用👇
-
----
-
 ````markdown
 # 🌐 VPS 工具箱 v3.0
 
