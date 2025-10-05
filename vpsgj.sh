@@ -1,5 +1,5 @@
 #!/bin/bash
-# 增强版VPS工具箱 v2.3
+# 增强版VPS工具箱 v1.0
 # GitHub: https://github.com/chengege666/bbr-gj
 
 RESULT_FILE="bbr_result.txt"
