@@ -1,5 +1,5 @@
 #!/bin/bash
-# 增强版VPS工具箱 v3.0
+# 增强版VPS工具箱 v2.3
 # GitHub: https://github.com/chengege666/bbr-gj
 
 RESULT_FILE="bbr_result.txt"
@@ -94,6 +94,9 @@ run_test() {
             modprobe tcp_bbrv3 >/dev/null 2>&1
             sysctl -w net.core.default_qdisc=fq >/dev/null 2>&1
             sysctl -w net.ipv4.tcp_congestion_control=bbrv3 >/dev/null 2>&1
+            ;;
+        *) # 增加一个默认情况以防意外输入，虽然测速模式通常是固定的
+            echo -e "${YELLOW}未知 BBR 模式: $MODE${RESET}"
             ;;
     esac
     
@@ -317,7 +320,7 @@ timezone_adjust() {
             ;;
         3)
             read -p "请输入时区 (如 Asia/Tokyo): " custom_tz
-            if timedatectl set-timezone "$custom_tz" 2>/dev/null; 键，然后
+            if timedatectl set-timezone "$custom_tz" 2>/dev/null; then
                 echo -e "${GREEN}已设置时区为 $custom_tz${RESET}"
             else
                 echo -e "${RED}无效的时区，请检查输入${RESET}"
@@ -367,7 +370,7 @@ docker_install() {
 }
 
 docker_menu() {
-    if ! command -v docker >/dev/null 2>&1; 键，然后
+    if ! command -v docker >/dev/null 2>&1; then
         echo -e "${RED}未检测到 Docker！${RESET}"
         read -p "是否现在安装 Docker? (y/n): " install_docker
         if [[ "$install_docker" == "y" || "$install_docker" == "Y" ]]; then
@@ -386,7 +389,7 @@ docker_menu() {
     echo "3) 返回主菜单"
     read -p "请选择操作: " docker_choice
     
-    case "$docker_choice" 在 # <-- 修复了这里的语法错误，将 '在' 改为 'in'
+    case "$docker_choice" in # <-- 修复点: 确保此处是 'in'
         1) docker ps -a 2>/dev/null || echo -e "${YELLOW}Docker 命令执行失败${RESET}" ;;
         2) 
             echo -e "${GREEN}正在重启所有容器...${RESET}"
@@ -482,7 +485,7 @@ upgrade_glibc() {
     
     echo -e "${CYAN}>>> 开始升级GLIBC...${RESET}"
     
-    # 检查系统类型
+    # 检查系统类型 (重新构建此 if-elif-else-fi 块，确保语法纯净)
     if command -v apt >/dev/null 2>&1; then
         # Debian/Ubuntu系统
         echo -e "${GREEN}检测到Debian/Ubuntu系统${RESET}"
@@ -501,11 +504,11 @@ upgrade_glibc() {
         dnf update -y
         dnf install -y gcc make bison
         dnf update -y glibc
-    else
+    else # <-- 此处的 'else' 是之前报告错误的位置
         echo -e "${RED}❌❌ 无法识别系统类型，请手动升级GLIBC${RESET}"
         return
-    fi
-    
+    fi # <-- 确保 'fi' 匹配了最外层的 'if'
+
     echo -e "${GREEN}GLIBC升级完成${RESET}"
     echo -e "${YELLOW}建议重启系统以使新GLIBC版本生效${RESET}"
 }
