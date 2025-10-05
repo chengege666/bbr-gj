@@ -1,10 +1,10 @@
 #!/bin/bash
-# 自动切换 BBR 算法并测速对比 / VPS 工具箱
+# 增强版VPS工具箱 v2.3
 # GitHub: https://github.com/chengege666/bbr-gj
 
 RESULT_FILE="bbr_result.txt"
-SCRIPT_FILE="vpsgj.sh"
-UNINSTALL_NOTE="vpsgj_uninstall_done.txt"
+SCRIPT_FILE="vps_toolbox.sh"
+UNINSTALL_NOTE="vps_toolbox_uninstall_done.txt"
 
 # -------------------------------
 # 颜色定义与欢迎窗口
@@ -19,9 +19,9 @@ RESET="\033[0m"
 print_welcome() {
     clear
     echo -e "${CYAN}==================================================${RESET}"
-    echo -e "${MAGENTA}                VPS 工具箱 v2.3                ${RESET}"
+    echo -e "${MAGENTA}                VPS 工具箱 v3.0                ${RESET}"
     echo -e "${CYAN}--------------------------------------------------${RESET}"
-    echo -e "${YELLOW}功能: BBR测速, 系统管理, Docker, SSH配置等${RESET}"
+    echo -e "${YELLOW}功能: BBR测速, 系统管理, GLIBC管理, Docker, SSH配置等${RESET}"
     echo -e "${GREEN}测速结果保存: ${RESULT_FILE}${RESET}"
     echo -e "${CYAN}==================================================${RESET}"
     echo ""
@@ -42,7 +42,7 @@ check_root() {
 # 依赖安装
 # -------------------------------
 install_deps() {
-    PKGS="curl wget git speedtest-cli net-tools"
+    PKGS="curl wget git speedtest-cli net-tools build-essential"
     if command -v apt >/dev/null 2>&1; then
         apt update -y
         apt install -y $PKGS
@@ -153,7 +153,7 @@ run_bbr_switch() {
 }
 
 # -------------------------------
-# 功能 3: 系统信息 (增强版，包含BBR类型显示)
+# 功能 3: 系统信息 (增强版，包含BBR类型和GLIBC版本)
 # -------------------------------
 show_sys_info() {
     echo -e "${CYAN}=== 系统详细信息 ===${RESET}"
@@ -196,29 +196,12 @@ show_sys_info() {
     echo -e "${GREEN}当前拥塞控制算法:${RESET} $CURRENT_BBR"
     echo -e "${GREEN}当前队列规则:${RESET} $CURRENT_QDISC"
     
-    # 增强BBR类型检测
-    KERNEL_VERSION=$(uname -r)
-    BBR_TYPE="官方内核"
-    if [[ $KERNEL_VERSION =~ "xanmod" ]]; then
-        BBR_TYPE="BBR Plus (xanmod内核)"
-    elif [[ $KERNEL_VERSION =~ "bbrplus" ]]; then
-        BBR_TYPE="BBR Plus (bbrplus内核)"
-    elif [[ $KERNEL_VERSION =~ "bbrv2" || $KERNEL_VERSION =~ "bbr2" ]]; then
-        BBR_TYPE="BBRv2"
-    elif [[ $KERNEL_VERSION =~ "bbrv3" || $KERNEL_VERSION =~ "bbr3" ]]; then
-        BBR_TYPE="BBRv3"
-    else
-        MAJOR_VERSION=$(echo "$KERNEL_VERSION" | cut -d. -f1)
-        MINOR_VERSION=$(echo "$KERNEL_VERSION" | cut -d. -f2)
-        if [ "$MAJOR_VERSION" -ge 5 ] && [ "$MINOR_VERSION" -ge 10 ]; then
-            BBR_TYPE="官方内核（支持BBRv2）"
-        elif [ "$MAJOR_VERSION" -ge 4 ] && [ "$MINOR_VERSION" -ge 9 ]; then
-            BBR_TYPE="官方内核（支持BBR）"
-        else
-            BBR_TYPE="官方内核（不支持BBR）"
-        fi
+    # GLIBC信息
+    GLIBC_VERSION=$(ldd --version 2>/dev/null | head -n1 | awk '{print $NF}')
+    if [ -z "$GLIBC_VERSION" ]; then
+        GLIBC_VERSION="未知"
     fi
-    echo -e "${GREEN}当前BBR类型:${RESET} $BBR_TYPE"
+    echo -e "${GREEN}GLIBC版本:${RESET} $GLIBC_VERSION"
     
     # 系统运行状态
     echo -e "${GREEN}系统运行时间:${RESET} $(uptime -p 2>/dev/null || uptime | awk '{print $3,$4,$5}' | sed 's/,//g')"
@@ -233,13 +216,14 @@ show_sys_info() {
 }
 
 # -------------------------------
-# 功能 4: 系统更新
+# 功能 4: 系统更新 (更新软件包列表并升级已安装软件)
 # -------------------------------
 sys_update() {
     echo -e "${CYAN}=== 系统更新 ===${RESET}"
-    echo -e "${GREEN}>>> 正在更新系统...${RESET}"
+    echo -e "${GREEN}>>> 正在更新软件包列表并升级已安装软件...${RESET}"
     if command -v apt >/dev/null 2>&1; then
-        apt update -y && apt upgrade -y
+        apt update -y
+        apt upgrade -y
     elif command -v yum >/dev/null 2>&1; then
         yum update -y
     elif command -v dnf >/dev/null 2>&1; then
@@ -252,14 +236,15 @@ sys_update() {
 }
 
 # -------------------------------
-# 功能 5: 系统清理
+# 功能 5: 系统清理 (清理旧版依赖包)
 # -------------------------------
 sys_cleanup() {
     echo -e "${CYAN}=== 系统清理 ===${RESET}"
-    echo -e "${GREEN}>>> 正在清理缓存和旧内核...${RESET}"
+    echo -e "${GREEN}>>> 正在清理缓存和旧版依赖包...${RESET}"
     if command -v apt >/dev/null 2>&1; then
         apt autoremove -y
         apt clean
+        apt autoclean
         echo -e "${GREEN}APT 清理完成${RESET}"
     elif command -v yum >/dev/null 2>&1; then
         yum autoremove -y
@@ -332,7 +317,7 @@ timezone_adjust() {
             ;;
         3)
             read -p "请输入时区 (如 Asia/Tokyo): " custom_tz
-            if timedatectl set-timezone "$custom_tz" 2>/dev/null; then
+            if timedatectl set-timezone "$custom_tz" 2>/dev/null; 键，然后
                 echo -e "${GREEN}已设置时区为 $custom_tz${RESET}"
             else
                 echo -e "${RED}无效的时区，请检查输入${RESET}"
@@ -365,7 +350,108 @@ system_reboot() {
 }
 
 # -------------------------------
-# 功能 9: Docker 管理
+# 功能 9: GLIBC 管理
+# -------------------------------
+glibc_menu() {
+    echo -e "${CYAN}=== GLIBC 管理 ===${RESET}"
+    echo "1) 查询当前GLIBC版本"
+    echo "2) 升级GLIBC"
+    echo "3) 返回主菜单"
+    read -p "请选择操作: " glibc_choice
+    
+    case "$glibc_choice" in
+        1)
+            echo -e "${GREEN}当前GLIBC版本:${RESET}"
+            ldd --version | head -n1
+            ;;
+        2)
+            upgrade_glibc
+            ;;
+        3)
+            return
+            ;;
+        *)
+            echo -e "${RED}无效选择${RESET}"
+            ;;
+    esac
+    read -n1 -p "按任意键返回菜单..."
+}
+
+upgrade_glibc() {
+    echo -e "${RED}警告：升级GLIBC是高风险操作，可能导致系统不稳定！${RESET}"
+    read -p "确定要继续升级GLIBC吗？(y/N): " confirm_upgrade
+    if [[ "$confirm_upgrade" != "y" && "$confirm_upgrade" != "Y" ]]; then
+        echo -e "${GREEN}已取消升级操作${RESET}"
+        return
+    fi
+    
+    echo -e "${CYAN}>>> 开始升级GLIBC...${RESET}"
+    
+    # 检查系统类型
+    if command -v apt >/dev/null 2>&1; then
+        # Debian/Ubuntu系统
+        echo -e "${GREEN}检测到Debian/Ubuntu系统${RESET}"
+        apt update -y
+        apt install -y build-essential gawk bison
+        apt upgrade -y libc6
+    elif command -v yum >/dev/null 2>&1; then
+        # CentOS/RHEL系统
+        echo -e "${GREEN}检测到CentOS/RHEL系统${RESET}"
+        yum update -y
+        yum install -y gcc make bison
+        yum update -y glibc
+    elif command -v dnf >/dev/null 2>&1; then
+        # Fedora系统
+        echo -e "${GREEN}检测到Fedora系统${RESET}"
+        dnf update -y
+        dnf install -y gcc make bison
+        dnf update -y glibc
+    else
+        echo -e "${RED}❌❌ 无法识别系统类型，请手动升级GLIBC${RESET}"
+        return
+    fi
+    
+    echo -e "${GREEN}GLIBC升级完成${RESET}"
+    echo -e "${YELLOW}建议重启系统以使新GLIBC版本生效${RESET}"
+}
+
+# -------------------------------
+# 功能 10: 全面系统升级 (包括内核和依赖)
+# -------------------------------
+full_system_upgrade() {
+    echo -e "${RED}警告：全面系统升级将升级所有软件包，包括内核，可能需要重启系统！${RESET}"
+    read -p "确定要继续全面系统升级吗？(y/N): " confirm_upgrade
+    if [[ "$confirm_upgrade" != "y" && "$confirm_upgrade" != "Y" ]]; then
+        echo -e "${GREEN}已取消升级操作${RESET}"
+        return
+    fi
+    
+    echo -e "${CYAN}>>> 开始全面系统升级...${RESET}"
+    
+    if command -v apt >/dev/null 2>&1; then
+        # Debian/Ubuntu系统
+        apt update -y
+        apt full-upgrade -y
+        apt dist-upgrade -y
+    elif command -v yum >/dev/null 2>&1; then
+        # CentOS/RHEL系统
+        yum update -y
+        yum upgrade -y
+    elif command -v dnf >/dev/null 2>&1; then
+        # Fedora系统
+        dnf update -y
+        dnf upgrade -y
+    else
+        echo -e "${RED}❌❌ 无法识别系统类型，请手动升级${RESET}"
+        return
+    fi
+    
+    echo -e "${GREEN}全面系统升级完成${RESET}"
+    echo -e "${YELLOW}建议重启系统以使所有更新生效${RESET}"
+}
+
+# -------------------------------
+# 功能 11: Docker 管理
 # -------------------------------
 docker_install() {
     echo -e "${CYAN}正在安装 Docker...${RESET}"
@@ -413,7 +499,7 @@ docker_menu() {
 }
 
 # -------------------------------
-# 功能 10: SSH 配置修改
+# 功能 12: SSH 配置修改
 # -------------------------------
 ssh_config_menu() {
     SSH_CONFIG="/etc/ssh/sshd_config"
@@ -460,7 +546,7 @@ ssh_config_menu() {
 }
 
 # -------------------------------
-# 功能 11: 卸载脚本
+# 功能 13: 卸载脚本
 # -------------------------------
 uninstall_script() {
     read -p "确定要卸载本脚本并清理相关文件吗 (y/n)? ${RED}此操作不可逆!${RESET}: " confirm_uninstall
@@ -526,20 +612,22 @@ show_menu() {
         echo "1) BBR 综合测速 (BBR/BBR Plus/BBRv2/BBRv3 对比)"
         echo "2) 安装/切换 BBR 内核"
         echo -e "${GREEN}--- VPS 系统管理 ---${RESET}"
-        echo "3) 查看系统信息 (OS/CPU/内存/IP/BBR)"
-        echo "4) 系统更新"
-        echo "5) 系统清理"
+        echo "3) 查看系统信息 (OS/CPU/内存/IP/BBR/GLIBC)"
+        echo "4) 更新软件包并升级 (不升级内核)"
+        echo "5) 系统清理 (清理旧版依赖包)"
         echo "6) IPv4/IPv6 切换 (当前: IPv$IP_VERSION)"
         echo "7) 系统时区调整"
         echo "8) 系统重启"
+        echo "9) GLIBC 管理"
+        echo "10) 全面系统升级 (含内核升级)"
         echo -e "${GREEN}--- 服务管理 ---${RESET}"
-        echo "9) Docker 容器管理"
-        echo "10) SSH 端口与密码修改"
+        echo "11) Docker 容器管理"
+        echo "12) SSH 端口与密码修改"
         echo -e "${GREEN}--- 其他 ---${RESET}"
-        echo "11) 卸载脚本及残留文件"
-        echo "12) 退出"
+        echo "13) 卸载脚本及残留文件"
+        echo "0) 退出"
         echo ""
-        read -p "输入数字选择: " choice
+        read -p "输入数字选择 (0-13): " choice
         
         case "$choice" in
             1) bbr_test_menu ;;
@@ -550,11 +638,13 @@ show_menu() {
             6) ip_version_switch ;;
             7) timezone_adjust ;;
             8) system_reboot ;;
-            9) docker_menu ;;
-            10) ssh_config_menu ;;
-            11) uninstall_script ;;
-            12) echo -e "${CYAN}感谢使用，再见！${RESET}"; exit 0 ;;
-            *) echo -e "${RED}无效选项，请输入 1-12${RESET}"; sleep 2 ;;
+            9) glibc_menu ;;
+            10) full_system_upgrade ;;
+            11) docker_menu ;;
+            12) ssh_config_menu ;;
+            13) uninstall_script ;;
+            0) echo -e "${CYAN}感谢使用，再见！${RESET}"; exit 0 ;;
+            *) echo -e "${RED}无效选项，请输入 0-13${RESET}"; sleep 2 ;;
         esac
     done
 }
