@@ -1,5 +1,5 @@
 #!/bin/bash
-# 增强版VPS工具箱 v2.3
+# 增强版VPS工具箱 v2.3 - 修复版
 # GitHub: https://github.com/chengege666/bbr-gj
 
 RESULT_FILE="bbr_result.txt"
@@ -19,7 +19,7 @@ RESET="\033[0m"
 print_welcome() {
     clear
     echo -e "${CYAN}==================================================${RESET}"
-    echo -e "${MAGENTA}                VPS 工具箱 v3.0                ${RESET}"
+    echo -e "${MAGENTA}                VPS 工具箱 v2.3                ${RESET}"
     echo -e "${CYAN}--------------------------------------------------${RESET}"
     echo -e "${YELLOW}功能: BBR测速, 系统管理, GLIBC管理, Docker, SSH配置等${RESET}"
     echo -e "${GREEN}测速结果保存: ${RESULT_FILE}${RESET}"
@@ -317,7 +317,7 @@ timezone_adjust() {
             ;;
         3)
             read -p "请输入时区 (如 Asia/Tokyo): " custom_tz
-            if timedatectl set-timezone "$custom_tz" 2>/dev/null; 键，然后
+            if timedatectl set-timezone "$custom_tz" 2>/dev/null; then
                 echo -e "${GREEN}已设置时区为 $custom_tz${RESET}"
             else
                 echo -e "${RED}无效的时区，请检查输入${RESET}"
@@ -487,7 +487,7 @@ docker_menu() {
     echo "3) 返回主菜单"
     read -p "请选择操作: " docker_choice
     
-    case "$docker_choice" in
+    case "$docker_choice" 在
         1) docker ps -a 2>/dev/null || echo -e "${YELLOW}Docker 命令执行失败${RESET}" ;;
         2) 
             echo -e "${GREEN}正在重启所有容器...${RESET}"
