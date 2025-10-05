@@ -398,6 +398,25 @@ docker_menu() {
         *) return ;;
     esac
     read -n1 -p "按任意键返回菜单..."
+}
+
+# -------------------------------
+# 功能 10: SSH 配置修改
+# -------------------------------
+ssh_config_menu() {
+    SSH_CONFIG="/etc/ssh/sshd_config"
+    if [ ! -f "$SSH_CONFIG" ]; then
+        echo -e "${RED}❌❌ 未找到 SSH 配置文件 ($SSH_CONFIG)。${RESET}"
+        read -n1 -p "按任意键返回菜单..."
+        return
+    fi
+
+    echo -e "${CYAN}=== SSH 配置修改 ===${RESET}"
+    
+    # 端口修改
+    CURRENT_PORT=$(grep -E '^Port' "$SSH_CONFIG" 2>/dev/null | awk '{print $2}' || echo "22")
+    read -p "输入新的 SSH 端口 (留空跳过，当前端口: $CURRENT_PORT): " new_port
+    if [ ! -z "$new_port" ]; then
         if [[ "$new_port" =~ ^[0-9]+$ ]] && [ "$new_port" -ge 1 ] && [ "$new_port" -le 65535 ]; then
             sed -i "s/^#\?Port\s\+.*$/Port $new_port/" "$SSH_CONFIG"
             echo -e "${GREEN}✅ SSH 端口已修改为 $new_port${RESET}"
