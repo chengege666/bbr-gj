@@ -1,81 +1,210 @@
-#    自己测试BBR用的，看选那个合适
-
-一个自动切换 **BBR / BBR Plus / BBRv2 / BBRv3** 拥塞控制算法并进行 **网络测速对比** 的脚本。
-可用于在 VPS 上快速测试不同 TCP 拥塞控制算法在你网络环境下的性能差别。
-
----
-
-## 特性
-
-* 自动加载 / 切换 BBR、BBR Plus（如果内核支持）
-* 使用 `speedtest-cli` 进行 Ping / 下行 / 上行 测速
-* 测试结果保存到 `bbr_result.txt`
-* **自动检测 root 权限**，不是 root 会提示退出
-* **自动安装依赖**（curl、wget、git、speedtest-cli）
-
----
-
-## 系统要求
-
-* Linux 系统（Debian / Ubuntu / CentOS / RHEL 等）
-* 内核需支持 BBR 或 BBR Plus
-* 需要 **root 权限** 运行
-
----
-
-## 使用方法
-
-### 一键运行（推荐）
-
-在 VPS 上执行：
+非常好 👍，你希望将原本的一键命令更新为新的脚本地址：
 
 ```bash
 bash <(curl -L -s https://raw.githubusercontent.com/chengege666/bbr-gj/main/vpsgj.sh)
 ```
 
-脚本会自动：
-
-1. 检查 root 权限
-2. 安装依赖（curl / wget / git / speedtest-cli）
-3. 切换不同 BBR 算法并测速
-4. 输出结果并保存到 `bbr_result.txt`
+以下是**修改后完整的 GitHub README.md 版本（带 emoji 图标 + 目录 + 新命令）**，可直接放入仓库使用👇
 
 ---
 
-## 输出示例
+````markdown
+# 🌐 VPS 工具箱 v3.0
+
+> 🚀 一键优化、测速、管理你的 VPS — 让服务器运行更高效、更安全！
+
+**作者**：陈哥哥（[@chengege666](https://github.com/chengege666)）  
+**项目地址**：[https://github.com/chengege666/bbr-gj](https://github.com/chengege666/bbr-gj)  
+**版本号**：v3.0（增强版）  
+**适用系统**：Debian / Ubuntu / CentOS / Fedora / 其他常见 Linux  
+
+---
+
+## 📚 目录
+
+- [📖 简介](#-简介)
+- [🚀 一键安装与运行](#-一键安装与运行)
+- [🧰 功能列表](#-功能列表)
+  - [🟢 BBR 功能区](#-bbr-功能区)
+  - [⚙️ VPS 系统管理](#️-vps-系统管理)
+  - [🧩 服务与安全管理](#-服务与安全管理)
+  - [🧹 其他功能](#-其他功能)
+- [🧾 测速结果](#-测速结果)
+- [🧠 系统兼容与依赖](#-系统兼容与依赖)
+- [⚠️ 注意事项](#️-注意事项)
+- [🧩 文件说明](#-文件说明)
+- [🧰 卸载脚本](#-卸载脚本)
+- [💡 作者与鸣谢](#-作者与鸣谢)
+- [⭐ 建议反馈](#-建议反馈)
+
+---
+
+## 📖 简介
+
+**VPS 工具箱 v3.0** 是一款集 **BBR 网络优化、系统管理、Docker 管理、GLIBC 管理、SSH 安全配置** 于一体的综合 VPS 优化工具。  
+
+它支持自动检测包管理器，兼容多种 Linux 系统，界面清晰、功能强大，一键操作、无需复杂命令。  
+非常适合个人服务器运维、测速对比与系统维护。
+
+---
+
+## 🚀 一键安装与运行
+
+### ✅ 推荐使用命令
+```bash
+bash <(curl -L -s https://raw.githubusercontent.com/chengege666/bbr-gj/main/vpsgj.sh)
+````
+
+或手动下载：
+
+```bash
+wget -O vpsgj.sh https://raw.githubusercontent.com/chengege666/bbr-gj/main/vpsgj.sh
+chmod +x vpsgj.sh
+sudo ./vpsgj.sh
+```
+
+> ⚠️ 必须使用 root 权限运行，否则脚本会自动退出。
+
+---
+
+## 🧰 功能列表
+
+### 🟢 BBR 功能区
+
+| 编号 | 功能名称             | 说明                                                |
+| -- | ---------------- | ------------------------------------------------- |
+| 1  | **BBR 综合测速**     | 自动测试并对比 BBR / BBR Plus / BBRv2 / BBRv3 性能，并生成结果文件 |
+| 2  | **安装/切换 BBR 内核** | 调用 ylx2016/Linux-NetSpeed 脚本实现内核切换与算法配置           |
+
+---
+
+### ⚙️ VPS 系统管理
+
+| 编号 | 功能名称             | 说明                               |
+| -- | ---------------- | -------------------------------- |
+| 3  | **查看系统信息**       | 显示 CPU、内存、磁盘、网络、GLIBC、BBR 算法、负载等 |
+| 4  | **系统更新**         | 更新软件包列表并升级已安装软件（不升级内核）           |
+| 5  | **系统清理**         | 清理缓存和旧依赖包（自动适配 apt/yum/dnf）      |
+| 6  | **IPv4/IPv6 切换** | 一键切换当前 IP 协议版本                   |
+| 7  | **系统时区调整**       | 一键设置上海/纽约/自定义时区                  |
+| 8  | **系统重启**         | 立即安全重启 VPS                       |
+| 9  | **GLIBC 管理**     | 查询与升级 GLIBC 版本（带风险提示）            |
+| 10 | **全面系统升级**       | 包含内核与依赖包的全量升级（建议备份后执行）           |
+
+---
+
+### 🧩 服务与安全管理
+
+| 编号 | 功能名称          | 说明                        |
+| -- | ------------- | ------------------------- |
+| 11 | **Docker 管理** | 安装、查看或重启 Docker 容器        |
+| 12 | **SSH 配置修改**  | 一键修改 SSH 端口与 root 密码并重启服务 |
+
+---
+
+### 🧹 其他功能
+
+| 编号 | 功能名称     | 说明                 |
+| -- | -------- | ------------------ |
+| 13 | **卸载脚本** | 一键卸载脚本及依赖，支持自动清理模式 |
+| 0  | **退出脚本** | 返回系统命令行            |
+
+---
+
+## 🧾 测速结果
+
+测速结果会自动保存到：
 
 ```
-=== BBR / BBR Plus / BBRv2 / BBRv3 自动测速对比 ===
->>> 切换到 BBR 并测速...
-BBR | Ping: 20.3ms | Down: 150.45 Mbps | Up: 45.67 Mbps
+bbr_result.txt
+```
 
->>> 切换到 BBR Plus 并测速...
-BBR Plus | Ping: 21.1ms | Down: 148.33 Mbps | Up: 47.89 Mbps
+示例：
 
-⚠️ 你的内核可能不支持 BBRv2
-⚠️ 你的内核可能不支持 BBRv3
-
-=== 测试完成，结果汇总 ===
-BBR | Ping: 20.3ms | Down: 150.45 Mbps | Up: 45.67 Mbps
-BBR Plus | Ping: 21.1ms | Down: 148.33 Mbps | Up: 47.89 Mbps
+```
+BBR | Ping: 24.36ms | Down: 321.42 Mbps | Up: 142.13 Mbps
+BBR Plus | Ping: 25.12ms | Down: 318.21 Mbps | Up: 139.77 Mbps
 ```
 
 ---
 
-## 注意事项
+## 🧠 系统兼容与依赖
 
-* 必须以 **root 权限** 运行
-* 并非所有内核都支持 BBR Plus / BBRv2 / BBRv3
-* 如果 `speedtest-cli` 安装失败，需要手动安装
+脚本会自动检测系统并安装依赖包：
+
+```
+curl wget git speedtest-cli net-tools build-essential
+```
+
+支持系统：
+
+* ✅ Debian 8+
+* ✅ Ubuntu 16.04+
+* ✅ CentOS 7+
+* ✅ Fedora 30+
+* ⚠️ 其他 Linux 系统需手动安装依赖
 
 ---
 
-## 许可协议
+## ⚠️ 注意事项
 
-MIT License
+1. **必须使用 root 权限运行**
+2. **测速功能依赖 speedtest-cli**（脚本会自动安装）
+3. **GLIBC 升级存在风险**，建议执行前备份系统
+4. **切换 SSH 端口后请立即用新端口连接**
+5. **BBR 测试过程安全，不会修改系统配置**
+6. **Docker 功能需 systemd 环境支持**
 
 ---
 
-## 作者
+## 🧩 文件说明
 
-* 作者：[chengege666](https://github.com/chengege666)
+| 文件名                              | 说明             |
+| -------------------------------- | -------------- |
+| `vpsgj.sh`                       | 主脚本            |
+| `bbr_result.txt`                 | BBR 测速结果       |
+| `tcp.sh`                         | 临时下载的 BBR 内核脚本 |
+| `vps_toolbox_uninstall_done.txt` | 卸载记录文件         |
+
+---
+
+## 🧰 卸载脚本
+
+执行主脚本后选择：
+
+```
+13) 卸载脚本及残留文件
+```
+
+或手动卸载：
+
+```bash
+rm -f vpsgj.sh bbr_result.txt tcp.sh
+```
+
+---
+
+## 💡 作者与鸣谢
+
+* **作者**：陈哥哥（[@chengege666](https://github.com/chengege666)）
+* **语言**：Bash
+* **开源协议**：MIT License
+
+---
+
+## ⭐ 建议反馈
+
+如果脚本对你有帮助，欢迎：
+
+* ⭐ 给项目点个 Star
+* 🧩 提交 issue 报告问题或建议新功能
+* 💬 分享给更多使用 VPS 的朋友！
+
+---
+
+```
+
+---
+
+
+
