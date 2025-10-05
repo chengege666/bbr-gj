@@ -26,10 +26,15 @@
 
 ## 🧰 一键安装与运行
 
+---
+
 ### ✅ 推荐命令
+
+---
 
 ```bash
 bash <(curl -L -s https://raw.githubusercontent.com/chengege666/bbr-gj/main/vpsgj.sh)
+
 ````
 
 ---
