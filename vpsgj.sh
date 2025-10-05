@@ -692,7 +692,67 @@ view_docker_status() {
 }
 
 manage_docker_containers() {
-    echo -e "${YELLOW}功能待实现: Docker容器管理${RESET}"
+    while true; do
+        clear
+        echo "=== Docker 容器管理 ==="
+        echo "1) 列出所有容器"
+        echo "2) 启动容器"
+        echo "3) 停止容器"
+        echo "4) 重启容器"
+        echo "5) 删除容器"
+        echo "6) 查看容器日志"
+        echo "7) 进入容器"
+        echo "0) 返回上一级菜单"
+        echo "======================="
+        read -p "请输入你的选择: " container_choice
+
+        case $container_choice in
+            1) list_all_containers ;;
+            2) start_docker_container ;;
+            3) stop_docker_container ;;
+            4) restart_docker_container ;;
+            5) remove_docker_container ;;
+            6) view_container_logs ;;
+            7) enter_docker_container ;;
+            0) break ;;
+            *) echo "无效的选择，请重新输入。" ; read -p "按任意键继续..." ;;
+        esac
+    done
+}
+
+list_all_containers() {
+    echo "功能待实现：列出所有容器"
+    read -p "按任意键继续..."
+}
+
+start_docker_container() {
+    echo "功能待实现：启动容器"
+    read -p "按任意键继续..."
+}
+
+stop_docker_container() {
+    echo "功能待实现：停止容器"
+    read -p "按任意键继续..."
+}
+
+restart_docker_container() {
+    echo "功能待实现：重启容器"
+    read -p "按任意键继续..."
+}
+
+remove_docker_container() {
+    echo "功能待实现：删除容器"
+    read -p "按任意键继续..."
+}
+
+view_container_logs() {
+    echo "功能待实现：查看容器日志"
+    read -p "按任意键继续..."
+}
+
+enter_docker_container() {
+    echo "功能待实现：进入容器"
+    read -p "按任意键继续..."
 }
 
 manage_docker_images() {
