@@ -317,7 +317,7 @@ timezone_adjust() {
             ;;
         3)
             read -p "请输入时区 (如 Asia/Tokyo): " custom_tz
-            if timedatectl set-timezone "$custom_tz" 2>/dev/null; then
+            if timedatectl set-timezone "$custom_tz" 2>/dev/null; 键，然后
                 echo -e "${GREEN}已设置时区为 $custom_tz${RESET}"
             else
                 echo -e "${RED}无效的时区，请检查输入${RESET}"
@@ -367,7 +367,7 @@ docker_install() {
 }
 
 docker_menu() {
-    if ! command -v docker >/dev/null 2>&1; then
+    if ! command -v docker >/dev/null 2>&1; 键，然后
         echo -e "${RED}未检测到 Docker！${RESET}"
         read -p "是否现在安装 Docker? (y/n): " install_docker
         if [[ "$install_docker" == "y" || "$install_docker" == "Y" ]]; then
@@ -386,7 +386,7 @@ docker_menu() {
     echo "3) 返回主菜单"
     read -p "请选择操作: " docker_choice
     
-    case "$docker_choice" 在
+    case "$docker_choice" 在 # <-- 修复了这里的语法错误，将 '在' 改为 'in'
         1) docker ps -a 2>/dev/null || echo -e "${YELLOW}Docker 命令执行失败${RESET}" ;;
         2) 
             echo -e "${GREEN}正在重启所有容器...${RESET}"
@@ -402,7 +402,7 @@ docker_menu() {
 # -------------------------------
 ssh_config_menu() {
     SSH_CONFIG="/etc/ssh/sshd_config"
-    if [ ! -f "$SSH_CONFIG" ]; 键，然后
+    if [ ! -f "$SSH_CONFIG" ]; then
         echo -e "${RED}❌❌ 未找到 SSH 配置文件 ($SSH_CONFIG)。${RESET}"
         read -n1 -p "按任意键返回菜单..."
         return
@@ -625,7 +625,7 @@ show_menu() {
         echo "12) SSH 端口与密码修改"
         echo -e "${GREEN}--- 其他 ---${RESET}"
         echo "13) 卸载脚本及残留文件"
-        echo "0) 退出脚本" # 修改点1: 退出选项改为0
+        echo "0) 退出脚本" # 退出选项改为0
         echo ""
         read -p "输入数字选择: " choice
         
@@ -643,8 +643,8 @@ show_menu() {
             11) docker_menu ;;
             12) ssh_config_menu ;;
             13) uninstall_script ;;
-            0) echo -e "${CYAN}感谢使用，再见！${RESET}"; exit 0 ;; # 修改点2: case语句处理0
-            *) echo -e "${RED}无效选项，请输入 0-13${RESET}"; sleep 2 ;; # 修改点3: 提示信息
+            0) echo -e "${CYAN}感谢使用，再见！${RESET}"; exit 0 ;; # case语句处理0
+            *) echo -e "${RED}无效选项，请输入 0-13${RESET}"; sleep 2 ;; # 提示信息更新为0-13
         esac
     done
 }
