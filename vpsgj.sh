@@ -1,5 +1,5 @@
 #!/bin/bash
-# 增强版VPS工具箱 v2.3 - 修复版
+# 增强版VPS工具箱 v2.3
 # GitHub: https://github.com/chengege666/bbr-gj
 
 RESULT_FILE="bbr_result.txt"
@@ -350,7 +350,102 @@ system_reboot() {
 }
 
 # -------------------------------
-# 功能 9: GLIBC 管理
+# 功能 9: Docker 管理
+# -------------------------------
+docker_install() {
+    echo -e "${CYAN}正在安装 Docker...${RESET}"
+    curl -fsSL https://get.docker.com -o get-docker.sh
+    sh get-docker.sh --mirror Aliyun
+    rm get-docker.sh
+    systemctl enable docker
+    systemctl start docker
+    if command -v docker >/dev/null 2>&1; then
+        echo -e "${GREEN}✅ Docker 安装并启动成功！${RESET}"
+    else
+        echo -e "${RED}❌❌ Docker 安装失败，请检查日志。${RESET}"
+    fi
+}
+
+docker_menu() {
+    if ! command -v docker >/dev/null 2>&1; then
+        echo -e "${RED}未检测到 Docker！${RESET}"
+        read -p "是否现在安装 Docker? (y/n): " install_docker
+        if [[ "$install_docker" == "y" || "$install_docker" == "Y" ]]; then
+            docker_install
+        fi
+        read -n1 -p "按任意键返回菜单..."
+        return
+    fi
+
+    echo -e "${CYAN}=== Docker 容器管理 ===${RESET}"
+    echo -e "${YELLOW}当前运行的容器:${RESET}"
+    docker ps --format "table {{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}" 2>/dev/null || echo -e "${YELLOW}无运行中的容器${RESET}"
+    echo ""
+    echo "1) 查看所有容器"
+    echo "2) 重启所有容器"
+    echo "3) 返回主菜单"
+    read -p "请选择操作: " docker_choice
+    
+    case "$docker_choice" in
+        1) docker ps -a 2>/dev/null || echo -e "${YELLOW}Docker 命令执行失败${RESET}" ;;
+        2) 
+            echo -e "${GREEN}正在重启所有容器...${RESET}"
+            docker restart $(docker ps -a -q) 2>/dev/null && echo -e "${GREEN}容器重启完成${RESET}" || echo -e "${YELLOW}无容器可重启${RESET}"
+            ;;
+        *) return ;;
+    esac
+    read -n1 -p "按任意键返回菜单..."
+}
+
+# -------------------------------
+# 功能 10: SSH 配置修改
+# -------------------------------
+ssh_config_menu() {
+    SSH_CONFIG="/etc/ssh/sshd_config"
+    if [ ! -f "$SSH_CONFIG" ]; then
+        echo -e "${RED}❌❌ 未找到 SSH 配置文件 ($SSH_CONFIG)。${RESET}"
+        read -n1 -p "按任意键返回菜单..."
+        return
+    fi
+
+    echo -e "${CYAN}=== SSH 配置修改 ===${RESET}"
+    
+    # 端口修改
+    CURRENT_PORT=$(grep -E '^Port' "$SSH_CONFIG" 2>/dev/null | awk '{print $2}' || echo "22")
+    read -p "输入新的 SSH 端口 (留空跳过，当前端口: $CURRENT_PORT): " new_port
+    if [ ! -z "$new_port" ]; then
+        if [[ "$new_port" =~ ^[0-9]+$ ]] && [ "$new_port" -ge 1 ] && [ "$new_port" -le 65535 ]; then
+            sed -i "s/^#\?Port\s\+.*$/Port $new_port/" "$SSH_CONFIG"
+            echo -e "${GREEN}✅ SSH 端口已修改为 $new_port${RESET}"
+        else
+            echo -e "${RED}❌❌ 端口输入无效。${RESET}"
+        fi
+    fi
+
+    # 密码修改
+    read -p "是否修改 root 用户密码? (y/n): " change_pass
+    if [[ "$change_pass" == "y" || "$change_pass" == "Y" ]]; then
+        echo -e "${YELLOW}请设置新的 root 密码:${RESET}"
+        passwd root
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}✅ root 密码修改成功${RESET}"
+        else
+            echo -e "${RED}❌❌ root 密码修改失败${RESET}"
+        fi
+    fi
+
+    echo -e "${GREEN}>>> 正在重启 SSH 服务以应用更改...${RESET}"
+    if command -v systemctl >/dev/null 2>&1; then
+        systemctl restart sshd
+    else
+        /etc/init.d/sshd restart
+    fi
+    echo -e "${YELLOW}请注意: 如果您更改了 SSH 端口，请立即使用新端口重新连接！${RESET}"
+    read -n1 -p "按任意键返回菜单..."
+}
+
+# -------------------------------
+# 功能 11: GLIBC 管理
 # -------------------------------
 glibc_menu() {
     echo -e "${CYAN}=== GLIBC 管理 ===${RESET}"
@@ -416,7 +511,7 @@ upgrade_glibc() {
 }
 
 # -------------------------------
-# 功能 10: 全面系统升级 (包括内核和依赖)
+# 功能 12: 全面系统升级 (包括内核和依赖)
 # -------------------------------
 full_system_upgrade() {
     echo -e "${RED}警告：全面系统升级将升级所有软件包，包括内核，可能需要重启系统！${RESET}"
@@ -448,101 +543,6 @@ full_system_upgrade() {
     
     echo -e "${GREEN}全面系统升级完成${RESET}"
     echo -e "${YELLOW}建议重启系统以使所有更新生效${RESET}"
-}
-
-# -------------------------------
-# 功能 11: Docker 管理
-# -------------------------------
-docker_install() {
-    echo -e "${CYAN}正在安装 Docker...${RESET}"
-    curl -fsSL https://get.docker.com -o get-docker.sh
-    sh get-docker.sh --mirror Aliyun
-    rm get-docker.sh
-    systemctl enable docker
-    systemctl start docker
-    if command -v docker >/dev/null 2>&1; then
-        echo -e "${GREEN}✅ Docker 安装并启动成功！${RESET}"
-    else
-        echo -e "${RED}❌❌ Docker 安装失败，请检查日志。${RESET}"
-    fi
-}
-
-docker_menu() {
-    if ! command -v docker >/dev/null 2>&1; then
-        echo -e "${RED}未检测到 Docker！${RESET}"
-        read -p "是否现在安装 Docker? (y/n): " install_docker
-        if [[ "$install_docker" == "y" || "$install_docker" == "Y" ]]; then
-            docker_install
-        fi
-        read -n1 -p "按任意键返回菜单..."
-        return
-    fi
-
-    echo -e "${CYAN}=== Docker 容器管理 ===${RESET}"
-    echo -e "${YELLOW}当前运行的容器:${RESET}"
-    docker ps --format "table {{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}" 2>/dev/null || echo -e "${YELLOW}无运行中的容器${RESET}"
-    echo ""
-    echo "1) 查看所有容器"
-    echo "2) 重启所有容器"
-    echo "3) 返回主菜单"
-    read -p "请选择操作: " docker_choice
-    
-    case "$docker_choice" 在
-        1) docker ps -a 2>/dev/null || echo -e "${YELLOW}Docker 命令执行失败${RESET}" ;;
-        2) 
-            echo -e "${GREEN}正在重启所有容器...${RESET}"
-            docker restart $(docker ps -a -q) 2>/dev/null && echo -e "${GREEN}容器重启完成${RESET}" || echo -e "${YELLOW}无容器可重启${RESET}"
-            ;;
-        *) return ;;
-    esac
-    read -n1 -p "按任意键返回菜单..."
-}
-
-# -------------------------------
-# 功能 12: SSH 配置修改
-# -------------------------------
-ssh_config_menu() {
-    SSH_CONFIG="/etc/ssh/sshd_config"
-    if [ ! -f "$SSH_CONFIG" ]; then
-        echo -e "${RED}❌❌ 未找到 SSH 配置文件 ($SSH_CONFIG)。${RESET}"
-        read -n1 -p "按任意键返回菜单..."
-        return
-    fi
-
-    echo -e "${CYAN}=== SSH 配置修改 ===${RESET}"
-    
-    # 端口修改
-    CURRENT_PORT=$(grep -E '^Port' "$SSH_CONFIG" 2>/dev/null | awk '{print $2}' || echo "22")
-    read -p "输入新的 SSH 端口 (留空跳过，当前端口: $CURRENT_PORT): " new_port
-    if [ ! -z "$new_port" ]; then
-        if [[ "$new_port" =~ ^[0-9]+$ ]] && [ "$new_port" -ge 1 ] && [ "$new_port" -le 65535 ]; then
-            sed -i "s/^#\?Port\s\+.*$/Port $new_port/" "$SSH_CONFIG"
-            echo -e "${GREEN}✅ SSH 端口已修改为 $new_port${RESET}"
-        else
-            echo -e "${RED}❌❌ 端口输入无效。${RESET}"
-        fi
-    fi
-
-    # 密码修改
-    read -p "是否修改 root 用户密码? (y/n): " change_pass
-    if [[ "$change_pass" == "y" || "$change_pass" == "Y" ]]; then
-        echo -e "${YELLOW}请设置新的 root 密码:${RESET}"
-        passwd root
-        if [ $? -eq 0 ]; then
-            echo -e "${GREEN}✅ root 密码修改成功${RESET}"
-        else
-            echo -e "${RED}❌❌ root 密码修改失败${RESET}"
-        fi
-    fi
-
-    echo -e "${GREEN}>>> 正在重启 SSH 服务以应用更改...${RESET}"
-    if command -v systemctl >/dev/null 2>&1; then
-        systemctl restart sshd
-    else
-        /etc/init.d/sshd restart
-    fi
-    echo -e "${YELLOW}请注意: 如果您更改了 SSH 端口，请立即使用新端口重新连接！${RESET}"
-    read -n1 -p "按任意键返回菜单..."
 }
 
 # -------------------------------
@@ -625,9 +625,9 @@ show_menu() {
         echo "12) SSH 端口与密码修改"
         echo -e "${GREEN}--- 其他 ---${RESET}"
         echo "13) 卸载脚本及残留文件"
-        echo "0) 退出"
+        echo "14) 退出"
         echo ""
-        read -p "输入数字选择 (0-13): " choice
+        read -p "输入数字选择: " choice
         
         case "$choice" in
             1) bbr_test_menu ;;
@@ -643,8 +643,8 @@ show_menu() {
             11) docker_menu ;;
             12) ssh_config_menu ;;
             13) uninstall_script ;;
-            0) echo -e "${CYAN}感谢使用，再见！${RESET}"; exit 0 ;;
-            *) echo -e "${RED}无效选项，请输入 0-13${RESET}"; sleep 2 ;;
+            14) echo -e "${CYAN}感谢使用，再见！${RESET}"; exit 0 ;;
+            *) echo -e "${RED}无效选项，请输入 1-14${RESET}"; sleep 2 ;;
         esac
     done
 }
