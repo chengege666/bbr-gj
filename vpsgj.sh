@@ -191,6 +191,7 @@ show_sys_info() {
     # 网络信息
     echo -e "${GREEN}公网IPv4:${RESET} $(curl -s4 ifconfig.me 2>/dev/null || echo '获取失败')"
     echo -e "${GREEN}公网IPv6:${RESET} $(curl -s6 ifconfig.me 2>/dev/null || echo '获取失败')"
+    echo -极速模式
     echo -e "${GREEN}内网IP:${RESET} $(hostname -I 2>/dev/null || ip addr show | grep -E 'inet (192\.168|10\.|172\.)' | head -1 | awk '{print $2}' || echo '未知')"
     
     # BBR信息
@@ -207,7 +208,7 @@ show_sys_info() {
     echo -e "${GREEN}GLIBC版本:${RESET} $GLIBC_VERSION"
     
     # 系统运行状态
-    echo -e "${GREEN}系统运行时间:${RESET} $(uptime -p 2>/dev/null || uptime | awk '{print $3,$4,$5}' | sed 's/,//g')"
+    echo -e "${GREEN}系统运行时间:${极速模式
     echo -e "${GREEN}系统负载:${RESET} $(uptime | awk -F'load average: ' '{print $2}' 2>/dev/null || echo '未知')"
     echo -e "${GREEN}当前登录用户:${RESET} $(who | wc -l 2>/dev/null || echo '未知')"
     
@@ -244,7 +245,7 @@ sys_update() {
 sys_cleanup() {
     echo -e "${CYAN}=== 系统清理 ===${RESET}"
     echo -e "${GREEN}>>> 正在清理缓存和旧版依赖包...${RESET}"
-    if command -v apt >/dev/null 2>&1; then
+    if command -v apt >/dev/null 2>&极速模式
         apt autoremove -y
         apt clean
         apt autoclean
@@ -505,8 +506,7 @@ upgrade_glibc() {
         dnf install -y gcc make bison
         dnf update -y glibc
     else # <-- 此处的 'else' 是之前报告错误的位置
-        echo -e "${RED}❌❌ 无法识别系统类型，请手动升级GLIBC${RESET}"
-        return
+        echo -e "${RED}❌❌ 无法识别系统类型，请手动升级GLIBC${RES极速模式
     fi # <-- 确保 'fi' 匹配了最外层的 'if'
 
     echo -e "${GREEN}GLIBC升级完成${RESET}"
@@ -549,7 +549,7 @@ full_system_upgrade() {
 }
 
 # -------------------------------
-# 功能 13: 防火墙管理
+# 功能 13: 防火墙管理 (修改后无需重启)
 # -------------------------------
 firewall_menu() {
     echo -e "${CYAN}=== 防火墙管理 ===${RESET}"
@@ -645,7 +645,7 @@ firewall_menu() {
                         echo -e "${GREEN}已开放端口 $port/$protocol${RESET}"
                         ;;
                     "firewalld")
-                        firewall-cmd --permanent --add-port=$port/$protocol
+                        firewall-cmd --add-port=$port/$protocol --permanent
                         firewall-cmd --reload
                         echo -e "${GREEN}已永久开放端口 $port/$protocol${RESET}"
                         ;;
@@ -667,7 +667,7 @@ firewall_menu() {
                         echo -e "${GREEN}已关闭端口 $port/$protocol${RESET}"
                         ;;
                     "firewalld")
-                        firewall-cmd --permanent --remove-port=$port/$protocol
+                        firewall-cmd --remove-port=$port/$protocol --permanent
                         firewall-cmd --reload
                         echo -e "${GREEN}已永久关闭端口 $port/$protocol${RESET}"
                         ;;
