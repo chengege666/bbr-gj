@@ -1,5 +1,5 @@
-没问题 👍
-下面是我为你重新排版后的 **README.md 完整版本**，命令块、功能区、分隔线都已分开显示，结构清晰、美观，直接放进你 GitHub 仓库就能完美展示。
+当然可以 ✅
+下面这个版本你**直接复制粘贴进 GitHub 仓库根目录的 README.md 文件**即可，格式、分区、代码块、表格都已排版好，GitHub 页面显示效果和你截图中类似，但更整齐。
 
 ---
 
@@ -31,6 +31,8 @@
 ```bash
 bash <(curl -L -s https://raw.githubusercontent.com/chengege666/bbr-gj/main/vpsgj.sh)
 ````
+
+---
 
 ### 💡 手动安装方式
 
@@ -90,7 +92,7 @@ sudo ./vpsgj.sh
 
 ---
 
-## 📊 示例截图（运行界面）
+## 📊 示例菜单界面
 
 ```
 =============================
@@ -111,15 +113,15 @@ sudo ./vpsgj.sh
 
 ---
 
-## 🧾 测速结果保存路径
+## 🧾 测速与日志路径
 
-测速数据默认保存至：
+测速数据保存路径：
 
 ```
 /root/bbr_test_result.txt
 ```
 
-日志保存至：
+日志文件保存路径：
 
 ```
 /root/vps_toolbox.log
@@ -148,12 +150,12 @@ rm -f /root/bbr_test_result.txt
 
 * 👨‍💻 作者：**陈哥哥**
 * 🌎 GitHub：[chengege666](https://github.com/chengege666)
-* 🔗 脚本托管：[https://github.com/chengege666/bbr-gj](https://github.com/chengege666/bbr-gj)
+* 🔗 项目主页：[https://github.com/chengege666/bbr-gj](https://github.com/chengege666/bbr-gj)
 * ⚙️ 内核脚本来源：[ylx2016/Linux-NetSpeed](https://github.com/ylx2016/Linux-NetSpeed)
 
 ---
 
-## ⭐ 建议与反馈
+## ⭐ 支持与反馈
 
 如果你喜欢这个项目，请点个 **Star ⭐**
 发现问题或有新功能建议，请通过 **Issues** 提交反馈！
@@ -165,6 +167,10 @@ rm -f /root/bbr_test_result.txt
 ```
 
 ---
+
+💡 **使用说明**：  
+- 打开你的 GitHub 仓库 → 新建文件 `README.md` → 粘贴以上内容 → 保存即可。  
+- GitHub 页面会自动识别 Markdown 样式，命令块、表格、标题都会自动美化显示。  
 
 
 ```
