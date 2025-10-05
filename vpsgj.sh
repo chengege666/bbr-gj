@@ -196,6 +196,30 @@ show_sys_info() {
     echo -e "${GREEN}当前拥塞控制算法:${RESET} $CURRENT_BBR"
     echo -e "${GREEN}当前队列规则:${RESET} $CURRENT_QDISC"
     
+    # 增强BBR类型检测
+    KERNEL_VERSION=$(uname -r)
+    BBR_TYPE="官方内核"
+    if [[ $KERNEL_VERSION =~ "xanmod" ]]; then
+        BBR_TYPE="BBR Plus (xanmod内核)"
+    elif [[ $KERNEL_VERSION =~ "bbrplus" ]]; then
+        BBR_TYPE="BBR Plus (bbrplus内核)"
+    elif [[ $KERNEL_VERSION =~ "bbrv2" || $KERNEL_VERSION =~ "bbr2" ]]; then
+        BBR_TYPE="BBRv2"
+    elif [[ $KERNEL_VERSION =~ "bbrv3" || $KERNEL_VERSION =~ "bbr3" ]]; then
+        BBR_TYPE="BBRv3"
+    else
+        MAJOR_VERSION=$(echo "$KERNEL_VERSION" | cut -d. -f1)
+        MINOR_VERSION=$(echo "$KERNEL_VERSION" | cut -d. -f2)
+        if [ "$MAJOR_VERSION" -ge 5 ] && [ "$MINOR_VERSION" -ge 10 ]; then
+            BBR_TYPE="官方内核（支持BBRv2）"
+        elif [ "$MAJOR_VERSION" -ge 4 ] && [ "$MINOR_VERSION" -ge 9 ]; then
+            BBR_TYPE="官方内核（支持BBR）"
+        else
+            BBR_TYPE="官方内核（不支持BBR）"
+        fi
+    fi
+    echo -e "${GREEN}当前BBR类型:${RESET} $BBR_TYPE"
+    
     # 系统运行状态
     echo -e "${GREEN}系统运行时间:${RESET} $(uptime -p 2>/dev/null || uptime | awk '{print $3,$4,$5}' | sed 's/,//g')"
     echo -e "${GREEN}系统负载:${RESET} $(uptime | awk -F'load average: ' '{print $2}' 2>/dev/null || echo '未知')"
