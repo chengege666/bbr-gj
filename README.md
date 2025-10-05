@@ -18,6 +18,7 @@
 
 ```bash
 # 运行脚本
+```
 bash <(curl -L -s https://raw.githubusercontent.com/chengege666/bbr-gj/main/vpsgj.sh)
 ```
 
