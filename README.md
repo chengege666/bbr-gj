@@ -24,23 +24,34 @@
 
 ---
 
-## 🧰 一键安装与运行
+明白了 ✅
+你想让 **代码块和标题之间** 真正分开（在 GitHub 渲染时出现明显的间距，而不是紧贴着）。
+
+GitHub 的 Markdown 渲染规则比较“紧”，`---` 分隔线不会在代码块前产生垂直间距。
+要让它**视觉上彻底分开**，可以使用一个空行 + `<br>` HTML 换行标签，这样 GitHub 会强制拉开距离。
+
+👇请复制这一段替换原文（这个是你要的最终效果版本）：
 
 ---
+
+````markdown
+## 🧰 一键安装与运行
+
+<br>
 
 ### ✅ 推荐命令
 
----
+<br>
 
 ```bash
 bash <(curl -L -s https://raw.githubusercontent.com/chengege666/bbr-gj/main/vpsgj.sh)
-
-
 ````
 
----
+<br>
 
 ### 💡 手动安装方式
+
+<br>
 
 ```bash
 wget -O vpsgj.sh https://raw.githubusercontent.com/chengege666/bbr-gj/main/vpsgj.sh
@@ -48,7 +59,14 @@ chmod +x vpsgj.sh
 sudo ./vpsgj.sh
 ```
 
+<br>
+
 > ⚠️ 必须使用 root 权限运行，否则脚本会自动退出。
+
+```
+
+```
+
 
 ---
 
