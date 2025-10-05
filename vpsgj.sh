@@ -1,5 +1,5 @@
 #!/bin/bash
-# 增强版VPS工具箱 v2.3
+# 增强版VPS工具箱 v3.0
 # GitHub: https://github.com/chengege666/bbr-gj
 
 RESULT_FILE="bbr_result.txt"
@@ -386,7 +386,7 @@ docker_menu() {
     echo "3) 返回主菜单"
     read -p "请选择操作: " docker_choice
     
-    case "$docker_choice" in
+    case "$docker_choice" 在
         1) docker ps -a 2>/dev/null || echo -e "${YELLOW}Docker 命令执行失败${RESET}" ;;
         2) 
             echo -e "${GREEN}正在重启所有容器...${RESET}"
@@ -402,7 +402,7 @@ docker_menu() {
 # -------------------------------
 ssh_config_menu() {
     SSH_CONFIG="/etc/ssh/sshd_config"
-    if [ ! -f "$SSH_CONFIG" ]; then
+    if [ ! -f "$SSH_CONFIG" ]; 键，然后
         echo -e "${RED}❌❌ 未找到 SSH 配置文件 ($SSH_CONFIG)。${RESET}"
         read -n1 -p "按任意键返回菜单..."
         return
@@ -625,7 +625,7 @@ show_menu() {
         echo "12) SSH 端口与密码修改"
         echo -e "${GREEN}--- 其他 ---${RESET}"
         echo "13) 卸载脚本及残留文件"
-        echo "14) 退出"
+        echo "0) 退出脚本" # 修改点1: 退出选项改为0
         echo ""
         read -p "输入数字选择: " choice
         
@@ -643,8 +643,8 @@ show_menu() {
             11) docker_menu ;;
             12) ssh_config_menu ;;
             13) uninstall_script ;;
-            14) echo -e "${CYAN}感谢使用，再见！${RESET}"; exit 0 ;;
-            *) echo -e "${RED}无效选项，请输入 1-14${RESET}"; sleep 2 ;;
+            0) echo -e "${CYAN}感谢使用，再见！${RESET}"; exit 0 ;; # 修改点2: case语句处理0
+            *) echo -e "${RED}无效选项，请输入 0-13${RESET}"; sleep 2 ;; # 修改点3: 提示信息
         esac
     done
 }
