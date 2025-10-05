@@ -16,9 +16,9 @@
 
 请确保您拥有 **root 权限**，并执行以下命令：
 
-```bash
+
 # 运行脚本
-```
+```bash
 bash <(curl -L -s https://raw.githubusercontent.com/chengege666/bbr-gj/main/vpsgj.sh)
 ```
 
