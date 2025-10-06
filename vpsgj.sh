@@ -1,5 +1,5 @@
 #!/bin/bash
-# 增强版VPS工具箱 v1.0
+# 增强版VPS工具箱 v1.1 (集成高级防火墙)
 # GitHub: https://github.com/chengege666/bbr-gj
 
 RESULT_FILE="bbr_result.txt"
@@ -19,9 +19,9 @@ RESET="\033[0m"
 print_welcome() {
     clear
     echo -e "${CYAN}==================================================${RESET}"
-    echo -e "${MAGENTA}                VPS 工具箱 v1.0                ${RESET}"
+    echo -e "${MAGENTA}              增强版 VPS 工具箱 v1.1             ${RESET}"
     echo -e "${CYAN}--------------------------------------------------${RESET}"
-    echo -e "${YELLOW}功能: BBR测速, 系统管理, GLIBC管理, Docker, SSH配置等${RESET}"
+    echo -e "${YELLOW}功能: BBR测速, 系统管理, 高级防火墙, Docker等${RESET}"
     echo -e "${GREEN}测速结果保存: ${RESULT_FILE}${RESET}"
     echo -e "${CYAN}==================================================${RESET}"
     echo ""
@@ -42,7 +42,7 @@ check_root() {
 # 依赖安装
 # -------------------------------
 install_deps() {
-    PKGS="curl wget git speedtest-cli net-tools build-essential"
+    PKGS="curl wget git speedtest-cli net-tools build-essential iptables"
     if command -v apt >/dev/null 2>&1; then
         apt update -y
         apt install -y $PKGS
@@ -57,7 +57,7 @@ install_deps() {
 }
 
 check_deps() {
-    for CMD in curl wget git speedtest-cli; do
+    for CMD in curl wget git speedtest-cli iptables; do
         if ! command -v $CMD >/dev/null 2>&1; then
             echo -e "${YELLOW}未检测到 $CMD，正在尝试安装依赖...${RESET}"
             install_deps
@@ -549,123 +549,233 @@ full_system_upgrade() {
 }
 
 # ====================================================================
-# +++ 新增功能: 防火墙管理 +++
+# +++ 新增功能: 高级防火墙管理 (基于iptables) +++
 # ====================================================================
-firewall_menu() {
-    FW_TOOL=""
-    if command -v ufw >/dev/null 2>&1; then
-        FW_TOOL="ufw"
-    elif command -v firewall-cmd >/dev/null 2>&1; then
-        FW_TOOL="firewalld"
-    fi
+# 获取当前SSH端口
+get_ssh_port() {
+    SSH_PORT=$(ss -tnlp | grep 'sshd' | awk '{print $4}' | awk -F ':' '{print $NF}' | head -n 1)
+    echo "${SSH_PORT:-22}"
+}
 
-    if [ -z "$FW_TOOL" ]; then
-        echo -e "${RED}未检测到 ufw 或 firewalld 防火墙工具。${RESET}"
-        read -p "是否需要为您安装 ufw (适用于Debian/Ubuntu)? (y/n): " install_fw
-        if [[ "$install_fw" == "y" || "$install_fw" == "Y" ]]; then
-            if command -v apt >/dev/null 2>&1; then
-                apt update && apt install -y ufw
-                echo -e "${GREEN}ufw 安装完成，请重新进入此菜单。${RESET}"
-                FW_TOOL="ufw"
-            else
-                echo -e "${RED}非Debian/Ubuntu系统，请手动安装 ufw 或 firewalld。${RESET}"
-            fi
+# 允许当前SSH连接，以防锁死
+allow_current_ssh() {
+    local ssh_port
+    ssh_port=$(get_ssh_port)
+    if ! iptables -C INPUT -p tcp --dport "$ssh_port" -j ACCEPT >/dev/null 2>&1; then
+        iptables -I INPUT 1 -p tcp --dport "$ssh_port" -j ACCEPT
+        echo -e "${YELLOW}为防止失联，已自动放行当前SSH端口 ($ssh_port)。${RESET}"
+    fi
+}
+
+# 保存iptables规则
+save_iptables_rules() {
+    echo -e "${CYAN}=== 保存防火墙规则 ===${RESET}"
+    if command -v apt >/dev/null 2>&1; then
+        if ! command -v iptables-save >/dev/null 2>&1; then
+            apt-get update
+            apt-get install -y iptables-persistent
         fi
-        read -n1 -p "按任意键返回菜单..."
+        iptables-save > /etc/iptables/rules.v4
+        ip6tables-save > /etc/iptables/rules.v6
+    elif command -v yum >/dev/null 2>&1 || command -v dnf >/dev/null 2>&1; then
+        if ! command -v iptables-save >/dev/null 2>&1; then
+           yum install -y iptables-services
+           systemctl enable iptables
+        fi
+        service iptables save
+    else
+        echo -e "${RED}无法确定规则保存方式，请手动执行 'iptables-save'。${RESET}"
         return
     fi
+    echo -e "${GREEN}防火墙规则已保存，重启后将自动加载。${RESET}"
+}
 
+# 安装GeoIP模块
+setup_geoip() {
+    if lsmod | grep -q 'xt_geoip'; then
+        return 0
+    fi
+    echo -e "${CYAN}检测到您首次使用国家IP限制功能，需要安装相关模块...${RESET}"
+    if command -v apt >/dev/null 2>&1; then
+        apt update
+        apt install -y xtables-addons-common libtext-csv-xs-perl unzip
+    elif command -v yum >/dev/null 2>&1 || command -v dnf >/dev/null 2>&1; then
+        # CentOS/RHEL 需要 EPEL
+        yum install -y epel-release
+        yum install -y xtables-addons perl-Text-CSV_XS unzip
+    fi
+
+    mkdir -p /usr/share/xt_geoip
+    cd /usr/share/xt_geoip || return
+    # 使用ipdeny的数据库
+    wget -qO- "https://www.ipdeny.com/ipblocks/data/countries/all-zones.tar.gz" | tar -xzf -
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}GeoIP数据库下载并解压成功。${RESET}"
+        /usr/lib/xtables-addons/xt_geoip_build -D /usr/share/xt_geoip/ -S /usr/share/xt_geoip/
+        echo -e "${GREEN}GeoIP数据库编译完成。${RESET}"
+        modprobe xt_geoip
+    else
+        echo -e "${RED}GeoIP数据库下载失败，请检查网络。${RESET}"
+        return 1
+    fi
+}
+
+firewall_menu_advanced() {
     while true; do
-        echo -e "${CYAN}=== 防火墙管理 ($FW_TOOL) ===${RESET}"
-        echo "1) 查看防火墙状态"
-        echo "2) 开启防火墙"
-        echo "3) 关闭防火墙"
-        echo "4) 查看所有规则"
-        echo "5) 开放端口"
-        echo "6) 关闭端口"
-        echo "7) 返回主菜单"
-        read -p "请选择操作: " fw_choice
+        clear
+        echo -e "${CYAN}=== 高级防火墙管理 (iptables) ===${RESET}"
+        iptables -L INPUT -n --line-numbers | head -n 20
+        echo "------------------------------------------------"
+        echo -e "${YELLOW}1. 开放指定端口${RESET}                ${YELLOW}2. 关闭指定端口${RESET}"
+        echo -e "${YELLOW}3. 开放所有端口(策略ACCEPT)${RESET}    ${YELLOW}4. 关闭所有端口(策略DROP)${RESET}"
+        echo -e "${YELLOW}5. IP白名单 (允许访问)${RESET}           ${YELLOW}6. IP黑名单 (禁止访问)${RESET}"
+        echo -e "${YELLOW}7. 清除指定IP规则${RESET}"
+        echo "------------------------------------------------"
+        echo -e "${CYAN}11. 允许 PING${RESET}                    ${CYAN}12. 禁止 PING${RESET}"
+        echo -e "${CYAN}13. 启用基础DDoS防御${RESET}           ${CYAN}14. 关闭基础DDoS防御${RESET}"
+        echo "------------------------------------------------"
+        echo -e "${MAGENTA}15. 阻止指定国家IP${RESET}             ${MAGENTA}16. 仅允许指定国家IP${RESET}"
+        echo -e "${MAGENTA}17. 解除所有国家IP限制${RESET}"
+        echo "------------------------------------------------"
+        echo -e "${GREEN}98. 保存当前规则使其永久生效${RESET}"
+        echo -e "${GREEN}99. 清空所有防火墙规则${RESET}"
+        echo -e "${GREEN}0. 返回上一级菜单${RESET}"
+        echo ""
+        read -p "请输入你的选择: " fw_choice
+
+        allow_current_ssh # 每次操作前都确保SSH是通的
 
         case "$fw_choice" in
             1)
-                if [ "$FW_TOOL" = "ufw" ]; then
-                    ufw status
-                else
-                    systemctl status firewalld
-                fi
+                read -p "请输入要开放的端口: " port
+                iptables -I INPUT -p tcp --dport "$port" -j ACCEPT
+                iptables -I INPUT -p udp --dport "$port" -j ACCEPT
+                echo -e "${GREEN}端口 $port (TCP/UDP) 已开放。${RESET}"
                 ;;
             2)
-                if [ "$FW_TOOL" = "ufw" ]; then
-                    ufw enable
-                else
-                    systemctl start firewalld
-                    systemctl enable firewalld
-                    echo -e "${GREEN}Firewalld 已启动并设置为开机自启。${RESET}"
-                fi
+                read -p "请输入要关闭的端口: " port
+                iptables -I INPUT -p tcp --dport "$port" -j DROP
+                iptables -I INPUT -p udp --dport "$port" -j DROP
+                echo -e "${GREEN}端口 $port (TCP/UDP) 的访问已被禁止。${RESET}"
                 ;;
             3)
-                if [ "$FW_TOOL" = "ufw" ]; then
-                    ufw disable
-                else
-                    systemctl stop firewalld
-                    systemctl disable firewalld
-                    echo -e "${GREEN}Firewalld 已停止并取消开机自启。${RESET}"
+                echo -e "${RED}警告：此操作将允许所有外部访问！${RESET}"
+                read -p "确定要将默认策略设为 ACCEPT 吗？(y/N): " confirm
+                if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then
+                    iptables -P INPUT ACCEPT
+                    echo -e "${GREEN}防火墙默认策略已设为 ACCEPT。${RESET}"
                 fi
                 ;;
             4)
-                if [ "$FW_TOOL" = "ufw" ]; then
-                    ufw status numbered
-                else
-                    firewall-cmd --list-all
+                echo -e "${RED}警告：此操作将默认拒绝所有访问，仅放行您已设置的允许规则！${RESET}"
+                read -p "确定要将默认策略设为 DROP 吗？(y/N): " confirm
+                if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then
+                    iptables -P INPUT DROP
+                    echo -e "${GREEN}防火墙默认策略已设为 DROP。${RESET}"
                 fi
                 ;;
             5)
-                read -p "请输入要开放的端口号: " port
-                read -p "请输入协议 (tcp/udp/all, 默认为all): " proto
-                proto=${proto:-all}
-                if [ "$FW_TOOL" = "ufw" ]; then
-                    if [ "$proto" = "all" ]; then
-                       ufw allow "$port"
-                    else
-                       ufw allow "$port"/"$proto"
-                    fi
-                else
-                    if [ "$proto" = "all" ]; then
-                        firewall-cmd --permanent --add-port="$port"/tcp
-                        firewall-cmd --permanent --add-port="$port"/udp
-                    else
-                        firewall-cmd --permanent --add-port="$port"/"$proto"
-                    fi
-                    firewall-cmd --reload
-                fi
-                echo -e "${GREEN}操作完成，请通过查看规则确认。${RESET}"
+                read -p "请输入要加入白名单的IP地址: " ip
+                iptables -I INPUT -s "$ip" -j ACCEPT
+                echo -e "${GREEN}IP $ip 已加入白名单。${RESET}"
                 ;;
             6)
-                read -p "请输入要关闭的端口号: " port
-                read -p "请输入协议 (tcp/udp/all, 默认为all): " proto
-                proto=${proto:-all}
-                if [ "$FW_TOOL" = "ufw" ]; then
-                    if [ "$proto" = "all" ]; then
-                       ufw delete allow "$port"
-                    else
-                       ufw delete allow "$port"/"$proto"
-                    fi
-                else
-                    if [ "$proto" = "all" ]; then
-                        firewall-cmd --permanent --remove-port="$port"/tcp
-                        firewall-cmd --permanent --remove-port="$port"/udp
-                    else
-                        firewall-cmd --permanent --remove-port="$port"/"$proto"
-                    fi
-                    firewall-cmd --reload
-                fi
-                echo -e "${GREEN}操作完成，请通过查看规则确认。${RESET}"
+                read -p "请输入要加入黑名单的IP地址: " ip
+                iptables -I INPUT -s "$ip" -j DROP
+                echo -e "${GREEN}IP $ip 已加入黑名单。${RESET}"
                 ;;
             7)
+                read -p "请输入要清除规则的IP地址: " ip
+                # 尝试删除该IP的所有规则
+                iptables -D INPUT -s "$ip" -j ACCEPT 2>/dev/null
+                iptables -D INPUT -s "$ip" -j DROP 2>/dev/null
+                echo -e "${GREEN}已尝试清除IP $ip 的所有规则。${RESET}"
+                ;;
+            11)
+                iptables -A INPUT -p icmp --icmp-type echo-request -j ACCEPT
+                echo -e "${GREEN}已允许 PING 请求。${RESET}"
+                ;;
+            12)
+                iptables -A INPUT -p icmp --icmp-type echo-request -j DROP
+                echo -e "${GREEN}已禁止 PING 请求。${RESET}"
+                ;;
+            13)
+                # 基础DDoS防御规则
+                iptables -A INPUT -p tcp --tcp-flags ALL NONE -j DROP
+                iptables -A INPUT -p tcp ! --syn -m state --state NEW -j DROP
+                iptables -A INPUT -p tcp --tcp-flags ALL ALL -j DROP
+                # 防止SYN洪水攻击
+                iptables -A INPUT -p tcp -m tcp --tcp-flags FIN,SYN,RST,PSH,ACK,URG NONE -j DROP
+                iptables -A INPUT -p tcp -m tcp --tcp-flags FIN,SYN FIN,SYN -j DROP
+                iptables -A INPUT -p tcp -m tcp --tcp-flags SYN,RST SYN,RST -j DROP
+                iptables -A INPUT -p tcp -m tcp --tcp-flags FIN,RST FIN,RST -j DROP
+                iptables -A INPUT -p tcp -m tcp --tcp-flags FIN,ACK FIN -j DROP
+                iptables -A INPUT -p tcp -m tcp --tcp-flags ACK,URG URG -j DROP
+                # 限制新连接速率
+                iptables -A INPUT -p tcp -m conntrack --ctstate NEW -m limit --limit 60/s --limit-burst 20 -j ACCEPT
+                iptables -A INPUT -p tcp -m conntrack --ctstate NEW -j DROP
+                echo -e "${GREEN}基础DDoS防御规则已启用。${RESET}"
+                ;;
+            14)
+                # 移除基础DDoS防御规则
+                iptables -D INPUT -p tcp --tcp-flags ALL NONE -j DROP 2>/dev/null
+                iptables -D INPUT -p tcp ! --syn -m state --state NEW -j DROP 2>/dev/null
+                iptables -D INPUT -p tcp --tcp-flags ALL ALL -j DROP 2>/dev/null
+                iptables -D INPUT -p tcp -m tcp --tcp-flags FIN,SYN,RST,PSH,ACK,URG NONE -j DROP 2>/dev/null
+                iptables -D INPUT -p tcp -m tcp --tcp-flags FIN,SYN FIN,SYN -j DROP 2>/dev/null
+                iptables -D INPUT -p tcp -m tcp --tcp-flags SYN,RST SYN,RST -j DROP 2>/dev/null
+                iptables -D INPUT -p tcp -m tcp --tcp-flags FIN,RST FIN,RST -j DROP 2>/dev/null
+                iptables -D INPUT -p tcp -m tcp --tcp-flags FIN,ACK FIN -j DROP 2>/dev/null
+                iptables -D INPUT -p tcp -m tcp --tcp-flags ACK,URG URG -j DROP 2>/dev/null
+                iptables -D INPUT -p tcp -m conntrack --ctstate NEW -m limit --limit 60/s --limit-burst 20 -j ACCEPT 2>/dev/null
+                iptables -D INPUT -p tcp -m conntrack --ctstate NEW -j DROP 2>/dev/null
+                echo -e "${GREEN}基础DDoS防御规则已关闭。${RESET}"
+                ;;
+            15)
+                setup_geoip
+                if [ $? -ne 0 ]; then read -n1 -p "按任意键返回..."; continue; fi
+                read -p "请输入要阻止的国家代码 (例如 CN,US,RU)，多个用逗号隔开: " country_codes
+                iptables -I INPUT -m geoip --src-cc "$country_codes" -j DROP
+                echo -e "${GREEN}已阻止来自 $country_codes 的IP访问。${RESET}"
+                ;;
+            16)
+                setup_geoip
+                if [ $? -ne 0 ]; then read -n1 -p "按任意键返回..."; continue; fi
+                echo -e "${RED}警告：此操作将拒绝除指定国家外的所有IP访问，风险极高！${RESET}"
+                read -p "请输入仅允许的国家代码 (例如 CN,US,RU)，多个用逗号隔开: " country_codes
+                read -p "再次确认执行此高风险操作吗？(y/N): " confirm
+                if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then
+                    iptables -A INPUT -m geoip ! --src-cc "$country_codes" -j DROP
+                    echo -e "${GREEN}已设置为仅允许来自 $country_codes 的IP访问。${RESET}"
+                fi
+                ;;
+            17)
+                # 移除所有GeoIP规则
+                for rule_num in $(iptables -L INPUT --line-numbers | grep 'geoip' | awk '{print $1}' | sort -rn); do
+                    iptables -D INPUT "$rule_num"
+                done
+                echo -e "${GREEN}所有国家IP限制规则已解除。${RESET}"
+                ;;
+            98)
+                save_iptables_rules
+                ;;
+            99)
+                echo -e "${RED}警告：此操作将清空所有防火墙规则，使服务器完全暴露！${RESET}"
+                read -p "确定要清空所有规则吗？(y/N): " confirm
+                if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then
+                    iptables -F
+                    iptables -X
+                    iptables -P INPUT ACCEPT
+                    iptables -P FORWARD ACCEPT
+                    iptables -P OUTPUT ACCEPT
+                    echo -e "${GREEN}所有防火墙规则已清空。${RESET}"
+                fi
+                ;;
+            0)
                 return
                 ;;
             *)
-                echo -e "${RED}无效选择${RESET}"
+                echo -e "${RED}无效选项，请输入正确的数字。${RESET}"
                 ;;
         esac
         read -n1 -p "按任意键返回防火墙菜单..."
@@ -748,10 +858,10 @@ show_menu() {
         echo "8) 系统重启"
         echo "9) GLIBC 管理"
         echo "10) 全面系统升级 (含内核升级)"
-        echo -e "${GREEN}--- 服务管理 ---${RESET}"
+        echo -e "${GREEN}--- 服务与安全 ---${RESET}"
         echo "11) Docker 容器管理"
         echo "12) SSH 端口与密码修改"
-        echo "13) 防火墙管理 (ufw/firewalld)"
+        echo "13) 高级防火墙管理 (iptables)"
         echo -e "${GREEN}--- 其他 ---${RESET}"
         echo "14) 卸载脚本及残留文件"
         echo "0) 退出脚本" # 退出选项改为0
@@ -771,10 +881,10 @@ show_menu() {
             10) full_system_upgrade ;;
             11) docker_menu ;;
             12) ssh_config_menu ;;
-            13) firewall_menu ;; # 新增的选项
-            14) uninstall_script ;; # 原卸载选项顺延
-            0) echo -e "${CYAN}感谢使用，再见！${RESET}"; exit 0 ;; # case语句处理0
-            *) echo -e "${RED}无效选项，请输入 0-14${RESET}"; sleep 2 ;; # 提示信息更新为0-14
+            13) firewall_menu_advanced ;; # 替换为新的高级防火墙菜单
+            14) uninstall_script ;; 
+            0) echo -e "${CYAN}感谢使用，再见！${RESET}"; exit 0 ;;
+            *) echo -e "${RED}无效选项，请输入 0-14${RESET}"; sleep 2 ;;
         esac
     done
 }
@@ -785,4 +895,3 @@ show_menu() {
 check_root
 check_deps
 show_menu
-
