@@ -548,6 +548,131 @@ full_system_upgrade() {
     echo -e "${YELLOW}建议重启系统以使所有更新生效${RESET}"
 }
 
+# ====================================================================
+# +++ 新增功能: 防火墙管理 +++
+# ====================================================================
+firewall_menu() {
+    FW_TOOL=""
+    if command -v ufw >/dev/null 2>&1; then
+        FW_TOOL="ufw"
+    elif command -v firewall-cmd >/dev/null 2>&1; then
+        FW_TOOL="firewalld"
+    fi
+
+    if [ -z "$FW_TOOL" ]; then
+        echo -e "${RED}未检测到 ufw 或 firewalld 防火墙工具。${RESET}"
+        read -p "是否需要为您安装 ufw (适用于Debian/Ubuntu)? (y/n): " install_fw
+        if [[ "$install_fw" == "y" || "$install_fw" == "Y" ]]; then
+            if command -v apt >/dev/null 2>&1; then
+                apt update && apt install -y ufw
+                echo -e "${GREEN}ufw 安装完成，请重新进入此菜单。${RESET}"
+                FW_TOOL="ufw"
+            else
+                echo -e "${RED}非Debian/Ubuntu系统，请手动安装 ufw 或 firewalld。${RESET}"
+            fi
+        fi
+        read -n1 -p "按任意键返回菜单..."
+        return
+    fi
+
+    while true; do
+        echo -e "${CYAN}=== 防火墙管理 ($FW_TOOL) ===${RESET}"
+        echo "1) 查看防火墙状态"
+        echo "2) 开启防火墙"
+        echo "3) 关闭防火墙"
+        echo "4) 查看所有规则"
+        echo "5) 开放端口"
+        echo "6) 关闭端口"
+        echo "7) 返回主菜单"
+        read -p "请选择操作: " fw_choice
+
+        case "$fw_choice" in
+            1)
+                if [ "$FW_TOOL" = "ufw" ]; then
+                    ufw status
+                else
+                    systemctl status firewalld
+                fi
+                ;;
+            2)
+                if [ "$FW_TOOL" = "ufw" ]; then
+                    ufw enable
+                else
+                    systemctl start firewalld
+                    systemctl enable firewalld
+                    echo -e "${GREEN}Firewalld 已启动并设置为开机自启。${RESET}"
+                fi
+                ;;
+            3)
+                if [ "$FW_TOOL" = "ufw" ]; then
+                    ufw disable
+                else
+                    systemctl stop firewalld
+                    systemctl disable firewalld
+                    echo -e "${GREEN}Firewalld 已停止并取消开机自启。${RESET}"
+                fi
+                ;;
+            4)
+                if [ "$FW_TOOL" = "ufw" ]; then
+                    ufw status numbered
+                else
+                    firewall-cmd --list-all
+                fi
+                ;;
+            5)
+                read -p "请输入要开放的端口号: " port
+                read -p "请输入协议 (tcp/udp/all, 默认为all): " proto
+                proto=${proto:-all}
+                if [ "$FW_TOOL" = "ufw" ]; then
+                    if [ "$proto" = "all" ]; then
+                       ufw allow "$port"
+                    else
+                       ufw allow "$port"/"$proto"
+                    fi
+                else
+                    if [ "$proto" = "all" ]; then
+                        firewall-cmd --permanent --add-port="$port"/tcp
+                        firewall-cmd --permanent --add-port="$port"/udp
+                    else
+                        firewall-cmd --permanent --add-port="$port"/"$proto"
+                    fi
+                    firewall-cmd --reload
+                fi
+                echo -e "${GREEN}操作完成，请通过查看规则确认。${RESET}"
+                ;;
+            6)
+                read -p "请输入要关闭的端口号: " port
+                read -p "请输入协议 (tcp/udp/all, 默认为all): " proto
+                proto=${proto:-all}
+                if [ "$FW_TOOL" = "ufw" ]; then
+                    if [ "$proto" = "all" ]; then
+                       ufw delete allow "$port"
+                    else
+                       ufw delete allow "$port"/"$proto"
+                    fi
+                else
+                    if [ "$proto" = "all" ]; then
+                        firewall-cmd --permanent --remove-port="$port"/tcp
+                        firewall-cmd --permanent --remove-port="$port"/udp
+                    else
+                        firewall-cmd --permanent --remove-port="$port"/"$proto"
+                    fi
+                    firewall-cmd --reload
+                fi
+                echo -e "${GREEN}操作完成，请通过查看规则确认。${RESET}"
+                ;;
+            7)
+                return
+                ;;
+            *)
+                echo -e "${RED}无效选择${RESET}"
+                ;;
+        esac
+        read -n1 -p "按任意键返回防火墙菜单..."
+    done
+}
+
+
 # -------------------------------
 # 功能 13: 卸载脚本
 # -------------------------------
@@ -626,8 +751,9 @@ show_menu() {
         echo -e "${GREEN}--- 服务管理 ---${RESET}"
         echo "11) Docker 容器管理"
         echo "12) SSH 端口与密码修改"
+        echo "13) 防火墙管理 (ufw/firewalld)"
         echo -e "${GREEN}--- 其他 ---${RESET}"
-        echo "13) 卸载脚本及残留文件"
+        echo "14) 卸载脚本及残留文件"
         echo "0) 退出脚本" # 退出选项改为0
         echo ""
         read -p "输入数字选择: " choice
@@ -645,9 +771,10 @@ show_menu() {
             10) full_system_upgrade ;;
             11) docker_menu ;;
             12) ssh_config_menu ;;
-            13) uninstall_script ;;
+            13) firewall_menu ;; # 新增的选项
+            14) uninstall_script ;; # 原卸载选项顺延
             0) echo -e "${CYAN}感谢使用，再见！${RESET}"; exit 0 ;; # case语句处理0
-            *) echo -e "${RED}无效选项，请输入 0-13${RESET}"; sleep 2 ;; # 提示信息更新为0-13
+            *) echo -e "${RED}无效选项，请输入 0-14${RESET}"; sleep 2 ;; # 提示信息更新为0-14
         esac
     done
 }
@@ -658,3 +785,4 @@ show_menu() {
 check_root
 check_deps
 show_menu
+
