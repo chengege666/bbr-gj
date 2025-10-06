@@ -1,5 +1,5 @@
 #!/bin/bash
-# 增强版VPS工具箱 v1.1 (集成高级防火墙)
+# 增强版VPS工具箱 v1.2 (集成高级Docker管理)
 # GitHub: https://github.com/chengege666/bbr-gj
 
 RESULT_FILE="bbr_result.txt"
@@ -19,9 +19,9 @@ RESET="\033[0m"
 print_welcome() {
     clear
     echo -e "${CYAN}==================================================${RESET}"
-    echo -e "${MAGENTA}              增强版 VPS 工具箱 v1.1             ${RESET}"
+    echo -e "${MAGENTA}              增强版 VPS 工具箱 v1.2             ${RESET}"
     echo -e "${CYAN}--------------------------------------------------${RESET}"
-    echo -e "${YELLOW}功能: BBR测速, 系统管理, 高级防火墙, Docker等${RESET}"
+    echo -e "${YELLOW}功能: BBR测速, 系统管理, 高级防火墙, 高级Docker等${RESET}"
     echo -e "${GREEN}测速结果保存: ${RESULT_FILE}${RESET}"
     echo -e "${CYAN}==================================================${RESET}"
     echo ""
@@ -352,53 +352,242 @@ system_reboot() {
     fi
 }
 
-# -------------------------------
-# 功能 9: Docker 管理
-# -------------------------------
-docker_install() {
-    echo -e "${CYAN}正在安装 Docker...${RESET}"
+# ====================================================================
+# +++ 高级Docker管理模块 (v2.0) +++
+# ====================================================================
+
+# 检查jq并安装
+check_jq() {
+    if ! command -v jq &> /dev/null; then
+        echo -e "${YELLOW}检测到需要使用 jq 工具来处理JSON配置，正在尝试安装...${RESET}"
+        if command -v apt >/dev/null 2>&1; then
+            apt update && apt install -y jq
+        elif command -v yum >/dev/null 2>&1; then
+            yum install -y jq
+        elif command -v dnf >/dev/null 2>&1; then
+            dnf install -y jq
+        fi
+        if ! command -v jq &> /dev/null; then
+            echo -e "${RED}jq 安装失败，相关功能可能无法使用。${RESET}"
+            return 1
+        fi
+        echo -e "${GREEN}jq 安装成功。${RESET}"
+    fi
+    return 0
+}
+
+# 编辑daemon.json的辅助函数
+edit_daemon_json() {
+    local key=$1
+    local value=$2
+    DAEMON_FILE="/etc/docker/daemon.json"
+    
+    check_jq || return 1
+    
+    if [ ! -f "$DAEMON_FILE" ]; then
+        echo "{}" > "$DAEMON_FILE"
+    fi
+    
+    # 使用jq来修改json文件
+    tmp_json=$(jq ".${key} = ${value}" "$DAEMON_FILE")
+    echo "$tmp_json" > "$DAEMON_FILE"
+    
+    echo -e "${GREEN}配置文件 $DAEMON_FILE 已更新。${RESET}"
+    echo -e "${YELLOW}正在重启Docker以应用更改...${RESET}"
+    systemctl restart docker
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}Docker重启成功。${RESET}"
+    else
+        echo -e "${RED}Docker重启失败，请手动检查: systemctl status docker${RESET}"
+    fi
+}
+
+# 安装/更新Docker
+install_update_docker() {
+    echo -e "${CYAN}正在使用官方脚本安装/更新 Docker...${RESET}"
     curl -fsSL https://get.docker.com -o get-docker.sh
     sh get-docker.sh --mirror Aliyun
     rm get-docker.sh
     systemctl enable docker
     systemctl start docker
     if command -v docker >/dev/null 2>&1; then
-        echo -e "${GREEN}✅ Docker 安装并启动成功！${RESET}"
+        echo -e "${GREEN}✅ Docker 安装/更新并启动成功！${RESET}"
     else
-        echo -e "${RED}❌❌ Docker 安装失败，请检查日志。${RESET}"
+        echo -e "${RED}❌❌ Docker 安装/更新失败，请检查日志。${RESET}"
     fi
 }
 
-docker_menu() {
-    if ! command -v docker >/dev/null 2>&1; then
-        echo -e "${RED}未检测到 Docker！${RESET}"
-        read -p "是否现在安装 Docker? (y/n): " install_docker
-        if [[ "$install_docker" == "y" || "$install_docker" == "Y" ]]; then
-            docker_install
-        fi
-        read -n1 -p "按任意键返回菜单..."
+# 卸载Docker
+uninstall_docker() {
+    echo -e "${RED}警告：此操作将彻底卸载Docker并删除所有数据（容器、镜像、卷）！${RESET}"
+    read -p "确定要继续吗？(y/N): " confirm
+    if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
+        echo -e "${GREEN}操作已取消。${RESET}"
         return
     fi
-
-    echo -e "${CYAN}=== Docker 容器管理 ===${RESET}"
-    echo -e "${YELLOW}当前运行的容器:${RESET}"
-    docker ps --format "table {{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}" 2>/dev/null || echo -e "${YELLOW}无运行中的容器${RESET}"
-    echo ""
-    echo "1) 查看所有容器"
-    echo "2) 重启所有容器"
-    echo "3) 返回主菜单"
-    read -p "请选择操作: " docker_choice
     
-    case "$docker_choice" in # <-- 修复点: 确保此处是 'in'
-        1) docker ps -a 2>/dev/null || echo -e "${YELLOW}Docker 命令执行失败${RESET}" ;;
-        2) 
-            echo -e "${GREEN}正在重启所有容器...${RESET}"
-            docker restart $(docker ps -a -q) 2>/dev/null && echo -e "${GREEN}容器重启完成${RESET}" || echo -e "${YELLOW}无容器可重启${RESET}"
-            ;;
-        *) return ;;
-    esac
-    read -n1 -p "按任意键返回菜单..."
+    systemctl stop docker
+    if command -v apt >/dev/null 2>&1; then
+        apt-get purge -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+        apt-get autoremove -y
+    elif command -v yum >/dev/null 2>&1; then
+        yum remove -y docker-ce docker-ce-cli containerd.io
+    elif command -v dnf >/dev/null 2>&1; then
+        dnf remove -y docker-ce docker-ce-cli containerd.io
+    fi
+    
+    rm -rf /var/lib/docker
+    rm -rf /var/lib/containerd
+    echo -e "${GREEN}Docker 已彻底卸载。${RESET}"
 }
+
+# Docker子菜单：容器管理
+container_management_menu() {
+    while true; do
+        clear
+        echo -e "${CYAN}=== Docker 容器管理 ===${RESET}"
+        docker ps -a
+        echo "------------------------------------------------"
+        echo "1. 启动容器    2. 停止容器    3. 重启容器"
+        echo "4. 查看日志    5. 进入容器    6. 删除容器"
+        echo "0. 返回上级菜单"
+        read -p "请选择操作: " choice
+        
+        read -p "请输入容器ID或名称 (留空则返回): " container
+        [ -z "$container" ] && continue
+
+        case "$choice" in
+            1) docker start "$container" ;;
+            2) docker stop "$container" ;;
+            3) docker restart "$container" ;;
+            4. | 4) docker logs "$container" ;;
+            5) docker exec -it "$container" /bin/sh -c "[ -x /bin/bash ] && /bin/bash || /bin/sh" ;;
+            6) docker rm "$container" ;;
+            0) break ;;
+            *) echo -e "${RED}无效选择${RESET}" ;;
+        esac
+        read -n1 -p "按任意键继续..."
+    done
+}
+
+# Docker子菜单：镜像管理
+image_management_menu() {
+    while true; do
+        clear
+        echo -e "${CYAN}=== Docker 镜像管理 ===${RESET}"
+        docker images
+        echo "------------------------------------------------"
+        echo "1. 拉取镜像    2. 删除镜像    3. 查看历史"
+        echo "0. 返回上级菜单"
+        read -p "请选择操作: " choice
+        
+        case "$choice" in
+            1) 
+                read -p "请输入要拉取的镜像名称 (例如: ubuntu:latest): " image_name
+                [ -n "$image_name" ] && docker pull "$image_name"
+                ;;
+            2) 
+                read -p "请输入要删除的镜像ID或名称: " image_id
+                [ -n "$image_id" ] && docker rmi "$image_id"
+                ;;
+            3)
+                read -p "请输入要查看历史的镜像ID或名称: " image_id
+                [ -n "$image_id" ] && docker history "$image_id"
+                ;;
+            0) break ;;
+            *) echo -e "${RED}无效选择${RESET}" ;;
+        esac
+        read -n1 -p "按任意键继续..."
+    done
+}
+
+# 主Docker菜单
+docker_menu() {
+    if ! command -v docker >/dev/null 2>&1; then
+        echo -e "${RED}未检测到 Docker 环境！${RESET}"
+        read -p "是否现在安装 Docker? (y/n): " install_docker
+        if [[ "$install_docker" == "y" || "$install_docker" == "Y" ]]; then
+            install_update_docker
+        fi
+        return
+    fi
+    
+    while true; do
+        clear
+        echo -e "${CYAN}Docker管理${RESET}"
+        if systemctl is-active --quiet docker; then
+            containers=$(docker ps -a --format '{{.ID}}' | wc -l)
+            images=$(docker images -q | wc -l)
+            networks=$(docker network ls -q | wc -l)
+            volumes=$(docker volume ls -q | wc -l)
+            echo -e "${GREEN}环境已经安装 容器: ${containers} 镜像: ${images} 网络: ${networks} 卷: ${volumes}${RESET}"
+        else
+            echo -e "${RED}Docker服务未运行！请先启动Docker。${RESET}"
+        fi
+        echo "------------------------------------------------"
+        echo "1.  安装/更新Docker环境"
+        echo "2.  查看Docker全局状态 (docker system df)"
+        echo "3.  Docker容器管理"
+        echo "4.  Docker镜像管理"
+        echo "5.  Docker网络管理"
+        echo "6.  Docker卷管理"
+        echo "7.  清理无用的Docker资源 (prune)"
+        echo "8.  更换Docker镜像源"
+        echo "9.  编辑daemon.json文件"
+        echo "11. 开启Docker-ipv6访问"
+        echo "12. 关闭Docker-ipv6访问"
+        echo "19. 备份/还原Docker环境"
+        echo "20. 卸载Docker环境"
+        echo "0.  返回主菜单"
+        echo "------------------------------------------------"
+        read -p "请输入你的选择: " choice
+
+        case "$choice" in
+            1) install_update_docker ;;
+            2) docker system df ;;
+            3) container_management_menu ;;
+            4) image_management_menu ;;
+            5) docker network ls && echo "网络管理功能待扩展" ;;
+            6) docker volume ls && echo "卷管理功能待扩展" ;;
+            7) 
+                read -p "这将删除所有未使用的容器、网络、镜像，确定吗? (y/N): " confirm
+                [[ "$confirm" == "y" || "$confirm" == "Y" ]] && docker system prune -af --volumes
+                ;;
+            8)
+                echo "请选择镜像源:"
+                echo "1. 阿里云 (推荐国内)"
+                echo "2. 网易"
+                echo "3. 中科大"
+                echo "4. Docker官方 (国外)"
+                read -p "输入选择: " mirror_choice
+                mirror_url=""
+                case "$mirror_choice" in
+                    1) mirror_url='"https://mirror.aliyuncs.com"' ;;
+                    2) mirror_url='"http://hub-mirror.c.163.com"' ;;
+                    3) mirror_url='"https://docker.mirrors.ustc.edu.cn"' ;;
+                    4) mirror_url='""' ;;
+                    *) echo "无效选择"; continue ;;
+                esac
+                edit_daemon_json '"registry-mirrors"' "[$mirror_url]"
+                ;;
+            9)
+                [ -f /etc/docker/daemon.json ] || echo "{}" > /etc/docker/daemon.json
+                editor=${EDITOR:-vi}
+                $editor /etc/docker/daemon.json
+                ;;
+            11) edit_daemon_json '"ipv6"' "true" ;;
+            12) edit_daemon_json '"ipv6"' "false" ;;
+            19) 
+                echo "功能开发中..." 
+                ;;
+            20) uninstall_docker ;;
+            0) break ;;
+            *) echo -e "${RED}无效选项${RESET}" ;;
+        esac
+        read -n1 -p "按任意键返回Docker菜单..."
+    done
+}
+
 
 # -------------------------------
 # 功能 10: SSH 配置修改
@@ -485,29 +674,25 @@ upgrade_glibc() {
     
     echo -e "${CYAN}>>> 开始升级GLIBC...${RESET}"
     
-    # 检查系统类型 (重新构建此 if-elif-else-fi 块，确保语法纯净)
     if command -v apt >/dev/null 2>&1; then
-        # Debian/Ubuntu系统
         echo -e "${GREEN}检测到Debian/Ubuntu系统${RESET}"
         apt update -y
         apt install -y build-essential gawk bison
         apt upgrade -y libc6
     elif command -v yum >/dev/null 2>&1; then
-        # CentOS/RHEL系统
         echo -e "${GREEN}检测到CentOS/RHEL系统${RESET}"
         yum update -y
         yum install -y gcc make bison
         yum update -y glibc
     elif command -v dnf >/dev/null 2>&1; then
-        # Fedora系统
         echo -e "${GREEN}检测到Fedora系统${RESET}"
         dnf update -y
         dnf install -y gcc make bison
         dnf update -y glibc
-    else # <-- 此处的 'else' 是之前报告错误的位置
+    else 
         echo -e "${RED}❌❌ 无法识别系统类型，请手动升级GLIBC${RESET}"
         return
-    fi # <-- 确保 'fi' 匹配了最外层的 'if'
+    fi 
 
     echo -e "${GREEN}GLIBC升级完成${RESET}"
     echo -e "${YELLOW}建议重启系统以使新GLIBC版本生效${RESET}"
@@ -527,16 +712,13 @@ full_system_upgrade() {
     echo -e "${CYAN}>>> 开始全面系统升级...${RESET}"
     
     if command -v apt >/dev/null 2>&1; then
-        # Debian/Ubuntu系统
         apt update -y
         apt full-upgrade -y
         apt dist-upgrade -y
     elif command -v yum >/dev/null 2>&1; then
-        # CentOS/RHEL系统
         yum update -y
         yum upgrade -y
     elif command -v dnf >/dev/null 2>&1; then
-        # Fedora系统
         dnf update -y
         dnf upgrade -y
     else
@@ -549,7 +731,7 @@ full_system_upgrade() {
 }
 
 # ====================================================================
-# +++ 新增功能: 高级防火墙管理 (基于iptables) +++
+# +++ 高级防火墙管理 (基于iptables) +++
 # ====================================================================
 # 获取当前SSH端口
 get_ssh_port() {
@@ -782,9 +964,8 @@ firewall_menu_advanced() {
     done
 }
 
-
 # -------------------------------
-# 功能 13: 卸载脚本
+# 功能 14: 卸载脚本
 # -------------------------------
 uninstall_script() {
     read -p "确定要卸载本脚本并清理相关文件吗 (y/n)? ${RED}此操作不可逆!${RESET}: " confirm_uninstall
@@ -859,12 +1040,12 @@ show_menu() {
         echo "9) GLIBC 管理"
         echo "10) 全面系统升级 (含内核升级)"
         echo -e "${GREEN}--- 服务与安全 ---${RESET}"
-        echo "11) Docker 容器管理"
+        echo "11) 高级Docker管理"
         echo "12) SSH 端口与密码修改"
         echo "13) 高级防火墙管理 (iptables)"
         echo -e "${GREEN}--- 其他 ---${RESET}"
         echo "14) 卸载脚本及残留文件"
-        echo "0) 退出脚本" # 退出选项改为0
+        echo "0) 退出脚本"
         echo ""
         read -p "输入数字选择: " choice
         
@@ -879,9 +1060,9 @@ show_menu() {
             8) system_reboot ;;
             9) glibc_menu ;;
             10) full_system_upgrade ;;
-            11) docker_menu ;;
+            11) docker_menu ;; # 替换为新的高级Docker菜单
             12) ssh_config_menu ;;
-            13) firewall_menu_advanced ;; # 替换为新的高级防火墙菜单
+            13) firewall_menu_advanced ;; 
             14) uninstall_script ;; 
             0) echo -e "${CYAN}感谢使用，再见！${RESET}"; exit 0 ;;
             *) echo -e "${RED}无效选项，请输入 0-14${RESET}"; sleep 2 ;;
