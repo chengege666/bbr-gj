@@ -1,5 +1,5 @@
 #!/bin/bash
-# 增强版VPS工具箱 v1.1
+# 增强版VPS工具箱 v1.0
 # GitHub: https://github.com/chengege666/bbr-gj
 
 RESULT_FILE="bbr_result.txt"
@@ -19,9 +19,9 @@ RESET="\033[0m"
 print_welcome() {
     clear
     echo -e "${CYAN}==================================================${RESET}"
-    echo -e "${MAGENTA}                VPS 工具箱 v1.1                ${RESET}"
+    echo -e "${MAGENTA}                VPS 工具箱 v1.0                ${RESET}"
     echo -e "${CYAN}--------------------------------------------------${RESET}"
-    echo -e "${YELLOW}功能: BBR测速, 系统管理, 防火墙, GLIBC管理, Docker等${RESET}"
+    echo -e "${YELLOW}功能: BBR测速, 系统管理, GLIBC管理, Docker, SSH配置等${RESET}"
     echo -e "${GREEN}测速结果保存: ${RESULT_FILE}${RESET}"
     echo -e "${CYAN}==================================================${RESET}"
     echo ""
@@ -32,7 +32,7 @@ print_welcome() {
 # -------------------------------
 check_root() {
     if [ "$(id -u)" -ne 0 ]; then
-        echo -e "${RED}❌❌❌❌ 错误：请使用 root 权限运行本脚本${RESET}"
+        echo -e "${RED}❌❌ 错误：请使用 root 权限运行本脚本${RESET}"
         echo "👉 使用方法: sudo bash $0"
         exit 1
     fi
@@ -150,7 +150,7 @@ run_bbr_switch() {
     echo -e "${CYAN}正在下载并运行 BBR 切换脚本... (来自 ylx2016/Linux-NetSpeed)${RESET}"
     wget -O tcp.sh "https://github.com/ylx2016/Linux-NetSpeed/raw/master/tcp.sh" && chmod +x tcp.sh && ./tcp.sh
     if [ $? -ne 0 ]; then
-        echo -e "${RED}❌❌❌❌ 下载或运行脚本失败，请检查网络连接${RESET}"
+        echo -e "${RED}❌❌ 下载或运行脚本失败，请检查网络连接${RESET}"
     fi
     read -n1 -p "按任意键返回菜单..."
 }
@@ -232,7 +232,7 @@ sys_update() {
     elif command -v dnf >/dev/null 2>&1; then
         dnf update -y
     else
-        echo -e "${RED}❌❌❌❌ 无法识别包管理器，请手动更新系统${RESET}"
+        echo -e "${RED}❌❌ 无法识别包管理器，请手动更新系统${RESET}"
     fi
     echo -e "${GREEN}系统更新操作完成。${RESET}"
     read -n1 -p "按任意键返回菜单..."
@@ -258,7 +258,7 @@ sys_cleanup() {
         dnf clean all
         echo -e "${GREEN}DNF 清理完成${RESET}"
     else
-        echo -e "${RED}❌❌❌❌ 无法识别包管理器，请手动清理${RESET}"
+        echo -e "${RED}❌❌ 无法识别包管理器，请手动清理${RESET}"
     fi
     echo -e "${GREEN}系统清理操作完成。${RESET}"
     read -n1 -p "按任意键返回菜单..."
@@ -276,7 +276,7 @@ ip_version_switch() {
     echo "3) 返回主菜单"
     read -p "请选择: " ip_choice
     
-    case "$ip_choice" 在
+    case "$ip_choice" in
         1) 
             IP_VERSION="4"
             echo -e "${GREEN}已切换到 IPv4 模式${RESET}"
@@ -309,7 +309,7 @@ timezone_adjust() {
     echo "4) 返回主菜单"
     read -p "请选择: " tz_choice
     
-    case "$tz_choice" 在
+    case "$tz_choice" in
         1)
             timedatectl set-timezone Asia/Shanghai
             echo -e "${GREEN}已设置时区为 Asia/Shanghai${RESET}"
@@ -344,7 +344,7 @@ system_reboot() {
     echo -e "${RED}警告：这将立即重启系统！${RESET}"
     read -p "确定要重启系统吗？(y/N): " confirm_reboot
     if [[ "$confirm_reboot" == "y" || "$confirm_reboot" == "Y" ]]; then
-        echo -e "${GREEN>}正在重启系统...${RESET}"
+        echo -e "${GREEN}正在重启系统...${RESET}"
         reboot
     else
         echo -e "${GREEN}已取消重启${RESET}"
@@ -365,7 +365,7 @@ docker_install() {
     if command -v docker >/dev/null 2>&1; then
         echo -e "${GREEN}✅ Docker 安装并启动成功！${RESET}"
     else
-        echo -e "${RED}❌❌❌❌ Docker 安装失败，请检查日志。${RESET}"
+        echo -e "${RED}❌❌ Docker 安装失败，请检查日志。${RESET}"
     fi
 }
 
@@ -389,7 +389,7 @@ docker_menu() {
     echo "3) 返回主菜单"
     read -p "请选择操作: " docker_choice
     
-    case "$docker_choice" in
+    case "$docker_choice" in # <-- 修复点: 确保此处是 'in'
         1) docker ps -a 2>/dev/null || echo -e "${YELLOW}Docker 命令执行失败${RESET}" ;;
         2) 
             echo -e "${GREEN}正在重启所有容器...${RESET}"
@@ -406,7 +406,7 @@ docker_menu() {
 ssh_config_menu() {
     SSH_CONFIG="/etc/ssh/sshd_config"
     if [ ! -f "$SSH_CONFIG" ]; then
-        echo -e "${RED}❌❌❌❌ 未找到 SSH 配置文件 ($SSH_CONFIG)。${RESET}"
+        echo -e "${RED}❌❌ 未找到 SSH 配置文件 ($SSH_CONFIG)。${RESET}"
         read -n1 -p "按任意键返回菜单..."
         return
     fi
@@ -421,7 +421,7 @@ ssh_config_menu() {
             sed -i "s/^#\?Port\s\+.*$/Port $new_port/" "$SSH_CONFIG"
             echo -e "${GREEN}✅ SSH 端口已修改为 $new_port${RESET}"
         else
-            echo -e "${RED}❌❌❌❌ 端口输入无效。${RESET}"
+            echo -e "${RED}❌❌ 端口输入无效。${RESET}"
         fi
     fi
 
@@ -433,7 +433,7 @@ ssh_config_menu() {
         if [ $? -eq 0 ]; then
             echo -e "${GREEN}✅ root 密码修改成功${RESET}"
         else
-            echo -e "${RED}❌❌❌❌ root 密码修改失败${RESET}"
+            echo -e "${RED}❌❌ root 密码修改失败${RESET}"
         fi
     fi
 
@@ -479,13 +479,13 @@ upgrade_glibc() {
     echo -e "${RED}警告：升级GLIBC是高风险操作，可能导致系统不稳定！${RESET}"
     read -p "确定要继续升级GLIBC吗？(y/N): " confirm_upgrade
     if [[ "$confirm_upgrade" != "y" && "$confirm_upgrade" != "Y" ]]; then
-        echo -e "${GREEN>}已取消升级操作${RESET}"
+        echo -e "${GREEN}已取消升级操作${RESET}"
         return
     fi
     
     echo -e "${CYAN}>>> 开始升级GLIBC...${RESET}"
     
-    # 检查系统类型
+    # 检查系统类型 (重新构建此 if-elif-else-fi 块，确保语法纯净)
     if command -v apt >/dev/null 2>&1; then
         # Debian/Ubuntu系统
         echo -e "${GREEN}检测到Debian/Ubuntu系统${RESET}"
@@ -504,10 +504,10 @@ upgrade_glibc() {
         dnf update -y
         dnf install -y gcc make bison
         dnf update -y glibc
-    else
-        echo -e "${RED}❌❌❌❌ 无法识别系统类型，请手动升级GLIBC${RESET}"
+    else # <-- 此处的 'else' 是之前报告错误的位置
+        echo -e "${RED}❌❌ 无法识别系统类型，请手动升级GLIBC${RESET}"
         return
-    fi
+    fi # <-- 确保 'fi' 匹配了最外层的 'if'
 
     echo -e "${GREEN}GLIBC升级完成${RESET}"
     echo -e "${YELLOW}建议重启系统以使新GLIBC版本生效${RESET}"
@@ -540,7 +540,7 @@ full_system_upgrade() {
         dnf update -y
         dnf upgrade -y
     else
-        echo -e "${RED}❌❌❌❌ 无法识别系统类型，请手动升级${RESET}"
+        echo -e "${RED}❌❌ 无法识别系统类型，请手动升级${RESET}"
         return
     fi
     
@@ -549,137 +549,7 @@ full_system_upgrade() {
 }
 
 # -------------------------------
-# 功能 13: 防火墙管理 (新增功能)
-# -------------------------------
-firewall_menu() {
-    echo -e "${CYAN}=== 防火墙管理 ===${RESET}"
-    
-    # 检测系统使用的防火墙工具
-    if command -v ufw >/dev/null 2>&1; then
-        FIREWALL_TYPE="ufw"
-        echo -e "${GREEN}检测到系统使用 UFW 防火墙${RESET}"
-    elif command -v firewalld >/dev/null 2>&1; then
-        FIREWALL_TYPE="firewalld"
-        echo -e "${GREEN}检测到系统使用 Firewalld 防火墙${RESET}"
-    elif command -v iptables >/dev/null 2>&1; then
-        FIREWALL_TYPE="iptables"
-        echo -e "${GREEN}检测到系统使用 iptables 防火墙${RESET}"
-    else
-        echo -e "${YELLOW}未检测到常用防火墙工具，尝试安装 UFW${RESET}"
-        if command -v apt >/dev/null 2>&1; then
-            apt install -y ufw
-            FIREWALL_TYPE="ufw"
-        elif command -v yum >/dev/null 2>&1; then
-            yum install -y firewalld
-            systemctl enable firewalld
-            systemctl start firewalld
-            FIREWALL_TYPE="firewalld"
-        else
-            echo -e "${RED}无法自动安装防火墙工具，请手动配置${RESET}"
-            read -n1 -p "按任意键返回菜单..."
-            return
-        fi
-    fi
-    
-    echo ""
-    echo "1) 查看防火墙状态"
-    echo "2) 开放端口"
-    echo "3) 关闭端口"
-    echo "4) 查看已开放端口"
-    echo "5) 禁用防火墙"
-    echo "6) 启用防火墙"
-    echo "7) 返回主菜单"
-    read -p "请选择操作: " fw_choice
-    
-    case "$fw_choice" in
-        1)
-            case "$FIREWALL_TYPE" in
-                "ufw") ufw status verbose ;;
-                "firewalld") firewall-cmd --state && firewall-cmd --list-all ;;
-                "iptables") iptables -L -n ;;
-            esac
-            ;;
-        2)
-            read -p "请输入要开放的端口号: " port
-            if [[ "$port" =~ ^[0-9]+$ ]] && [ "$port" -ge 1 ] && [ "$port" -le 65535 ]; then
-                case "$FIREWALL_TYPE" in
-                    "ufw") ufw allow $port/tcp ;;
-                    "firewalld") 
-                        firewall-cmd --permanent --add-port=$port/tcp
-                        firewall-cmd --reload
-                        ;;
-                    "iptables") 
-                        iptables -A INPUT -p tcp --dport $port -j ACCEPT
-                        service iptables save
-                        ;;
-                esac
-                echo -e "${GREEN}✅ 端口 $port 已开放${RESET}"
-            else
-                echo -e "${RED}❌❌❌❌ 端口号无效${RESET}"
-            fi
-            ;;
-        3)
-            read -p "请输入要关闭的端口号: " port
-            if [[ "$port" =~ ^[0-9]+$ ]] && [ "$port" -ge 1 ] && [ "$port" -le 65535 ]; then
-                case "$FIREWALL_TYPE" in
-                    "ufw") ufw delete allow $port/tcp ;;
-                    "firewalld") 
-                        firewall-cmd --permanent --remove-port=$port/tcp
-                        firewall-cmd --reload
-                        ;;
-                    "iptables") 
-                        iptables -D INPUT -p tcp --dport $port -j ACCEPT
-                        service iptables save
-                        ;;
-                esac
-                echo -e "${GREEN}✅ 端口 $port 已关闭${RESET}"
-            else
-                echo -e "${RED}❌❌❌❌ 端口号无效${RESET}"
-            fi
-            ;;
-        4)
-            case "$FIREWALL_TYPE" in
-                "ufw") ufw status | grep ALLOW ;;
-                "firewalld") firewall-cmd --list-ports ;;
-                "iptables") iptables -L -n | grep -E "(tcp|udp)" ;;
-            esac
-            ;;
-        5)
-            case "$FIREWALL_TYPE" in
-                "ufw") ufw disable ;;
-                "firewalld") systemctl stop firewalld ;;
-                "iptables") 
-                    iptables -P INPUT ACCEPT
-                    iptables -P FORWARD ACCEPT
-                    iptables -P OUTPUT ACCEPT
-                    iptables -F
-                    service iptables save
-                    ;;
-            esac
-            echo -e "${GREEN}✅ 防火墙已禁用${RESET}"
-            ;;
-        6)
-            case "$FIREWALL_TYPE" in
-                "ufw") ufw enable ;;
-                "firewalld") systemctl start firewalld ;;
-                "iptables") 
-                    service iptables restart
-                    ;;
-            esac
-            echo -e "${GREEN}✅ 防火墙已启用${RESET}"
-            ;;
-        7)
-            return
-            ;;
-        *)
-            echo -e "${RED}无效选择${RESET}"
-            ;;
-    esac
-    read -n1 -p "按任意键返回菜单..."
-}
-
-# -------------------------------
-# 功能 14: 卸载脚本
+# 功能 13: 卸载脚本
 # -------------------------------
 uninstall_script() {
     read -p "确定要卸载本脚本并清理相关文件吗 (y/n)? ${RED}此操作不可逆!${RESET}: " confirm_uninstall
@@ -717,7 +587,7 @@ uninstall_script() {
             elif command -v dnf >/dev/null 2>&1; then
                 dnf remove -y curl wget git speedtest-cli net-tools
             else
-                echo -e "${RED}❌❌❌❌ 无法识别包管理器，请手动清理${RESET}"
+                echo -e "${RED}❌❌ 无法识别包管理器，请手动清理${RESET}"
             fi
             echo -e "${GREEN}✅ 依赖包清理完成${RESET}"
         fi
@@ -756,10 +626,9 @@ show_menu() {
         echo -e "${GREEN}--- 服务管理 ---${RESET}"
         echo "11) Docker 容器管理"
         echo "12) SSH 端口与密码修改"
-        echo "13) 防火墙管理"
         echo -e "${GREEN}--- 其他 ---${RESET}"
-        echo "14) 卸载脚本及残留文件"
-        echo "0) 退出脚本"
+        echo "13) 卸载脚本及残留文件"
+        echo "0) 退出脚本" # 退出选项改为0
         echo ""
         read -p "输入数字选择: " choice
         
@@ -776,10 +645,9 @@ show_menu() {
             10) full_system_upgrade ;;
             11) docker_menu ;;
             12) ssh_config_menu ;;
-            13) firewall_menu ;;
-            14) uninstall_script ;;
-            0) echo -e "${CYAN}感谢使用，再见！${RESET}"; exit 0 ;;
-            *) echo -e "${RED}无效选项，请输入 0-14${RESET}"; sleep 2 ;;
+            13) uninstall_script ;;
+            0) echo -e "${CYAN}感谢使用，再见！${RESET}"; exit 0 ;; # case语句处理0
+            *) echo -e "${RED}无效选项，请输入 0-13${RESET}"; sleep 2 ;; # 提示信息更新为0-13
         esac
     done
 }
