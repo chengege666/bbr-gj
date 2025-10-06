@@ -1,5 +1,5 @@
 #!/bin/bash
-# 增强版VPS工具箱 v1.2 (集成高级Docker管理)
+# 增强版VPS工具箱 v1.2.1 (修复Docker管理逻辑)
 # GitHub: https://github.com/chengege666/bbr-gj
 
 RESULT_FILE="bbr_result.txt"
@@ -19,7 +19,7 @@ RESET="\033[0m"
 print_welcome() {
     clear
     echo -e "${CYAN}==================================================${RESET}"
-    echo -e "${MAGENTA}              增强版 VPS 工具箱 v1.2             ${RESET}"
+    echo -e "${MAGENTA}              增强版 VPS 工具箱 v1.2.1           ${RESET}"
     echo -e "${CYAN}--------------------------------------------------${RESET}"
     echo -e "${YELLOW}功能: BBR测速, 系统管理, 高级防火墙, 高级Docker等${RESET}"
     echo -e "${GREEN}测速结果保存: ${RESULT_FILE}${RESET}"
@@ -353,7 +353,7 @@ system_reboot() {
 }
 
 # ====================================================================
-# +++ 高级Docker管理模块 (v2.0) +++
+# +++ 高级Docker管理模块 (v2.1) +++
 # ====================================================================
 
 # 检查jq并安装
@@ -441,7 +441,7 @@ uninstall_docker() {
     echo -e "${GREEN}Docker 已彻底卸载。${RESET}"
 }
 
-# Docker子菜单：容器管理
+# Docker子菜单：容器管理 (v2.1 修复返回逻辑)
 container_management_menu() {
     while true; do
         clear
@@ -453,22 +453,34 @@ container_management_menu() {
         echo "0. 返回上级菜单"
         read -p "请选择操作: " choice
         
-        read -p "请输入容器ID或名称 (留空则返回): " container
-        [ -z "$container" ] && continue
+        # 检查是否是返回操作
+        if [[ "$choice" == "0" ]]; then
+            break
+        fi
 
-        case "$choice" in
-            1) docker start "$container" ;;
-            2) docker stop "$container" ;;
-            3) docker restart "$container" ;;
-            4. | 4) docker logs "$container" ;;
-            5) docker exec -it "$container" /bin/sh -c "[ -x /bin/bash ] && /bin/bash || /bin/sh" ;;
-            6) docker rm "$container" ;;
-            0) break ;;
-            *) echo -e "${RED}无效选择${RESET}" ;;
-        esac
-        read -n1 -p "按任意键继续..."
+        # 检查是否是需要容器ID的有效操作
+        if [[ "$choice" =~ ^[1-6]$ ]]; then
+            read -p "请输入容器ID或名称 (留空则取消): " container
+            if [ -z "$container" ]; then
+                continue # 取消操作，返回子菜单循环
+            fi
+
+            case "$choice" in
+                1) docker start "$container" ;;
+                2) docker stop "$container" ;;
+                3) docker restart "$container" ;;
+                4) docker logs "$container" ;;
+                5) docker exec -it "$container" /bin/sh -c "[ -x /bin/bash ] && /bin/bash || /bin/sh" ;;
+                6) docker rm "$container" ;;
+            esac
+            read -n1 -p "操作完成。按任意键继续..."
+        else
+            echo -e "${RED}无效选择，请输入 0-6 之间的数字。${RESET}"
+            sleep 2
+        fi
     done
 }
+
 
 # Docker子菜单：镜像管理
 image_management_menu() {
