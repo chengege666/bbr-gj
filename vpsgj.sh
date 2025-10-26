@@ -1,5 +1,5 @@
 #!/bin/bash
-# 增强版VPS工具箱 v2.0.0 (合并图片功能)
+# 增强版VPS工具箱 v2.1.0 (增加 IP质量测试 功能)
 # GitHub: https://github.com/chengege666/bbr-gj (原始)
 # 此版本由AI根据用户需求合并修改
 
@@ -31,7 +31,7 @@ RESET="\033[0m"
 print_welcome() {
     clear
     echo -e "${CYAN}==================================================${RESET}"
-    echo -e "${MAGENTA}              增强版 VPS 工具箱 v2.0.0           ${RESET}"
+    echo -e "${MAGENTA}              增强版 VPS 工具箱 v2.1.0           ${RESET}"
     echo -e "${CYAN}--------------------------------------------------${RESET}"
     echo -e "${YELLOW}功能: 系统管理, BBR, 安全, Docker, NPM等${RESET}"
     echo -e "${CYAN}==================================================${RESET}"
@@ -1195,6 +1195,25 @@ manage_glibc() {
     glibc_menu # 调用原脚本的函数
 }
 
+# 53. 网络延迟IP质量测试 (新功能)
+run_nodequality_test() {
+    echo -e "${CYAN}=== 正在运行 NodeQuality.com IP质量测试脚本 ===${RESET}"
+    echo -e "${YELLOW}这将从 run.NodeQuality.com 下载并执行脚本...${RESET}"
+    
+    # 确保 curl 已安装 (check_deps 应该已经处理了)
+    if ! command -v curl >/dev/null 2>&1; then
+        echo -e "${RED}错误：未找到 curl 命令。${RESET}"
+        pause
+        return
+    fi
+    
+    # 执行脚本
+    bash <(curl -sL https://run.NodeQuality.com)
+    
+    echo -e "${GREEN}✅ IP质量测试脚本执行完毕。${RESET}"
+    pause
+}
+
 # ====================================================================
 # +++ 90+: 脚本管理 +++
 # ====================================================================
@@ -1926,7 +1945,7 @@ update_npm() {
     fi
     check_compose_command || return
     
-    echo -e "${CYAN}>>> 正在拉取最新的 Nginx Proxy Manager 镜像...${RESET}"
+    echo -e "${CYAN}>>> G 正在拉取最新的 Nginx Proxy Manager 镜像...${RESET}"
     (cd "$NPM_DIR" && $COMPOSE_CMD pull)
     
     echo -e "${CYAN}>>> 正在使用新镜像重启服务...${RESET}"
@@ -2012,8 +2031,9 @@ show_menu() {
         echo -e "${CYAN}▶ 高级服务${RESET}"
         echo " 41. ${GREEN}高级 Docker 管理${RESET}                 42. ${GREEN}Nginx Proxy Manager 管理${RESET}"
         echo "---------------------------------------------------------------------"
-        echo -e "${CYAN}▶ BBR / 调优${RESET}"
+        echo -e "${CYAN}▶ BBR / 网络调优${RESET}"
         echo " 51. ${YELLOW}BBR 综合测速${RESET} (BBR/Plus/v2/v3)  52. GLIBC 管理 (查询/升级)"
+        echo " 53. 网络延迟/IP质量测试 (NodeQuality)"
         echo "---------------------------------------------------------------------"
         echo " 99. ${RED}卸载本工具箱${RESET}                     0. 退出脚本"
         echo ""
@@ -2058,6 +2078,7 @@ show_menu() {
             
             51) bbr_speed_test ;;
             52) manage_glibc ;;
+            53) run_nodequality_test ;;
             
             99) uninstall_toolbox ;;
             0) echo -e "${CYAN}感谢使用，再见！${RESET}"; exit 0 ;;
