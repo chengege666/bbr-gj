@@ -601,49 +601,332 @@ bbr_management() {
     done
 }
 
-# 主循环
-main() {
-    # 检查root权限
-    check_root
+# ====================================================================
+# +++ Docker管理模块 +++
+# ====================================================================
+
+# -------------------------------
+# 检查jq并安装
+# -------------------------------
+check_jq() {
+    if ! command -v jq &> /dev/null; then
+        echo "检测到需要使用 jq 工具来处理JSON配置，正在尝试安装..."
+        if command -v apt >/dev/null 2>&1; then
+            apt update && apt install -y jq
+        elif command -v yum >/dev/null 2>&1; then
+            yum install -y jq
+        elif command -v dnf >/dev/null 2>&1; then
+            dnf install -y jq
+        fi
+        if ! command -v jq &> /dev/null; then
+            echo "jq 安装失败，相关功能可能无法使用。"
+            return 1
+        fi
+        echo "jq 安装成功。"
+    fi
+    return 0
+}
+
+# -------------------------------
+# 编辑daemon.json的辅助函数
+# -------------------------------
+edit_daemon_json() {
+    local key=$1
+    local value=$2
+    DAEMON_FILE="/etc/docker/daemon.json"
     
-    # 检查依赖
-    check_deps
+    check_jq || return 1
     
+    if [ ! -f "$DAEMON_FILE" ]; then
+        echo "{}" > "$DAEMON_FILE"
+    fi
+    
+    # 使用jq来修改json文件
+    tmp_json=$(jq ".${key} = ${value}" "$DAEMON_FILE")
+    echo "$tmp_json" > "$DAEMON_FILE"
+    
+    echo "配置文件 $DAEMON_FILE 已更新。"
+    echo "正在重启Docker以应用更改..."
+    systemctl restart docker
+    if [ $? -eq 0 ]; then
+        echo "Docker重启成功。"
+    else
+        echo "Docker重启失败，请手动检查: systemctl status docker"
+    fi
+}
+
+# -------------------------------
+# 安装/更新Docker
+# -------------------------------
+install_update_docker() {
+    echo "正在使用官方脚本安装/更新 Docker..."
+    curl -fsSL https://get.docker.com -o get-docker.sh
+    sh get-docker.sh --mirror Aliyun
+    rm get-docker.sh
+    systemctl enable docker
+    systemctl start docker
+    if command -v docker >/dev/null 2>&1; then
+        echo "✅ Docker 安装/更新并启动成功！"
+    else
+        echo "❌ Docker 安装/更新失败，请检查日志。"
+    fi
+}
+
+# -------------------------------
+# 卸载Docker
+# -------------------------------
+uninstall_docker() {
+    echo "警告：此操作将彻底卸载Docker并删除所有数据（容器、镜像、卷）！"
+    read -p "确定要继续吗？(y/N): " confirm
+    if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
+        echo "操作已取消。"
+        return
+    fi
+    
+    systemctl stop docker
+    if command -v apt >/dev/null 2>&1; then
+        apt-get purge -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+        apt-get autoremove -y
+    elif command -v yum >/dev/null 2>&1; then
+        yum remove -y docker-ce docker-ce-cli containerd.io
+    elif command -v dnf >/dev/null 2>&1; then
+        dnf remove -y docker-ce docker-ce-cli containerd.io
+    fi
+    
+    rm -rf /var/lib/docker
+    rm -rf /var/lib/containerd
+    echo "Docker 已彻底卸载。"
+}
+
+# -------------------------------
+# Docker容器管理子菜单
+# -------------------------------
+container_management_menu() {
     while true; do
-        show_menu
-        read -p "请输入选项编号: " choice
+        clear
+        echo "=== Docker 容器管理 ==="
+        docker ps -a
+        echo "------------------------------------------------"
+        echo "1. 启动容器 2. 停止容器 3. 重启容器"
+        echo "4. 查看日志 5. 进入容器 6. 删除容器"
+        echo "0. 返回上级菜单"
+        read -p "请选择操作: " choice
         
-        case $choice in
-            1)
-                system_info
+        if [[ "$choice" == "0" ]]; then
+            break
+        fi
+
+        if [[ "$choice" =~ ^[1-6]$ ]]; then
+            read -p "请输入容器ID或名称 (留空则取消): " container
+            if [ -z "$container" ]; then
+                continue
+            fi
+
+            case "$choice" in
+                1) docker start "$container" ;;
+                2) docker stop "$container" ;;
+                3) docker restart "$container" ;;
+                4) docker logs "$container" ;;
+                5) docker exec -it "$container" /bin/sh -c "[ -x /bin/bash ] && /bin/bash || /bin/sh" ;;
+                6) docker rm "$container" ;;
+            esac
+            read -n1 -p "操作完成。按任意键继续..."
+        else
+            echo "无效选择，请输入 0-6 之间的数字。"
+            sleep 2
+        fi
+    done
+}
+
+# -------------------------------
+# Docker镜像管理子菜单
+# -------------------------------
+image_management_menu() {
+    while true; do
+        clear
+        echo "=== Docker 镜像管理 ==="
+        docker images
+        echo "------------------------------------------------"
+        echo "1. 拉取镜像 2. 删除镜像 3. 查看历史"
+        echo "0. 返回上级菜单"
+        read -p "请选择操作: " choice
+        
+        case "$choice" in
+            1) 
+                read -p "请输入要拉取的镜像名称 (例如: ubuntu:latest): " image_name
+                [ -n "$image_name" ] && docker pull "$image_name"
                 ;;
-            2)
-                system_update
+            2) 
+                read -p "请输入要删除的镜像ID或名称: " image_id
+                [ -n "$image_id" ] && docker rmi "$image_id"
                 ;;
             3)
-                system_clean
+                read -p "请输入要查看历史的镜像ID或名称: " image_id
+                [ -n "$image_id" ] && docker history "$image_id"
                 ;;
-            4)
-                basic_tools
+            0) break ;;
+            *) echo "无效选择" ;;
+        esac
+        read -n1 -p "按任意键继续..."
+    done
+}
+
+# -------------------------------
+# Docker网络管理子菜单
+# -------------------------------
+network_management_menu() {
+    while true; do
+        clear
+        echo "=== Docker 网络管理 ==="
+        docker network ls
+        echo "------------------------------------------------"
+        echo "1. 创建网络 2. 删除网络 3. 查看网络详情"
+        echo "0. 返回上级菜单"
+        read -p "请选择操作: " choice
+        
+        case "$choice" in
+            1) 
+                read -p "请输入网络名称: " network_name
+                [ -n "$network_name" ] && docker network create "$network_name"
                 ;;
-            5)
-                bbr_management
+            2) 
+                read -p "请输入要删除的网络ID或名称: " network_id
+                [ -n "$network_id" ] && docker network rm "$network_id"
                 ;;
-            6|7)
-                echo -e "${YELLOW}功能正在开发中，敬请期待！${NC}"
-                sleep 1
+            3)
+                read -p "请输入要查看详情的网络ID或名称: " network_id
+                [ -n "$network_id" ] && docker network inspect "$network_id"
                 ;;
-            0)
-                echo -e "${GREEN}感谢使用，再见！${NC}"
-                exit 0
+            0) break ;;
+            *) echo "无效选择" ;;
+        esac
+        read -n1 -p "按任意键继续..."
+    done
+}
+
+# -------------------------------
+# Docker卷管理子菜单
+# -------------------------------
+volume_management_menu() {
+    while true; do
+        clear
+        echo "=== Docker 卷管理 ==="
+        docker volume ls
+        echo "------------------------------------------------"
+        echo "1. 创建卷 2. 删除卷 3. 查看卷详情"
+        echo "0. 返回上级菜单"
+        read -p "请选择操作: " choice
+        
+        case "$choice" in
+            1) 
+                read -p "请输入卷名称: " volume_name
+                [ -n "$volume_name" ] && docker volume create "$volume_name"
                 ;;
-            *)
-                echo -e "${RED}无效的选项，请重新输入！${NC}"
-                sleep 1
+            2) 
+                read -p "请输入要删除的卷名称: " volume_name
+                [ -n "$volume_name" ] && docker volume rm "$volume_name"
+                ;;
+            3)
+                read -p "请输入要查看详情的卷名称: " volume_name
+                [ -n "$volume_name" ] && docker volume inspect "$volume_name"
+                ;;
+            0) break ;;
+            *) echo "无效选择" ;;
+        esac
+        read -n1 -p "按任意键继续..."
+    done
+}
+
+# -------------------------------
+# Docker管理主菜单
+# -------------------------------
+docker_menu() {
+    if ! command -v docker >/dev/null 2>&1; then
+        echo "未检测到 Docker 环境！"
+        read -p "是否现在安装 Docker? (y/n): " install_docker
+        if [[ "$install_docker" == "y" || "$install_docker" == "Y" ]]; then
+            install_update_docker
+        else
+            return
+        fi
+    fi
+    
+    while true; do
+        clear
+        echo "=== Docker管理菜单 ==="
+        if systemctl is-active --quiet docker; then
+            containers=$(docker ps -a --format '{{.ID}}' | wc -l)
+            images=$(docker images -q | wc -l)
+            networks=$(docker network ls -q | wc -l)
+            volumes=$(docker volume ls -q | wc -l)
+            echo "Docker状态: 运行中 | 容器: $containers | 镜像: $images | 网络: $networks | 卷: $volumes"
+        else
+            echo "Docker服务未运行！请先启动Docker。"
+        fi
+        echo "------------------------------------------------"
+        echo "1. 安装/更新Docker环境"
+        echo "2. 查看Docker全局状态 (docker system df)"
+        echo "3. Docker容器管理"
+        echo "4. Docker镜像管理"
+        echo "5. Docker网络管理"
+        echo "6. Docker卷管理"
+        echo "7. 清理无用的Docker资源 (prune)"
+        echo "8. 更换Docker镜像源"
+        echo "9. 编辑daemon.json文件"
+        echo "10. 开启Docker-ipv6访问"
+        echo "11. 关闭Docker-ipv6访问"
+        echo "12. 备份/还原Docker环境"
+        echo "13. 卸载Docker环境"
+        echo "0. 返回主菜单"
+        echo "------------------------------------------------"
+        read -p "请输入你的选择: " choice
+
+        case "$choice" in
+            1) install_update_docker ;;
+            2) docker system df ;;
+            3) container_management_menu ;;
+            4) image_management_menu ;;
+            5) network_management_menu ;;
+            6) volume_management_menu ;;
+            7) 
+                read -p "这将删除所有未使用的容器、网络、镜像，确定吗? (y/N): " confirm
+                [[ "$confirm" == "y" || "$confirm" == "Y" ]] && docker system prune -af --volumes
+                ;;
+            8)
+                echo "请选择镜像源:"
+                echo "1. 阿里云 (推荐国内)"
+                echo "2. 网易"
+                echo "3. 中科大"
+                echo "4. Docker官方 (国外)"
+                read -p "输入选择: " mirror_choice
+                mirror_url=""
+                case "$mirror_choice" 在
+                    1) mirror_url='"https://mirror.aliyuncs.com"' ;;
+                    2) mirror_url='"http://hub-mirror.c.163.com"' ;;
+                    3) mirror_url='"https://docker.mirrors.ustc.edu.cn"' ;;
+                    4) mirror_url='""' ;;
+                    *) echo "无效选择"; continue ;;
+                esac
+                edit_daemon_json '"registry-mirrors"' "[$mirror_url]"
+                ;;
+            9)
+                [ -f /etc/docker/daemon.json ] || echo "{}" > /etc/docker/daemon.json
+                editor=${EDITOR:-vi}
+                $editor /etc/docker/daemon.json
+                echo "请手动重启Docker服务: systemctl restart docker"
+                ;;
+            10) edit_daemon_json '"ipv6"' "true" ;;
+            11) edit_daemon_json '"ipv6"' "false" ;;
+            12) 
+                echo "备份/还原功能开发中..."
+                read -p "按任意键继续..."
+                ;;
+            13) uninstall_docker ;;
+            0) break ;;
+            *) 
+                echo "无效选项"
+                read -n1 -p "按任意键继续..."
                 ;;
         esac
     done
 }
-
-# 运行主函数
-main
