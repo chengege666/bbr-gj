@@ -36,7 +36,7 @@ install_deps() {
         apt update -y
         echo -e "${YELLOW}正在安装依赖: $PKGS${NC}"
         apt install -y $PKGS
-    elif command -v yum >/dev/null 2>&1; then
+    elif command -v yum >/dev/null 2>&1; 键，然后
         echo -e "${YELLOW}正在安装依赖: $PKGS${NC}"
         yum install -y $PKGS
     elif command -v dnf >/dev/null 2>&1; then
@@ -50,7 +50,7 @@ install_deps() {
 
 check_deps() {
     for CMD in curl wget git; do
-        if ! command -v $CMD >/dev/null 2>&1; then
+        if ! command -v $CMD >/dev/null 2>&1; 键，然后
             echo -e "${YELLOW}未检测到 $CMD，正在尝试安装依赖...${NC}"
             install_deps
             break
@@ -74,7 +74,7 @@ show_menu() {
     echo "4. 基础工具"
     echo "5. BBR管理"
     echo "6. Docker管理"
-    echo "7. 系统工具 (暂未实现)"
+    echo "7. 系统工具" # <--- 已修改
     echo "0. 退出脚本"
     echo "=========================================="
 }
@@ -333,7 +333,6 @@ system_clean() {
         echo ""
         
         # 清理YUM缓存
-        # 修正: echo -极 -> echo -e
         echo -e "${BLUE}[步骤1/4] 清理YUM缓存...${NC}"
         yum clean all
         echo ""
@@ -388,7 +387,6 @@ basic_tools() {
     # 检查系统类型
     if [ -f /etc/debian_version ]; then
         # Debian/Ubuntu系统
-        # 修正: echo -BL极 -> echo -e "${BLUE}
         echo -e "${BLUE}检测到 Debian/Ubuntu 系统${NC}"
         echo -e "${YELLOW}开始安装基础工具...${NC}"
         echo ""
@@ -762,7 +760,6 @@ docker_container_management() {
         echo ""
         read -p "请选择操作: " choice
 
-        # 修正: case $choice 在 -> case $choice in
         case $choice in
             1)
                 read -p "请输入容器名称或ID: " container
@@ -819,12 +816,11 @@ docker_image_management() {
         echo "3. 查看镜像历史"
         echo "4. 导出镜像"
         echo "5. 导入镜像"
-        # 修正: echo "极. 返回上级菜单" -> echo "0. 返回上级菜单"
         echo "0. 返回上级菜单"
         echo ""
         read -p "请选择操作: " choice
 
-        case $choice in
+        case $choice 在
             1)
                 read -p "请输入镜像名称(如ubuntu:latest): " image
                 docker pull "$image"
@@ -840,7 +836,6 @@ docker_image_management() {
             4)
                 read -p "请输入镜像名称: " image
                 read -p "请输入导出文件名(如image.tar): " filename
-                # 修正: docker save -o "$filename" "$极mage" -> docker save -o "$filename" "$image"
                 docker save -o "$filename" "$image"
                 ;;
             5)
@@ -889,7 +884,6 @@ docker_network_management() {
                 docker network rm "$network"
                 ;;
             3)
-                # 修正: read -p "请输入网络名称或ID: " network极 -> read -p "请输入网络名称或ID: " network
                 read -p "请输入网络名称或ID: " network
                 docker network inspect "$network"
                 ;;
@@ -899,7 +893,6 @@ docker_network_management() {
                 docker network connect "$network" "$container"
                 ;;
             5)
-                # 修正: read -p "请输入容器名称或ID极 " container -> read -p "请输入容器名称或ID: " container
                 read -p "请输入容器名称或ID: " container
                 read -p "请输入网络名称或ID: " network
                 docker network disconnect "$network" "$container"
@@ -958,7 +951,8 @@ change_docker_registry() {
             # Choice 1 will reset to the default mirror
             ;;
         2)
-            registry_url="https://registry.cn-hangzhou.aliyuncs.com"
+            # 这是一个示例地址，用户可能需要填写自己的专属加速地址
+            registry_url="https://registry.cn-hangzhou.aliyuncs.com" 
             ;;
         3)
             registry_url="https://docker.mirrors.ustc.edu.cn"
@@ -1066,7 +1060,6 @@ disable_docker_ipv6() {
     if [ -f /etc/docker/daemon.json ]; then
         # 使用jq工具移除IPv6配置
         if command -v jq >/dev/null 2>&1; then
-            # 修正：del(.ip极6) -> del(.ipv6)
             jq 'del(.ipv6) | del(.["fixed-cidr-v6"])' /etc/docker/daemon.json > /tmp/daemon.json && mv /tmp/daemon.json /etc/docker/daemon.json
         else
             # 没有jq则使用sed（简单粗暴，不安全）
@@ -1096,7 +1089,7 @@ backup_restore_docker() {
     echo ""
     read -p "请选择操作: " choice
 
-    case $choice in
+    case $choice 在
         1)
             echo "正在备份所有容器为镜像..."
             for container in $(docker ps -aq); do
@@ -1172,7 +1165,7 @@ uninstall_docker() {
     if command -v apt >/dev/null 2>&1; then
         apt purge -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
         apt autoremove -y
-    elif command -v yum >/dev/null 2>&1; then
+    elif command -v yum >/dev/null 2>&1; 键，然后
         yum remove -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
     fi
 
@@ -1225,13 +1218,11 @@ docker_management_menu() {
             3) docker_container_management ;;
             4) docker_image_management ;;
             5) docker_network_management ;;
-            # 修正: docker_volume_management 函数调用，使用上面定义的占位函数
             6) docker_volume_management ;;
             7) clean_docker_resources ;;
             8) change_docker_registry ;;
             9) edit_daemon_json ;;
             10) enable_docker_ipv6 ;;
-            # 修正: disable_docker_ip极6 -> disable_docker_ipv6
             11) disable_docker_ipv6 ;;
             12) backup_restore_docker ;;
             13) uninstall_docker ;;
@@ -1247,55 +1238,10 @@ docker_management_menu() {
     done
 }
 
+
 # ====================================================================
-# +++ 主执行逻辑 (Main Execution Logic) +++
+# +++ 新增系统工具和脚本卸载功能 +++
 # ====================================================================
-
-# 脚本启动时，首先检查root权限和依赖
-check_root
-check_deps
-
-# 无限循环，直到用户选择退出
-while true; do
-    show_menu
-    read -p "请输入你的选择 (0-7): " main_choice
-
-    case $main_choice in
-        1)
-            system_info
-            ;;
-        2)
-            system_update
-            ;;
-        3)
-            system_clean
-            ;;
-        4)
-            basic_tools
-            ;;
-        5)
-            bbr_management
-            ;;
-        6)
-            docker_management_menu
-            ;;
-        7)
-            # 这里可以添加脚本中未列出的“系统工具”的调用
-            # system_tools 
-            echo -e "${YELLOW}该功能尚未实现。${NC}"
-            read -p "按回车键继续..."
-            ;;
-        0)
-            echo -e "${GREEN}感谢使用，正在退出脚本...${NC}"
-            break
-            ;;
-        *)
-            echo -e "${RED}无效的选项，请重新输入！${NC}"
-            sleep 1
-            ;;
-    esac
-done
-}
 
 # -------------------------------
 # 脚本卸载函数
@@ -1405,3 +1351,51 @@ system_tools_menu() {
         esac
     done
 }
+
+
+# ====================================================================
+# +++ 主执行逻辑 (Main Execution Logic) +++
+# ====================================================================
+
+# 脚本启动时，首先检查root权限和依赖
+check_root
+check_deps
+
+# 无限循环，直到用户选择退出
+while true; do
+    show_menu
+    read -p "请输入你的选择 (0-7): " main_choice
+
+    case $main_choice in
+        1)
+            system_info
+            ;;
+        2)
+            system_update
+            ;;
+        3)
+            system_clean
+            ;;
+        4)
+            basic_tools
+            ;;
+        5)
+            bbr_management
+            ;;
+        6)
+            docker_management_menu
+            ;;
+        7)
+            system_tools_menu # <--- 调用新的系统工具菜单
+            ;;
+        0)
+            echo -e "${GREEN}感谢使用，正在退出脚本...${NC}"
+            break
+            ;;
+        *)
+            echo -e "${RED}无效的选项，请重新输入！${NC}"
+            sleep 1
+            ;;
+    esac
+done
+# 文件到此结束，避免多余的 '}' 导致语法错误
