@@ -1045,7 +1045,7 @@ backup_restore_docker() {
             echo "正在备份所有容器为镜像..."
             for container in $(docker ps -aq); do
                 name=$(docker inspect --format='{{.Name}}' $container | sed 's/^\///')
-                docker commit $container "${name}-backup"
+                docker commit "$container" "${name}-backup"
             done
             echo "容器备份完成"
             ;;
