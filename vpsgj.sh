@@ -661,3 +661,93 @@ docker_menu() {
         read -n1 -p "按任意键返回Docker菜单..."
     done
 }
+
+# -------------------------------
+# Docker管理主菜单
+# -------------------------------
+docker_menu() {
+    if ! command -v docker >/dev/null 2>&1; then
+        echo -e "${RED}未检测到 Docker 环境！${NC}"
+        read -p "是否现在安装 Docker? (y/n): " install_docker
+        if [[ "$install_docker" == "y" || "$install_docker" == "Y" ]]; then
+            install_update_docker
+        else
+            return
+        fi
+    fi
+    
+    while true; do
+        clear
+        echo -e "${CYAN}Docker管理${NC}"
+        if systemctl is-active --quiet docker; then
+            containers=$(docker ps -a --format '{{.ID}}' | wc -l)
+            images=$(docker images -q | wc -l)
+            networks=$(docker network ls -q | wc -l)
+            volumes=$(docker volume ls -q | wc -l)
+            echo -e "${GREEN}环境已经安装 容器: ${containers} 镜像: ${images} 网络: ${networks} 卷: ${volumes}${NC}"
+        else
+            echo -e "${RED}Docker服务未运行！请先启动Docker。${NC}"
+        fi
+        echo "------------------------------------------------"
+        echo "1.  安装/更新Docker环境"
+        echo "2.  查看Docker全局状态 (docker system df)"
+        echo "3.  Docker容器管理"
+        echo "4.  Docker镜像管理"
+        echo "5.  Docker网络管理"
+        echo "6.  Docker卷管理"
+        echo "7.  清理无用的Docker资源 (prune)"
+        echo "8.  更换Docker镜像源"
+        echo "9.  编辑daemon.json文件"
+        echo "10. 开启Docker-ipv6访问"
+        echo "11. 关闭Docker-ipv6访问"
+        echo "12. 备份/还原Docker环境"
+        echo "13. 卸载Docker环境"
+        echo "0.  返回主菜单"
+        echo "------------------------------------------------"
+        read -p "请输入你的选择: " choice
+
+        case "$choice" in
+            1) install_update_docker ;;
+            2) docker system df ;;
+            3) container_management_menu ;;
+            4) image_management_menu ;;
+            5) network_management_menu ;;
+            6) volume_management_menu ;;
+            7) 
+                read -p "这将删除所有未使用的容器、网络、镜像，确定吗? (y/N): " confirm
+                [[ "$confirm" == "y" || "$confirm" == "Y" ]] && docker system prune -af --volumes
+                ;;
+            8)
+                echo "请选择镜像源:"
+                echo "1. 阿里云 (推荐国内)"
+                echo "2. 网易"
+                echo "3. 中科大"
+                echo "4. Docker官方 (国外)"
+                read -p "输入选择: " mirror_choice
+                mirror_url=""
+                case "$mirror_choice" in
+                    1) mirror_url='"https://mirror.aliyuncs.com"' ;;
+                    2) mirror_url='"http://hub-mirror.c.163.com"' ;;
+                    3) mirror_url='"https://docker.mirrors.ustc.edu.cn"' ;;
+                    4) mirror_url='""' ;;
+                    *) echo "无效选择"; continue ;;
+                esac
+                edit_daemon_json '"registry-mirrors"' "[$mirror_url]"
+                ;;
+            9)
+                [ -f /etc/docker/daemon.json ] || echo "{}" > /etc/docker/daemon.json
+                editor=${EDITOR:-vi}
+                $editor /etc/docker/daemon.json
+                ;;
+            10) edit_daemon_json '"ipv6"' "true" ;;
+            11) edit_daemon_json '"ipv6"' "false" ;;
+            12) 
+                echo "功能开发中..."
+                ;;
+            13) uninstall_docker ;;
+            0) break ;;
+            *) echo -e "${RED}无效选项${NC}" ;;
+        esac
+        read -n1 -p "按任意键返回Docker菜单..."
+    done
+}
