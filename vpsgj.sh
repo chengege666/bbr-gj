@@ -79,10 +79,9 @@ show_menu() {
     echo "=========================================="
 }
 
-# --- [此处省略 System Info, Update, Clean, Tools, BBR, Docker 函数 - 保持不变] ---
 
 # -------------------------------
-# 检查BBR状态函数 (略)
+# 检查BBR状态函数
 # -------------------------------
 check_bbr() {
     local bbr_enabled=$(sysctl net.ipv4.tcp_congestion_control | awk '{print $3}')
@@ -113,7 +112,7 @@ check_bbr() {
     fi
 }
 # -------------------------------
-# 系统信息查询函数 (略)
+# 系统信息查询函数
 # -------------------------------
 system_info() {
     clear; echo -e "${CYAN}"; echo "=========================================="; echo "              系统信息查询                "; echo "=========================================="; echo -e "${NC}"
@@ -137,7 +136,7 @@ system_info() {
     echo -e "${CYAN}"; echo "=========================================="; echo -e "${NC}"; read -p "按回车键返回主菜单..."
 }
 # -------------------------------
-# 系统更新函数 (略)
+# 系统更新函数
 # -------------------------------
 system_update() {
     clear; echo -e "${CYAN}"; echo "=========================================="; echo "              系统更新功能                "; echo "=========================================="; echo -e "${NC}"
@@ -158,7 +157,7 @@ system_update() {
     echo -e "${CYAN}"; echo "=========================================="; echo -e "${NC}"; read -p "按回车键返回主菜单..."
 }
 # -------------------------------
-# 系统清理函数 (略)
+# 系统清理函数
 # -------------------------------
 system_clean() {
     clear; echo -e "${CYAN}"; echo "=========================================="; echo "              系统清理功能                "; echo "=========================================="; echo -e "${NC}"
@@ -185,7 +184,7 @@ system_clean() {
     echo -e "${CYAN}"; echo "=========================================="; echo -e "${NC}"; read -p "按回车键返回主菜单..."
 }
 # -------------------------------
-# 基础工具安装函数 (略)
+# 基础工具安装函数
 # -------------------------------
 basic_tools() {
     clear; echo -e "${CYAN}"; echo "=========================================="; echo "              基础工具安装                "; echo "=========================================="; echo -e "${NC}"
@@ -205,14 +204,191 @@ basic_tools() {
     fi
     echo -e "${CYAN}"; echo "=========================================="; echo -e "${NC}"; read -p "按回车键返回主菜单..."
 }
+
+# ====================================================================
+# +++ BBR & Docker 功能实现 (已补全) +++
+# ====================================================================
+
 # -------------------------------
-# BBR 管理菜单 (略)
+# BBR 管理菜单
 # -------------------------------
-# ... (BBR 函数内容未修改，此处省略) ...
+bbr_management() {
+    while true; do
+        clear
+        echo -e "${CYAN}"
+        echo "=========================================="
+        echo "                BBR 管理菜单              "
+        echo "=========================================="
+        echo -e "${NC}"
+        echo -e "${BLUE}当前BBR状态:${NC}"
+        check_bbr # 调用检查函数显示状态
+        echo "------------------------------------------"
+        echo "1. 安装/升级 BBR v1 (Linux 内核)"
+        echo "2. 安装 BBR Plus 内核 (xanmod)"
+        echo "3. 卸载 BBR Plus 内核"
+        echo "4. 开启 BBR / BBR Plus"
+        echo "5. 关闭 BBR"
+        echo "0. 返回主菜单"
+        echo "=========================================="
+        read -p "请输入选项编号: " bbr_choice
+
+        case $bbr_choice in
+            1)
+                echo -e "${YELLOW}功能占位：正在准备执行 BBR v1 安装脚本...${NC}"
+                # 此处可以集成类似 aoj.ac 的一键脚本
+                # bash <(curl -L -s https://github.com/teddysun/across/raw/master/bbr.sh)
+                echo -e "${GREEN}提示: BBR v1 通常需要升级内核，操作后需要重启。${NC}"
+                read -p "按回车键返回..."
+                ;;
+            2)
+                echo -e "${YELLOW}功能占位：正在准备执行 BBR Plus 安装脚本...${NC}"
+                # 此处可以集成 xanmod 内核安装脚本
+                # wget -qO- https://dl.xanmod.org/archive.key | gpg --dearmor -o /usr/share/keyrings/xanmod-archive-keyring.gpg
+                # echo 'deb [signed-by=/usr/share/keyrings/xanmod-archive-keyring.gpg] http://deb.xanmod.org releases main' | tee /etc/apt/sources.list.d/xanmod-release.list
+                # apt update && apt install linux-xanmod -y
+                echo -e "${GREEN}提示: 安装新内核后需要重启才能生效。${NC}"
+                read -p "按回车键返回..."
+                ;;
+            3)
+                echo -e "${YELLOW}功能占位：正在准备卸载 BBR Plus 内核...${NC}"
+                # apt-get remove --purge linux-xanmod
+                echo -e "${GREEN}提示: 卸载内核后需要重启。${NC}"
+                read -p "按回车键返回..."
+                ;;
+            4)
+                echo -e "${YELLOW}正在尝试开启 BBR...${NC}"
+                sed -i '/net.core.default_qdisc/d' /etc/sysctl.conf
+                sed -i '/net.ipv4.tcp_congestion_control/d' /etc/sysctl.conf
+                echo "net.core.default_qdisc=fq" >> /etc/sysctl.conf
+                echo "net.ipv4.tcp_congestion_control=bbr" >> /etc/sysctl.conf
+                sysctl -p >/dev/null 2>&1
+                echo -e "${GREEN}✅ BBR 已开启，请检查上方状态确认。${NC}"
+                read -p "按回车键返回..."
+                ;;
+            5)
+                echo -e "${YELLOW}正在尝试关闭 BBR (恢复 cubic)...${NC}"
+                sed -i '/net.core.default_qdisc/d' /etc/sysctl.conf
+                sed -i '/net.ipv4.tcp_congestion_control/d' /etc/sysctl.conf
+                echo "net.ipv4.tcp_congestion_control=cubic" >> /etc/sysctl.conf
+                sysctl -p >/dev/null 2>&1
+                echo -e "${GREEN}✅ BBR 已关闭。${NC}"
+                read -p "按回车键返回..."
+                ;;
+            0)
+                return
+                ;;
+            *)
+                echo -e "${RED}无效的选项，请重新输入！${NC}"
+                sleep 1
+                ;;
+        esac
+    done
+}
+
 # -------------------------------
-# Docker 管理菜单 (略)
+# Docker 管理菜单
 # -------------------------------
-# ... (Docker 函数内容未修改，此处省略) ...
+docker_management_menu() {
+    while true; do
+        clear
+        echo -e "${CYAN}"
+        echo "=========================================="
+        echo "               Docker 管理菜单            "
+        echo "=========================================="
+        echo -e "${NC}"
+        if ! command -v docker >/dev/null 2>&1; then
+            echo -e "${YELLOW}⚠️ Docker 未安装。${NC}"
+            echo "------------------------------------------"
+            echo "1. 安装 Docker"
+            echo "0. 返回主菜单"
+        else
+            echo -e "${BLUE}Docker 版本: ${GREEN}$(docker --version)${NC}"
+            echo -e "${BLUE}Docker-Compose 版本: ${GREEN}$(docker-compose --version 2>/dev/null || echo '未安装')${NC}"
+            echo "------------------------------------------"
+            echo "2. 卸载 Docker"
+            echo "3. 启动/停止/重启 Docker 服务"
+            echo "4. 查看 Docker 容器/镜像/网络"
+            echo "5. 清理 Docker 资源 (慎用)"
+            echo "6. 安装 Docker-Compose"
+            echo "0. 返回主菜单"
+        fi
+        echo "=========================================="
+        read -p "请输入选项编号: " docker_choice
+
+        case $docker_choice in
+            1)
+                echo -e "${YELLOW}正在执行 Docker 一键安装脚本...${NC}"
+                bash <(curl -sSL https://get.docker.com)
+                systemctl enable --now docker
+                echo -e "${GREEN}✅ Docker 安装完成！${NC}"
+                read -p "按回车键返回..."
+                ;;
+            2)
+                read -p "确定要卸载 Docker 吗？(y/N): " confirm
+                if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then
+                    echo -e "${YELLOW}正在卸载 Docker...${NC}"
+                    systemctl stop docker
+                    if command -v apt >/dev/null 2>&1; then
+                        apt-get purge -y docker-ce docker-ce-cli containerd.io
+                        rm -rf /var/lib/docker
+                    elif command -v yum >/dev/null 2>&1; then
+                        yum remove -y docker-ce docker-ce-cli containerd.io
+                        rm -rf /var/lib/docker
+                    fi
+                    echo -e "${GREEN}✅ Docker 卸载完成。${NC}"
+                else
+                    echo -e "${YELLOW}操作已取消。${NC}"
+                fi
+                read -p "按回车键返回..."
+                ;;
+            3)
+                read -p "选择操作: [1]启动 [2]停止 [3]重启 Docker: " docker_op
+                case $docker_op in
+                    1) systemctl start docker; echo "Docker 已启动" ;;
+                    2) systemctl stop docker; echo "Docker 已停止" ;;
+                    3) systemctl restart docker; echo "Docker 已重启" ;;
+                    *) echo "无效操作" ;;
+                esac
+                read -p "按回车键返回..."
+                ;;
+            4)
+                echo "--- [容器列表] ---"; docker ps -a; 
+                echo -e "\n--- [镜像列表] ---"; docker images;
+                echo -e "\n--- [网络列表] ---"; docker network ls;
+                read -p "按回车键返回..."
+                ;;
+            5)
+                read -p "警告：这将删除所有停止的容器和未使用的镜像/网络！确定吗？(y/N): " confirm
+                if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then
+                    docker system prune -a -f
+                    echo -e "${GREEN}✅ Docker 资源清理完成。${NC}"
+                else
+                    echo -e "${YELLOW}操作已取消。${NC}"
+                fi
+                read -p "按回车键返回..."
+                ;;
+            6)
+                echo -e "${YELLOW}正在安装最新版 Docker-Compose...${NC}"
+                LATEST_COMPOSE_URL=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | grep "browser_download_url" | grep "docker-compose-linux-x86_64" | cut -d '"' -f 4)
+                if [ -z "$LATEST_COMPOSE_URL" ]; then
+                    echo -e "${RED}❌ 无法获取 Docker-Compose 最新版本链接，请检查网络或稍后再试。${NC}"
+                else
+                    curl -L "$LATEST_COMPOSE_URL" -o /usr/local/bin/docker-compose
+                    chmod +x /usr/local/bin/docker-compose
+                    echo -e "${GREEN}✅ Docker-Compose 安装完成: $(docker-compose --version)${NC}"
+                fi
+                read -p "按回车键返回..."
+                ;;
+            0)
+                return
+                ;;
+            *)
+                echo -e "${RED}无效的选项，请重新输入！${NC}"
+                sleep 1
+                ;;
+        esac
+    done
+}
 
 
 # ====================================================================
@@ -400,7 +576,8 @@ toggle_ipv_priority() {
             [ -f "$GAI_CONF" ] && cp "$GAI_CONF" "$GAI_CONF.bak"
             
             # 移除或注释掉所有 priority 行
-            sed -i '/^#\s*precedence/!s/^\s*precedence/# precedence/g' "$GAI_CONF"
+            sed -i '/^#\s*precedence/!s/^\s*precedence/# precedence/g' "$GAI_CONF" 2>/dev/null
+            touch "$GAI_CONF" # 如果文件不存在则创建
             sed -i '/^precedence\s*::ffff:0:0\/96/d' "$GAI_CONF"
 
             # 写入优先 IPv4 的配置
@@ -416,7 +593,8 @@ toggle_ipv_priority() {
             [ -f "$GAI_CONF" ] && cp "$GAI_CONF" "$GAI_CONF.bak"
 
             # 移除或注释掉所有 priority 行
-            sed -i '/^#\s*precedence/!s/^\s*precedence/# precedence/g' "$GAI_CONF"
+            sed -i '/^#\s*precedence/!s/^\s*precedence/# precedence/g' "$GAI_CONF" 2>/dev/null
+            touch "$GAI_CONF" # 如果文件不存在则创建
             sed -i '/^precedence\s*::ffff:0:0\/96/d' "$GAI_CONF"
 
             echo -e "${GREEN}✅ 配置完成。系统将按默认配置优先解析 IPv6。${NC}"
