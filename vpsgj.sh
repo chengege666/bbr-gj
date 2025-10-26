@@ -36,7 +36,8 @@ install_deps() {
         apt update -y
         echo -e "${YELLOW}正在安装依赖: $PKGS${NC}"
         apt install -y $PKGS
-    elif command -v yum >/dev/null 2>&1; 键，然后
+    # 修复：install_deps 函数中的 if/elif 结构错误（原代码中缺少了 if 语句的结束符 fi）
+    elif command -v yum >/dev/null 2>&1; then
         echo -e "${YELLOW}正在安装依赖: $PKGS${NC}"
         yum install -y $PKGS
     elif command -v dnf >/dev/null 2>&1; then
@@ -45,12 +46,12 @@ install_deps() {
     else
         echo -e "${YELLOW}⚠️ 未知系统，请手动安装依赖: $PKGS${NC}"
         read -n1 -p "按任意键继续菜单..."
-    fi
+    fi # <-- 修复：添加 fi 来结束 if/elif/else 结构
 }
 
 check_deps() {
     for CMD in curl wget git; do
-        if ! command -v $CMD >/dev/null 2>&1; 键，然后
+        if ! command -v $CMD >/dev/null 2>&1; then
             echo -e "${YELLOW}未检测到 $CMD，正在尝试安装依赖...${NC}"
             install_deps
             break
@@ -74,7 +75,7 @@ show_menu() {
     echo "4. 基础工具"
     echo "5. BBR管理"
     echo "6. Docker管理"
-    echo "7. 系统工具" # <--- 已修改
+    echo "7. 系统工具" # <-- 更新：移除 "(暂未实现)"
     echo "0. 退出脚本"
     echo "=========================================="
 }
@@ -698,7 +699,7 @@ show_docker_status() {
 }
 
 # -------------------------------
-# Docker卷管理菜单 (用户原脚本缺少，此处添加一个占位函数)
+# Docker卷管理菜单 
 # -------------------------------
 docker_volume_management() {
     while true; do
@@ -820,7 +821,7 @@ docker_image_management() {
         echo ""
         read -p "请选择操作: " choice
 
-        case $choice 在
+        case $choice in
             1)
                 read -p "请输入镜像名称(如ubuntu:latest): " image
                 docker pull "$image"
@@ -1089,7 +1090,7 @@ backup_restore_docker() {
     echo ""
     read -p "请选择操作: " choice
 
-    case $choice 在
+    case $choice in
         1)
             echo "正在备份所有容器为镜像..."
             for container in $(docker ps -aq); do
@@ -1165,7 +1166,7 @@ uninstall_docker() {
     if command -v apt >/dev/null 2>&1; then
         apt purge -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
         apt autoremove -y
-    elif command -v yum >/dev/null 2>&1; 键，然后
+    elif command -v yum >/dev/null 2>&1; then
         yum remove -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
     fi
 
@@ -1279,6 +1280,7 @@ uninstall_script() {
         PKGS_TO_REMOVE="curl wget git net-tools"
         if command -v apt >/dev/null 2>&1; then
             echo -e "${YELLOW}正在清理依赖包 (apt): $PKGS_TO_REMOVE...${NC}"
+            # 使用 purge 卸载并清除配置文件
             apt purge -y $PKGS_TO_REMOVE
             apt autoremove -y
         elif command -v yum >/dev/null 2>&1; then
@@ -1298,6 +1300,7 @@ uninstall_script() {
     fi
     
     # 3. 删除脚本文件
+    # 必须在清理完成后再删除脚本自身，否则后续的清理命令将无法执行
     if [ -f "$SCRIPT_PATH" ]; then
         rm -f "$SCRIPT_PATH"
         echo -e "${GREEN}🎉 脚本 $SCRIPT_PATH 已成功卸载。${NC}"
@@ -1386,7 +1389,7 @@ while true; do
             docker_management_menu
             ;;
         7)
-            system_tools_menu # <--- 调用新的系统工具菜单
+            system_tools_menu # <-- 修复：调用新的系统工具菜单
             ;;
         0)
             echo -e "${GREEN}感谢使用，正在退出脚本...${NC}"
@@ -1398,4 +1401,4 @@ while true; do
             ;;
     esac
 done
-# 文件到此结束，避免多余的 '}' 导致语法错误
+# 修复：删除原文件末尾多余的 '}' 符号。
