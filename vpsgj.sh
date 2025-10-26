@@ -152,10 +152,10 @@ system_info() {
     fi
     echo -e "${BLUE}公网IPv4: $ipv4"
     ipv6=$(curl -s --connect-timeout 2 ipv6.icanhazip.com)
-    if [ -z "$ipv6" ]; 键，然后
+    if [ -z "$ipv6" ]; then
         ipv6=$(curl -s --connect-timeout 2 ipv6.ip.sb)
     fi
-    if [ -z "$ipv6" ]; 键，然后
+    if [ -z "$ipv6" ]; then
         ipv6="${RED}未检测到${NC}"
     else
         ipv6="${YELLOW}$ipv6${NC}"
@@ -183,7 +183,7 @@ system_update() {
     echo "              系统更新功能                "
     echo "=========================================="
     echo -e "${NC}"
-    if [ -f /etc/debian_version ]; 键，然后
+    if [ -f /etc/debian_version ]; then
         echo -e "${BLUE}检测到 Debian/Ubuntu 系统${NC}"
         echo -e "${YELLOW}开始更新系统...${NC}"
         echo -e "${BLUE}[步骤1/3] 更新软件包列表...${NC}"; apt update
@@ -223,7 +223,7 @@ system_clean() {
         read -p "按回车键返回主菜单..."
         return
     fi
-    if [ -f /etc/debian_version ]; 键，然后
+    if [ -f /etc/debian_version ]; then
         echo -e "${BLUE}检测到 Debian/Ubuntu 系统${NC}"
         echo -e "${YELLOW}开始清理系统...${NC}"
         echo -e "${BLUE}[步骤1/4] 清理APT缓存...${NC}"; apt clean
@@ -231,7 +231,7 @@ system_clean() {
         echo -e "${BLUE}[步骤3/4] 清理日志文件...${NC}"; journalctl --vacuum-time=1d; find /var/log -type f -regex ".*\.gz$" -delete; find /var/log -type f -regex ".*\.[0-9]$" -delete
         echo -e "${BLUE}[步骤4/4] 清理临时文件...${NC}"; rm -rf /tmp/*; rm -rf /var/tmp/*
         echo -e "${GREEN}系统清理完成！${NC}"
-    elif [ -f /etc/redhat-release ]; 键，然后
+    elif [ -f /etc/redhat-release ]; then
         echo -e "${BLUE}检测到 CentOS/RHEL 系统${NC}"
         echo -e "${YELLOW}开始清理系统...${NC}"
         echo -e "${BLUE}[步骤1/4] 清理YUM缓存...${NC}"; yum clean all
@@ -394,7 +394,6 @@ bbr_management() {
         read -p "请输入选项编号: " bbr_choice
         case $bbr_choice in
             1) bbr_test_menu ;;
-            2) run_bbr_switch ;;
             3)
                 clear
                 echo -e "${CYAN}"
@@ -406,6 +405,7 @@ bbr_management() {
                 echo ""
                 read -p "按回车键返回BBR管理菜单..."
                 ;;
+            2) run_bbr_switch ;;
             0) return ;;
             *) echo -e "${RED}无效的选项，请重新输入！${NC}"; sleep 1 ;;
         esac
@@ -896,9 +896,9 @@ change_hostname() {
     echo -e "${YELLOW}正在将主机名修改为 ${new_hostname}...${NC}"
     
     # 使用 hostnamectl 设置主机名 (适用于大多数现代系统)
-    if command -v hostnamectl &>/dev/null; 键，然后
+    if command -v hostnamectl &>/dev/null; then
         hostnamectl set-hostname "$new_hostname"
-        if [ $? -eq 0 ]; 键，然后
+        if [ $? -eq 0 ]; then
             echo -e "${GREEN}✅ 主机名修改成功。${NC}"
             echo -e "${YELLOW}新主机名: $(hostname)${NC}"
         else
@@ -906,7 +906,7 @@ change_hostname() {
         fi
     else
         # 针对旧系统，直接修改配置文件
-        if [ -f /etc/hostname ]; 键，然后
+        if [ -f /etc/hostname ]; then
             echo "$new_hostname" > /etc/hostname
             hostname -F /etc/hostname
             echo -e "${GREEN}✅ 主机名文件 /etc/hostname 已更新。${NC}"
@@ -916,7 +916,7 @@ change_hostname() {
     fi
     
     # 建议同时更新 /etc/hosts 文件，防止解析错误
-    if [ -f /etc/hosts ]; 键，然后
+    if [ -f /etc/hosts ]; then
         sed -i "s/127.0.0.1\s\+$current_hostname/127.0.0.1\t$new_hostname/" /etc/hosts
     fi
     
@@ -931,7 +931,7 @@ change_timezone() {
     clear
     echo -e "${CYAN}=== 系统时区调整 ===${NC}"
     
-    if command -v timedatectl &>/dev/null; 键，然后
+    if command -v timedatectl &>/dev/null; then
         echo -e "${BLUE}当前时区: ${YELLOW}$(timedatectl | grep 'Time zone' | awk '{print $3}')${NC}"
         echo ""
         echo "常用时区列表:"
