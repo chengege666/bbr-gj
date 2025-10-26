@@ -1155,3 +1155,52 @@ docker_management_menu() {
         read -p "按回车键继续..."
     done
 }
+
+# ====================================================================
+# +++ 主执行逻辑 (Main Execution Logic) +++
+# ====================================================================
+
+# 脚本启动时，首先检查root权限和依赖
+check_root
+check_deps
+
+# 无限循环，直到用户选择退出
+while true; do
+    show_menu
+    read -p "请输入你的选择 (0-7): " main_choice
+
+    case $main_choice in
+        1)
+            system_info
+            ;;
+        2)
+            system_update
+            ;;
+        3)
+            system_clean
+            ;;
+        4)
+            basic_tools
+            ;;
+        5)
+            bbr_management
+            ;;
+        6)
+            docker_management_menu
+            ;;
+        7)
+            # 这里可以添加脚本中未列出的“系统工具”的调用
+            # system_tools 
+            echo -e "${YELLOW}该功能尚未实现。${NC}"
+            read -p "按回车键继续..."
+            ;;
+        0)
+            echo -e "${GREEN}感谢使用，正在退出脚本...${NC}"
+            break
+            ;;
+        *)
+            echo -e "${RED}无效的选项，请重新输入！${NC}"
+            sleep 1
+            ;;
+    esac
+done
