@@ -37,9 +37,15 @@ check_bbr() {
     local bbr_enabled=$(sysctl net.ipv4.tcp_congestion_control | awk '{print $3}')
     local bbr_module=$(lsmod | grep bbr)
     
+    # 获取默认队列算法
+    local default_qdisc=$(sysctl net.core.default_qdisc | awk '{print $3}')
+    
+    # 获取BBR参数
+    local bbr_params=$(sysctl -a 2>/dev/null | grep -E "bbr|tcp_congestion_control" | grep -v '^net.core' | sort)
+    
+    # 检查BBR版本
+    local bbr_version=""
     if [[ "$bbr_enabled" == *"bbr"* ]]; then
-        # 获取BBR版本信息
-        local bbr_version=""
         if [[ "$bbr_enabled" == "bbr" ]]; then
             bbr_version="BBR v1"
         elif [[ "$bbr_enabled" == "bbr2" ]]; then
@@ -48,19 +54,19 @@ check_bbr() {
             bbr_version="未知BBR类型"
         fi
         
-        # 获取BBR参数
-        local bbr_params=$(sysctl -a 2>/dev/null | grep -E "bbr|tcp_congestion_control" | grep -v '^net.core' | sort)
-        
         # 返回BBR信息
         echo -e "${GREEN}已启用${NC} ($bbr_version)"
+        echo -e "${BLUE}默认队列算法: ${NC}$default_qdisc"
         echo -e "${BLUE}BBR参数:${NC}"
         echo "$bbr_params" | while read -r line; do
             echo "  $line"
         done
     elif [[ -n "$bbr_module" ]]; then
         echo -e "${YELLOW}已加载但未启用${NC}"
+        echo -e "${BLUE}默认队列算法: ${NC}$default_qdisc"
     else
         echo -e "${RED}未启用${NC}"
+        echo -e "${BLUE}默认队列算法: ${NC}$default_qdisc"
     fi
 }
 
