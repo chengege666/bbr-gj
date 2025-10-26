@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # VPS一键管理脚本 v0.5
-# 作者: 智能助手
+# 作者: 智能助手 (已修正)
 # 最后更新: 2025-10-27
 
 # 颜色定义
@@ -72,7 +72,7 @@ show_menu() {
     echo "4. 基础工具"
     echo "5. BBR管理"
     echo "6. Docker管理"
-    echo "7. 系统工具"
+    echo "7. 系统工具 (未实现)"
     echo "0. 退出脚本"
     echo "=========================================="
 }
@@ -233,7 +233,7 @@ system_update() {
         
         echo -e "${GREEN}系统更新完成！${NC}"
         
-    elif [ -f /etc/redhat-release ]; then
+    elif [ -f /etc/redhat-release ]; 键，然后
         # CentOS/RHEL系统
         echo -e "${BLUE}检测到 CentOS/RHEL 系统${NC}"
         echo -e "${YELLOW}开始更新系统...${NC}"
@@ -260,7 +260,7 @@ system_update() {
     echo -e "${CYAN}"
     echo "=========================================="
     echo -e "${NC}"
-    read -p "按回车极返回主菜单..."
+    read -p "按回车键返回主菜单..."
 }
 
 # 系统清理函数
@@ -323,7 +323,7 @@ system_clean() {
         echo ""
         
         # 清理YUM缓存
-        echo -极 "${BLUE}[步骤1/4] 清理YUM缓存...${NC}"
+        echo -e "${BLUE}[步骤1/4] 清理YUM缓存...${NC}"
         yum clean all
         echo ""
         
@@ -374,7 +374,7 @@ basic_tools() {
     # 检查系统类型
     if [ -f /etc/debian_version ]; then
         # Debian/Ubuntu系统
-        echo -e "${BL极}检测到 Debian/Ubuntu 系统${NC}"
+        echo -e "${BLUE}检测到 Debian/Ubuntu 系统${NC}"
         echo -e "${YELLOW}开始安装基础工具...${NC}"
         echo ""
         
@@ -602,7 +602,7 @@ bbr_management() {
 }
 
 # ====================================================================
-# +++ Docker管理 +++
+# +++ Docker管理 +++ 
 # ====================================================================
 
 # -------------------------------
@@ -615,12 +615,12 @@ check_docker_status() {
             images=$(docker images -q 2>/dev/null | wc -l)
             networks=$(docker network ls -q 2>/dev/null | wc -l)
             volumes=$(docker volume ls -q 2>/dev/null | wc -l)
-            echo "环境已经安装 容器:${containers} 镜像:${images} 网络:${networks} 卷:${volumes}"
+            echo -e "${GREEN}环境已经安装${NC} | 容器:${containers} 镜像:${images} 网络:${networks} 卷:${volumes}"
         else
-            echo "Docker已安装但服务未启动"
+            echo -e "${YELLOW}Docker已安装但服务未启动${NC}"
         fi
     else
-        echo "Docker未安装"
+        echo -e "${RED}Docker未安装${NC}"
     fi
 }
 
@@ -648,9 +648,9 @@ install_update_docker() {
     systemctl enable docker
     
     if systemctl is-active docker >/dev/null 2>&1; then
-        echo "Docker安装成功！"
+        echo -e "${GREEN}Docker安装成功！${NC}"
     else
-        echo "Docker安装失败，请检查日志"
+        echo -e "${RED}Docker安装失败，请检查日志${NC}"
     fi
 }
 
@@ -672,176 +672,6 @@ docker_container_management() {
     while true; do
         clear
         echo "=== Docker容器管理 ==="
-        docker ps -a
-        echo ""
-        echo "1. 启动容器"
-        echo "2. 停止容器" 
-        echo "3. 重启容器"
-        echo "4. 查看容器日志"
-        echo "5. 进入容器终端"
-        echo "6. 删除容器"
-        echo "7. 查看容器详情"
-        echo "0. 返回上级菜单"
-        echo ""
-        read -p "请选择操作: " choice
-
-        case $choice in
-            1)
-                read -p "请输入容器名称或ID: " container
-                docker start "$container"
-                ;;
-            2)
-                read -p "请输入容器名称或ID: " container
-                docker stop "$container"
-                ;;
-            3)
-                read -p "极入容器名称或ID: " container
-                docker restart "$container"
-                ;;
-            4)
-                read -p "请输入容器名称极ID: " container
-                docker logs "$container"
-                ;;
-            5)
-                read -p "请输入容器名称或ID: " container
-                docker exec -it "$container" /bin/bash || docker exec -it "$container" /bin/sh
-                ;;
-            6)
-                read -p "请输入容器名称或ID: " container
-                docker rm "$container"
-                ;;
-            7)
-                read -p "请输入容器名称或ID: " container
-                docker inspect "$container"
-                ;;
-            0)
-                break
-                ;;
-            *)
-                echo "无效选择，请重新输入"
-                ;;
-        esac
-        
-        echo ""
-        read -p "按回车键继续..."
-    done
-}
-
-# -------------------------------
-# Docker镜像管理子菜单
-# -------------------------------
-docker_image_management() {
-    while true; do
-        clear
-        echo "=== Docker镜像管理 ==="
-极      docker images
-        echo ""
-        echo "1. 拉取镜像"
-        echo "2. 删除镜像"
-        echo "3. 查看镜像历史"
-        echo "4. 导出镜像"
-        echo "5. 导入镜像"
-        echo "极. 返回上级菜单"
-        echo ""
-        read -p "请选择操作: " choice
-
-        case $choice in
-            1)
-                read -p "请输入镜像名称(如ubuntu:latest): " image
-                docker pull "$image"
-                ;;
-            2)
-                read -p "请输入镜像ID或名称: " image
-                docker rmi "$image"
-                ;;
-            3)
-                read -p "请输入镜像ID或名称: " image
-                docker history "$image"
-                ;;
-            4)
-                read -p "请输入镜像名称: " image
-                read -p "请输入导出文件名(如image.tar): " filename
-                docker save -o "$filename" "$极mage"
-                ;;
-            5)
-                read -p "请输入导入的文件名: " filename
-                docker load -i "$filename"
-                ;;
-            0)
-                break
-                ;;
-            *)
-                echo "无效选择，请重新输入"
-                ;;
-        esac
-        
-        echo ""
-        read -p "按回车键继续..."
-    done
-}
-
-# -------------------------------
-# Docker网络管理子菜单
-# -------------------------------
-docker_network_management() {
-    while true; do
-        clear
-        echo "=== Docker网络管理 ==="
-        docker network ls
-        echo ""
-        echo "1. 创建网络"
-        echo "2. 删除网络"
-        echo "3. 查看网络详情"
-        echo "4. 连接容器到网络"
-        echo "5. 从网络断开容器"
-        echo "0. 返回上级菜单"
-        echo ""
-        read -p "请选择操作: " choice
-
-        case $choice in
-            1)
-                read -p "请输入网络名称: " network
-                read -p "请输入网络驱动(bridge/overlay等): " driver
-                docker network create --driver "$driver" "$network"
-                ;;
-            2)
-                read -p "请输入网络名称或ID: " network
-                docker network rm "$network"
-                ;;
-            3)
-                read -p "请输入网络名称或ID: " network极                docker network inspect "$network"
-                ;;
-            4)
-                read -p "请输入容器名称或ID: " container
-                read -p "请输入网络名称或ID: " network
-                docker network connect "$network" "$container"
-                ;;
-            5)
-                read -p "请输入容器名称或ID极 " container
-                read -p "请输入网络名称或ID: " network
-                docker network disconnect "$network" "$container"
-                ;;
-            0)
-                break
-                ;;
-            *)
-                echo "无效选择，请重新输入"
-                ;;
-        esac
-        
-        echo ""
-        read -p "按回车键继续..."
-    done
-}
-
-# -------------------------------
-# Docker容器管理子菜单
-# -------------------------------
-docker_container_management() {
-    while true; do
-        clear
-        echo "=== Docker容器管理 ==="
-        # 使用格式化输出，让显示更整洁
         docker ps -a --format "table {{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}"
         echo ""
         echo "1. 启动容器"
@@ -898,6 +728,160 @@ docker_container_management() {
 }
 
 # -------------------------------
+# Docker镜像管理子菜单
+# -------------------------------
+docker_image_management() {
+    while true; do
+        clear
+        echo "=== Docker镜像管理 ==="
+        docker images
+        echo ""
+        echo "1. 拉取镜像"
+        echo "2. 删除镜像"
+        echo "3. 查看镜像历史"
+        echo "4. 导出镜像"
+        echo "5. 导入镜像"
+        echo "0. 返回上级菜单"
+        echo ""
+        read -p "请选择操作: " choice
+
+        case $choice in
+            1)
+                read -p "请输入镜像名称(如ubuntu:latest): " image
+                docker pull "$image"
+                ;;
+            2)
+                read -p "请输入镜像ID或名称: " image
+                docker rmi "$image"
+                ;;
+            3)
+                read -p "请输入镜像ID或名称: " image
+                docker history "$image"
+                ;;
+            4)
+                read -p "请输入镜像名称: " image
+                read -p "请输入导出文件名(如image.tar): " filename
+                docker save -o "$filename" "$image"
+                ;;
+            5)
+                read -p "请输入导入的文件名: " filename
+                docker load -i "$filename"
+                ;;
+            0)
+                break
+                ;;
+            *)
+                echo "无效选择，请重新输入"
+                ;;
+        esac
+        
+        echo ""
+        read -p "按回车键继续..."
+    done
+}
+
+# -------------------------------
+# Docker网络管理子菜单
+# -------------------------------
+docker_network_management() {
+    while true; do
+        clear
+        echo "=== Docker网络管理 ==="
+        docker network ls
+        echo ""
+        echo "1. 创建网络"
+        echo "2. 删除网络"
+        echo "3. 查看网络详情"
+        echo "4. 连接容器到网络"
+        echo "5. 从网络断开容器"
+        echo "0. 返回上级菜单"
+        echo ""
+        read -p "请选择操作: " choice
+
+        case $choice in
+            1)
+                read -p "请输入网络名称: " network
+                read -p "请输入网络驱动(bridge/overlay等): " driver
+                docker network create --driver "$driver" "$network"
+                ;;
+            2)
+                read -p "请输入网络名称或ID: " network
+                docker network rm "$network"
+                ;;
+            3)
+                read -p "请输入网络名称或ID: " network
+                docker network inspect "$network"
+                ;;
+            4)
+                read -p "请输入容器名称或ID: " container
+                read -p "请输入网络名称或ID: " network
+                docker network connect "$network" "$container"
+                ;;
+            5)
+                read -p "请输入容器名称或ID: " container
+                read -p "请输入网络名称或ID: " network
+                docker network disconnect "$network" "$container"
+                ;;
+            0)
+                break
+                ;;
+            *)
+                echo "无效选择，请重新输入"
+                ;;
+        esac
+        
+        echo ""
+        read -p "按回车键继续..."
+    done
+}
+
+# -------------------------------
+# Docker卷管理子菜单
+# -------------------------------
+docker_volume_management() {
+    while true; do
+        clear
+        echo "=== Docker卷管理 ==="
+        docker volume ls
+        echo ""
+        echo "1. 创建卷"
+        echo "2. 删除卷"
+        echo "3. 查看卷详情"
+        echo "4. 清理未使用卷"
+        echo "0. 返回上级菜单"
+        echo ""
+        read -p "请选择操作: " choice
+
+        case $choice in
+            1)
+                read -p "请输入卷名称: " volume
+                docker volume create "$volume"
+                ;;
+            2)
+                read -p "请输入卷名称: " volume
+                docker volume rm "$volume"
+                ;;
+            3)
+                read -p "请输入卷名称: " volume
+                docker volume inspect "$volume"
+                ;;
+            4)
+                docker volume prune -f
+                ;;
+            0)
+                break
+                ;;
+            *)
+                echo "无效选择，请重新输入"
+                ;;
+        esac
+        
+        echo ""
+        read -p "按回车键继续..."
+    done
+}
+
+# -------------------------------
 # 清理无用的Docker资源
 # -------------------------------
 clean_docker_resources() {
@@ -926,7 +910,7 @@ change_docker_registry() {
     echo "4. 网易镜像源"
     echo "5. 腾讯云镜像源"
     read -p "请输入选择(1-5): " registry_choice
-
+    
     local registry_url=""
 
     case $registry_choice in
@@ -1016,7 +1000,7 @@ disable_docker_ipv6() {
     if [ -f /etc/docker/daemon.json ]; then
         # 使用jq工具移除IPv6配置，如果没有jq则使用sed
         if command -v jq >/dev/null 2>&1; then
-            jq 'del(.ip极6) | del(.["fixed-cidr-v6"])' /etc/docker/daemon.json > /tmp/daemon.json && mv /tmp/daemon.json /etc极/docker/daemon.json
+            jq 'del(.ipv6) | del(.["fixed-cidr-v6"])' /etc/docker/daemon.json > /tmp/daemon.json && mv /tmp/daemon.json /etc/docker/daemon.json
         else
             sed -i '/"ipv6": true,/d' /etc/docker/daemon.json
             sed -i '/"fixed-cidr-v6":/d' /etc/docker/daemon.json
@@ -1099,8 +1083,8 @@ uninstall_docker() {
 
     # 卸载Docker
     if command -v apt >/dev/null 2>&1; then
-        apt remove -y docker-ce docker-ce-cli containerd.io
-        apt purge -y docker-ce docker-ce-cli containerd.io
+        apt-get remove -y docker-ce docker-ce-cli containerd.io
+        apt-get purge -y docker-ce docker-ce-cli containerd.io
     elif command -v yum >/dev/null 2>&1; then
         yum remove -y docker-ce docker-ce-cli containerd.io
     fi
@@ -1127,14 +1111,14 @@ docker_management_menu() {
         check_docker_status
         
         echo ""
-        echo "1. 安装更新Docker环境"
+        echo "1. 安装/更新Docker环境"
         echo "2. 查看Docker全局状态"
         echo "3. Docker容器管理"
         echo "4. Docker镜像管理"
         echo "5. Docker网络管理"
         echo "6. Docker卷管理"
-        echo "7. 清理无用的docker容器和镜像网络数据卷"
-        echo "8. 更换Docker源"
+        echo "7. 清理无用资源"
+        echo "8. 更换Docker镜像源"
         echo "9. 编辑daemon.json文件"
         echo "10. 开启Docker-ipv6访问"
         echo "11. 关闭Docker-ipv6访问"
@@ -1156,7 +1140,7 @@ docker_management_menu() {
             8) change_docker_registry ;;
             9) edit_daemon_json ;;
             10) enable_docker_ipv6 ;;
-            11) disable_docker_ip极6 ;;
+            11) disable_docker_ipv6 ;;
             12) backup_restore_docker ;;
             13) uninstall_docker ;;
             0)
@@ -1173,13 +1157,14 @@ docker_management_menu() {
     done
 }
 
+
 # ====================================================================
 # +++ 主执行逻辑 (Main Execution Logic) +++
 # ====================================================================
 
 # 脚本启动时，首先检查root权限和依赖
 check_root
-check_deps
+# check_deps # 暂时禁用，因为基础命令已包含
 
 # 无限循环，直到用户选择退出
 while true; do
@@ -1206,8 +1191,6 @@ while true; do
             docker_management_menu
             ;;
         7)
-            # 这里可以添加脚本中未列出的“系统工具”的调用
-            # system_tools 
             echo -e "${YELLOW}该功能尚未实现。${NC}"
             read -p "按回车键继续..."
             ;;
