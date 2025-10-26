@@ -1,5 +1,5 @@
 #!/bin/bash
-# 增强版VPS工具箱 v2.0 - 路径修复版
+# 增强版VPS工具箱 v2.0 - 完整版
 # GitHub: https://github.com/chengege666/bbr-gj
 
 # 获取脚本真实路径
@@ -86,7 +86,7 @@ install_deps() {
 }
 
 # -------------------------------
-# 模块管理系统（修复版）
+# 模块管理系统
 # -------------------------------
 load_module() {
     local module_name="$1"
@@ -105,4 +105,144 @@ load_module() {
                 source "$module_file"
                 return 0
             else
-                echo -极速模式 (已停止)
+                echo -e "${RED}❌ 模块下载后仍不存在: $module_name${RESET}"
+                return 1
+            fi
+        else
+            echo -e "${RED}❌ 模块下载失败: $module_name${RESET}"
+            return 1
+        fi
+    fi
+}
+
+download_module() {
+    local module_name="$1"
+    local module_url="$GITHUB_BASE/modules/${module_name}.sh"
+    local module_file="$MODULES_DIR/${module_name}.sh"
+    
+    echo -e "${CYAN}>>> 下载模块: $module_name${RESET}"
+    echo -e "${YELLOW}下载URL: $module_url${RESET}"
+    
+    # 使用 curl 或 wget 下载
+    if command -v curl >/dev/null 2>&1; then
+        if curl -fsSL "$module_url" -o "$module_file"; then
+            chmod +x "$module_file"
+            echo -e "${GREEN}✅ 模块下载成功: $module_name${RESET}"
+            return 0
+        fi
+    elif command -v wget >/dev/null 2>&1; then
+        if wget -q "$module_url" -O "$module_file"; then
+            chmod +x "$module_file"
+            echo -e "${GREEN}✅ 模块下载成功: $module_name${RESET}"
+            return 0
+        fi
+    else
+        echo -e "${RED}❌ 未找到 curl 或 wget${RESET}"
+    fi
+    
+    echo -e "${RED}❌ 模块下载失败: $module_name${RESET}"
+    return 1
+}
+
+# -------------------------------
+# 主菜单功能调用
+# -------------------------------
+call_module() {
+    local module_name="$1"
+    
+    echo -e "${CYAN}=== 调用模块: $module_name ===${RESET}"
+    
+    if load_module "$module_name"; then
+        if declare -f "main" > /dev/null; then
+            main
+        else
+            echo -e "${RED}❌ 函数 'main' 不存在于模块 $module_name 中${RESET}"
+        fi
+    else
+        echo -e "${RED}❌ 无法加载模块: $module_name${RESET}"
+    fi
+}
+
+# -------------------------------
+# 工具函数
+# -------------------------------
+press_any_key() {
+    echo ""
+    read -n1 -p "按任意键继续..."
+    echo -e "\n"
+}
+
+script_update() {
+    echo -e "${CYAN}=== 脚本更新 ===${RESET}"
+    local backup_file="vpsgj.sh.backup.$(date +%Y%m%d%H%M%S)"
+    
+    echo -e "${YELLOW}备份当前脚本...${RESET}"
+    cp "$0" "$backup_file"
+    
+    echo -e "${YELLOW}下载最新版本...${RESET}"
+    if wget -q "$GITHUB_BASE/vpsgj.sh" -O "vpsgj.sh.new"; then
+        mv "vpsgj.sh.new" "vpsgj.sh"
+        chmod +x "vpsgj.sh"
+        echo -e "${GREEN}✅ 脚本更新完成！${RESET}"
+        echo -e "${YELLOW}请重新运行脚本${RESET}"
+        exit 0
+    else
+        echo -e "${RED}❌ 更新失败${RESET}"
+        mv "$backup_file" "vpsgj.sh"
+    fi
+    press_any_key
+}
+
+exit_script() {
+    echo -e "${GREEN}感谢使用，再见！${RESET}"
+    exit 0
+}
+
+# -------------------------------
+# 主菜单
+# -------------------------------
+show_menu() {
+    while true; do
+        print_welcome
+        
+        echo -e "${WHITE}1. 系统信息查询${RESET}"
+        echo -e "${WHITE}2. 系统更新${RESET}"
+        echo -e "${WHITE}3. 系统清理${RESET}"
+        echo -e "${WHITE}4. 基础工具${RESET}"
+        echo -e "${WHITE}5. BBR管理${RESET}"
+        echo -e "${WHITE}6. Docker管理${RESET}"
+        echo -e "${WHITE}8. 测试脚本合集${RESET}"
+        echo -e "${WHITE}13. 系统工具${RESET}"
+        echo -e "${CYAN}00. 脚本更新${RESET}"
+        echo -e "${RED}0. 退出脚本${RESET}"
+        echo ""
+        
+        read -p "请输入你的选择: " choice
+        
+        case "$choice" in
+            1) call_module "system_info" ;;
+            2) call_module "system_update" ;;
+            3) call_module "system_cleanup" ;;
+            4) call_module "basic_tools" ;;
+            5) call_module "bbr_manager" ;;
+            6) call_module "docker_manager" ;;
+            8) call_module "test_scripts" ;;
+            13) call_module "system_tools" ;;
+            00) script_update ;;
+            0) exit_script ;;
+            *) echo -e "${RED}无效选择${RESET}"; sleep 1 ;;
+        esac
+    done
+}
+
+# -------------------------------
+# 主程序
+# -------------------------------
+main() {
+    check_root
+    check_deps
+    show_menu
+}
+
+# 运行主程序
+main "$@"
