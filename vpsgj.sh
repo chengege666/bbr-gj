@@ -1295,3 +1295,113 @@ while true; do
             ;;
     esac
 done
+}
+
+# -------------------------------
+# 脚本卸载函数
+# -------------------------------
+uninstall_script() {
+    clear
+    echo -e "${RED}⚠️ 警告：此操作将卸载本管理脚本并清理相关文件！${NC}"
+    echo ""
+    echo -e "${YELLOW}将执行以下操作：${NC}"
+    echo "1. 删除本脚本文件 (${0})"
+    echo "2. 删除临时结果文件 (${RESULT_FILE})"
+    
+    # 确定是否要清理依赖包
+    read -p "是否清理脚本安装的依赖包 (curl, wget, git, net-tools)? (y/N): " clean_deps_confirm
+    
+    # 确认操作
+    read -p "确定要继续卸载本脚本吗？(y/N): " confirm
+    if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
+        echo -e "${YELLOW}已取消脚本卸载操作${NC}"
+        read -p "按回车键返回主菜单..."
+        return
+    fi
+    
+    # 获取脚本自身的路径
+    SCRIPT_PATH="$0"
+    
+    # 1. 删除临时结果文件
+    if [ -f "$RESULT_FILE" ]; then
+        rm -f "$RESULT_FILE"
+        echo -e "${GREEN}✅ 临时结果文件 $RESULT_FILE 已清理。${NC}"
+    fi
+
+    # 2. 清理依赖包
+    if [[ "$clean_deps_confirm" == "y" || "$clean_deps_confirm" == "Y" ]]; then
+        PKGS_TO_REMOVE="curl wget git net-tools"
+        if command -v apt >/dev/null 2>&1; then
+            echo -e "${YELLOW}正在清理依赖包 (apt): $PKGS_TO_REMOVE...${NC}"
+            apt purge -y $PKGS_TO_REMOVE
+            apt autoremove -y
+        elif command -v yum >/dev/null 2>&1; then
+            echo -e "${YELLOW}正在清理依赖包 (yum): $PKGS_TO_REMOVE...${NC}"
+            yum remove -y $PKGS_TO_REMOVE
+            yum autoremove -y
+        elif command -v dnf >/dev/null 2>&1; then
+            echo -e "${YELLOW}正在清理依赖包 (dnf): $PKGS_TO_REMOVE...${NC}"
+            dnf remove -y $PKGS_TO_REMOVE
+            dnf autoremove -y
+        else
+            echo -e "${YELLOW}⚠️ 未知系统，请手动卸载依赖包: $PKGS_TO_REMOVE${NC}"
+        fi
+        echo -e "${GREEN}✅ 依赖包清理完成。${NC}"
+    else
+        echo -e "${YELLOW}跳过依赖包清理。${NC}"
+    fi
+    
+    # 3. 删除脚本文件
+    if [ -f "$SCRIPT_PATH" ]; then
+        rm -f "$SCRIPT_PATH"
+        echo -e "${GREEN}🎉 脚本 $SCRIPT_PATH 已成功卸载。${NC}"
+        echo -e "${CYAN}=========================================="
+        echo "   脚本已卸载，请关闭当前终端窗口。    "
+        echo "=========================================="
+        echo -e "${NC}"
+        # 退出脚本，因为脚本自身已被删除
+        exit 0 
+    else
+        echo -e "${RED}❌ 脚本文件未找到或已被删除，无法完成卸载。${NC}"
+    fi
+    
+    read -p "按回车键返回主菜单..."
+}
+
+# -------------------------------
+# 系统工具菜单
+# -------------------------------
+system_tools_menu() {
+    while true; do
+        clear
+        echo -e "${CYAN}"
+        echo "=========================================="
+        echo "              系统工具菜单                "
+        echo "=========================================="
+        echo -e "${NC}"
+        echo "1. 卸载本脚本 (清理文件和依赖)"
+        echo "2. 其他工具 (暂未实现)"
+        echo "0. 返回主菜单"
+        echo "=========================================="
+        
+        read -p "请输入选项编号: " tools_choice
+        
+        case $tools_choice in
+            1)
+                uninstall_script
+                # 如果卸载成功，脚本会通过 exit 0 退出，否则会继续循环
+                ;;
+            2)
+                echo -e "${YELLOW}该功能尚未实现。${NC}"
+                read -p "按回车键继续..."
+                ;;
+            0)
+                return
+                ;;
+            *)
+                echo -e "${RED}无效的选项，请重新输入！${NC}"
+                sleep 1
+                ;;
+        esac
+    done
+}
