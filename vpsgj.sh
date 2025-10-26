@@ -835,44 +835,54 @@ docker_network_management() {
 }
 
 # -------------------------------
-# Docker镜像管理子菜单
+# Docker容器管理子菜单
 # -------------------------------
-docker_image_management() {
+docker_container_management() {
     while true; do
         clear
-        echo "=== Docker镜像管理 ==="
-        docker images
+        echo "=== Docker容器管理 ==="
+        # 使用格式化输出，让显示更整洁
+        docker ps -a --format "table {{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}"
         echo ""
-        echo "1. 拉取镜像"
-        echo "2. 删除镜像"
-        echo "3. 查看镜像历史"
-        echo "4. 导出镜像"
-        echo "5. 导入镜像"
+        echo "1. 启动容器"
+        echo "2. 停止容器" 
+        echo "3. 重启容器"
+        echo "4. 查看容器日志"
+        echo "5. 进入容器终端"
+        echo "6. 删除容器"
+        echo "7. 查看容器详情"
         echo "0. 返回上级菜单"
         echo ""
         read -p "请选择操作: " choice
 
-        case $choice in
+        case $choice 在
             1)
-                read -p "请输入镜像名称(如ubuntu:latest): " image
-                docker pull "$image"
+                read -p "请输入容器名称或ID: " container
+                docker start "$container"
                 ;;
             2)
-                read -p "请输入镜像ID或名称: " image
-                docker rmi "$image"
+                read -p "请输入容器名称或ID: " container
+                docker stop "$container"
                 ;;
             3)
-                read -p "请输入镜像ID或名称: " image
-                docker history "$image"
+                read -p "请输入容器名称或ID: " container
+                docker restart "$container"
                 ;;
             4)
-                read -p "请输入镜像名称: " image
-                read -p "请输入导出文件名(如image.tar): " filename
-                docker save -o "$filename" "$image"
+                read -p "请输入容器名称或ID: " container
+                docker logs "$container"
                 ;;
             5)
-                read -p "请输入导入的文件名: " filename
-                docker load -i "$filename"
+                read -p "请输入容器名称或ID: " container
+                docker exec -it "$container" /bin/bash || docker exec -it "$container" /bin/sh
+                ;;
+            6)
+                read -p "请输入容器名称或ID: " container
+                docker rm "$container"
+                ;;
+            7)
+                read -p "请输入容器名称或ID: " container
+                docker inspect "$container"
                 ;;
             0)
                 break
