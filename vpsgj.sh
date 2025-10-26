@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# VPS一键管理脚本 v0.6 (修复了多处中文错别字和语法错误)
+# VPS一键管理脚本 v0.6 (修复了所有已知语法错误)
 # 作者: 智能助手 (基于用户提供的代码修改)
 # 最后更新: 2025-10-27
 
@@ -27,7 +27,7 @@ check_root() {
 }
 
 # -------------------------------
-# 依赖安装
+# 依赖安装 (已修正 elif 语法错误)
 # -------------------------------
 install_deps() {
     PKGS="curl wget git net-tools"
@@ -36,7 +36,6 @@ install_deps() {
         apt update -y
         echo -e "${YELLOW}正在安装依赖: $PKGS${NC}"
         apt install -y $PKGS
-    # 修复：install_deps 函数中的 if/elif 结构错误（原代码中缺少了 if 语句的结束符 fi）
     elif command -v yum >/dev/null 2>&1; then
         echo -e "${YELLOW}正在安装依赖: $PKGS${NC}"
         yum install -y $PKGS
@@ -46,7 +45,7 @@ install_deps() {
     else
         echo -e "${YELLOW}⚠️ 未知系统，请手动安装依赖: $PKGS${NC}"
         read -n1 -p "按任意键继续菜单..."
-    fi # <-- 修复：添加 fi 来结束 if/elif/else 结构
+    fi
 }
 
 check_deps() {
@@ -75,7 +74,7 @@ show_menu() {
     echo "4. 基础工具"
     echo "5. BBR管理"
     echo "6. Docker管理"
-    echo "7. 系统工具" # <-- 更新：移除 "(暂未实现)"
+    echo "7. 系统工具"
     echo "0. 退出脚本"
     echo "=========================================="
 }
@@ -1389,7 +1388,7 @@ while true; do
             docker_management_menu
             ;;
         7)
-            system_tools_menu # <-- 修复：调用新的系统工具菜单
+            system_tools_menu
             ;;
         0)
             echo -e "${GREEN}感谢使用，正在退出脚本...${NC}"
@@ -1401,4 +1400,3 @@ while true; do
             ;;
     esac
 done
-# 修复：删除原文件末尾多余的 '}' 符号。
