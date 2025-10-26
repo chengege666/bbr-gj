@@ -938,17 +938,21 @@ change_docker_registry() {
     if [ -n "$registry_url" ]; 键，然后
         cat > /etc/docker/daemon.json << EOF
 {
+if [ "$registry_choice" = "1" ]; then
+    # 设置自定义镜像源
+    cat > /etc/docker/daemon.json << EOF
+{
   "registry-mirrors": ["$registry_url"]
 }
 EOF
-        echo "已设置镜像源: $registry_url"
-    else
-        # 恢复默认配置
-        cat > /etc/docker/daemon.json << EOF
+    echo "已设置镜像源：$registry_url"
+else
+    # 恢复默认配置（清空或使用空配置）
+    cat > /etc/docker/daemon.json << EOF
 {}
 EOF
-        echo "已恢复默认镜像源"
-    fi
+    echo "已恢复默认镜像源"
+fi
 
     # 重启Docker服务
     systemctl restart docker
