@@ -65,7 +65,7 @@ show_menu() {
     clear
     echo -e "${CYAN}"
     echo "=========================================="
-    echo "          VPS 脚本管理菜单 v0.7.1         "
+    echo "          VPS 脚本管理菜单 v0.8           "
     echo "=========================================="
     echo -e "${NC}"
     echo "1. 系统信息查询"
@@ -74,7 +74,7 @@ show_menu() {
     echo "4. 基础工具"
     echo "5. BBR管理"
     echo "6. Docker管理"
-    echo "7. 系统工具 (包含防火墙管理)"
+    echo "7. 高级防火墙管理"
     echo "0. 退出脚本"
     echo "=========================================="
 }
@@ -373,90 +373,511 @@ save_iptables() {
 }
 
 
+# ====================================================================
+# +++ 高级防火墙管理功能 (新增) +++
+# ====================================================================
+
 # -------------------------------
-# 高级防火墙管理主菜单
+# 依赖检查和安装 (iptables/ipset)
 # -------------------------------
-advanced_firewall_management() {
-    clear
-    # 首先检查系统是否具备执行条件
-    if ! check_firewall_system; then return; fi
+check_firewall_deps() {
+    PKGS_FW="iptables iptables-persistent ipset"
+    local needs_install=false
+    for CMD in iptables ipset; do
+        if ! command -v $CMD >/dev/null 2>&1; then
+            needs_install=true
+            break
+        fi
+    done
+
+    if $needs_install; then
+        echo -e "${YELLOW}未检测到 iptables/ipset，正在尝试安装...${NC}"
+        if command -v apt >/dev/null 2>&1; then
+            apt update -y
+            apt install -y $PKGS_FW
+            if command -v netfilter-persistent >/dev/null 2>&1; then
+                # 针对Debian/Ubuntu，安装保存规则的工具
+                echo -e "${GREEN}✅ 已安装 iptables-persistent (netfilter-persistent)${NC}"
+            fi
+        elif command -v yum >/dev/null 2>&1 || command -v dnf >/dev/null 2>&1; then
+            if command -v yum >/dev/null 2>&1; then
+                yum install -y $PKGS_FW
+            else
+                dnf install -y $PKGS_FW
+            fi
+        else
+            echo -e "${RED}❌ 无法自动安装防火墙依赖。请手动安装: $PKGS_FW${NC}"
+            read -p "按回车键返回..."
+            return 1
+        fi
+        
+        # 针对CentOS/RHEL，启用服务
+        if command -v systemctl >/dev/null 2>&1 && systemctl status iptables &>/dev/null; then
+             systemctl enable iptables; systemctl start iptables
+        fi
+        
+        # 第一次安装后，设置默认策略
+        if iptables -L INPUT -n | grep -q "Chain INPUT (policy ACCEPT)"; then
+            echo -e "${YELLOW}正在设置默认防火墙规则...${NC}"
+            save_iptables_rules
+        fi
+        
+        return 0
+    else
+        return 0
+    fi
+}
+
+# -------------------------------
+# 保存 iptables 规则
+# -------------------------------
+save_iptables_rules() {
+    echo -e "${YELLOW}正在保存 iptables 规则...${NC}"
+    if command -v netfilter-persistent >/dev/null 2>&1; then
+        netfilter-persistent save
+    elif command -v iptables-save >/dev/null 2>&1; then
+        # 适用于大多数系统
+        iptables-save > /etc/iptables/rules.v4 2>/dev/null
+        if [ $? -ne 0 ]; then
+            iptables-save > /etc/sysconfig/iptables 2>/dev/null
+        fi
+    fi
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✅ iptables 规则保存成功！${NC}"
+    else
+        echo -e "${RED}❌ 规则保存失败，请检查系统是否支持 iptables-persistent 或 systemd/init.d 机制。${NC}"
+    fi
+}
+
+# -------------------------------
+# 显示防火墙状态 (菜单顶部)
+# -------------------------------
+show_firewall_status() {
+    echo -e "${CYAN}=========================================="
+    echo "          高级防火墙管理状态              "
+    echo "=========================================="
+    echo -e "${NC}"
+    echo -e "${BLUE}Chain INPUT (policy ${YELLOW}$(iptables -L INPUT -n | grep 'Chain INPUT' | awk '{print $4}' | tr -d '()' )${NC}${BLUE})${NC}"
+    echo "target     prot opt source               destination"
+    # 只显示前几条自定义规则
+    iptables -L INPUT -n --line-numbers | head -n 10
+    echo ""
+}
+
+# -------------------------------
+# 1. 开放指定端口
+# -------------------------------
+open_specified_port() {
+    read -p "请输入要开放的端口号 (e.g., 80, 22, 3000-3005): " PORT
+    read -p "请输入协议 (tcp/udp, 默认tcp): " PROTO
+    PROTO=${PROTO:-tcp}
     
-    while true; do
-        show_iptables_status # 每次显示前都打印状态
+    echo -e "${YELLOW}正在开放 ${PORT}/${PROTO}...${NC}"
+    
+    if iptables -C INPUT -p "$PROTO" --dport "$PORT" -j ACCEPT 2>/dev/null; then
+        echo -e "${YELLOW}⚠️ 端口 ${PORT}/${PROTO} 已开放，跳过。${NC}"
+    else
+        iptables -I INPUT -p "$PROTO" --dport "$PORT" -j ACCEPT
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}✅ 端口 ${PORT}/${PROTO} 开放成功。${NC}"
+            save_iptables_rules
+        else
+            echo -e "${RED}❌ 开放端口失败。${NC}"
+        fi
+    fi
+}
+
+# -------------------------------
+# 2. 关闭指定端口
+# -------------------------------
+close_specified_port() {
+    read -p "请输入要关闭的端口号 (e.g., 80, 22): " PORT
+    read -p "请输入协议 (tcp/udp, 默认tcp): " PROTO
+    PROTO=${PROTO:-tcp}
+
+    echo -e "${YELLOW}正在关闭 ${PORT}/${PROTO}...${NC}"
+    
+    # 尝试删除规则，如果存在
+    if iptables -D INPUT -p "$PROTO" --dport "$PORT" -j ACCEPT 2>/dev/null; then
+        echo -e "${GREEN}✅ 端口 ${PORT}/${PROTO} 关闭成功 (ACCEPT规则已移除)。${NC}"
+        save_iptables_rules
+    else
+        echo -e "${YELLOW}⚠️ 未找到端口 ${PORT}/${PROTO} 的开放规则，操作完成。${NC}"
+    fi
+}
+
+# -------------------------------
+# 3. 开放所有端口 (设置默认策略为ACCEPT)
+# -------------------------------
+open_all_ports() {
+    echo -e "${RED}!!! 警告：此操作将允许所有传入连接，非常不安全！ !!!${NC}"
+    read -p "输入 'yes' 确认开放所有端口: " confirm
+    if [ "$confirm" == "yes" ]; then
+        echo -e "${YELLOW}正在设置 INPUT 链默认策略为 ACCEPT...${NC}"
+        iptables -P INPUT ACCEPT
+        iptables -P FORWARD ACCEPT
+        iptables -P OUTPUT ACCEPT
+        iptables -F # 清空所有规则
+        save_iptables_rules
+        echo -e "${GREEN}✅ 所有端口已开放，防火墙已禁用。${NC}"
+    else
+        echo -e "${GREEN}已取消操作。${NC}"
+    fi
+}
+
+# -------------------------------
+# 4. 关闭所有端口 (设置默认策略为DROP)
+# -------------------------------
+close_all_ports() {
+    echo -e "${RED}!!! 警告：此操作将断开您的 SSH 连接！请确保您已添加 SSH 端口的 ACCEPT 规则！ !!!${NC}"
+    read -p "输入 'yes' 确认关闭所有端口: " confirm
+    if [ "$confirm" == "yes" ]; then
+        # 0. 获取当前SSH端口
+        local ssh_port=$(grep -E '^\s*Port\s+[0-9]+' /etc/ssh/sshd_config | awk '{print $2}' | head -1)
+        ssh_port=${ssh_port:-22}
         
-        echo -e "${CYAN}"
-        echo "=========================================="
-        echo "           高级防火墙管理 (Iptables)      "
-        echo "=========================================="
-        echo -e "${NC}"
-        echo "  --- 端口管理 ---"
-        echo "1. 开放指定端口        2. 关闭指定端口"
-        echo "3. 开放所有端口        4. 关闭所有端口"
-        echo "  --- IP 过滤 ---"
-        echo "5. IP 白名单 (ACCEPT)  6. IP 黑名单 (DROP)"
-        echo "7. 清除指定 IP 规则    8. 允许 PING"
-        echo "9. 禁止 PING           10. 清空所有规则 (极度危险)"
-        echo "  --- 规则操作 ---"
-        echo "11. 保存当前规则 (持久化)  12. 重载已保存规则"
-        echo "0. 返回系统工具菜单"
-        echo "=========================================="
+        echo -e "${YELLOW}正在清空所有规则并设置默认策略为 DROP...${NC}"
         
-        read -p "请输入选项编号: " fw_choice
+        # 1. 清空所有规则
+        iptables -F
         
-        case $fw_choice in
-            1) open_port ;;
-            2) close_port ;;
-            3) open_all_ports ;;
-            4) close_all_ports ;;
-            5) ip_management "WHITELIST" ;;
-            6) ip_management "BLACKLIST" ;;
-            7) remove_ip_rule ;;
-            8) manage_ping "ALLOW" ;;
-            9) manage_ping "DENY" ;;
-            10)
-                echo -e "${RED}!!! 极度危险：清空所有规则将移除所有防火墙保护！ !!!${NC}"
-                read -p "输入 'CONFIRM' 清空所有规则: " confirm_clear
-                if [ "$confirm_clear" == "CONFIRM" ]; then
-                    iptables -F # 清空所有规则
-                    iptables -X # 清空所有自定义链
-                    iptables -Z # 计数器清零
-                    echo -e "${GREEN}✅ 所有 Iptables 规则已清空！${NC}"
-                else
-                    echo -e "${YELLOW}操作已取消。${NC}"
-                fi
-                ;;
-            11) save_iptables ;;
-            12)
-                echo -e "${YELLOW}正在尝试加载已保存的规则...${NC}"
-                if command -v iptables-restore &>/dev/null; then
-                    # 适用于 Debian/Ubuntu
-                    if [ -f /etc/iptables/rules.v4 ]; then
-                        iptables-restore < /etc/iptables/rules.v4
-                        echo -e "${GREEN}✅ 规则已从 /etc/iptables/rules.v4 加载。${NC}"
-                    # 适用于 CentOS/RHEL
-                    elif [ -f /etc/sysconfig/iptables ]; then
-                        iptables-restore < /etc/sysconfig/iptables
-                        echo -e "${GREEN}✅ 规则已从 /etc/sysconfig/iptables 加载。${NC}"
-                    else
-                        echo -e "${RED}❌ 未找到已保存的规则文件。${NC}"
-                    fi
-                else
-                    echo -e "${RED}❌ 错误：未找到 iptables-restore 命令。${NC}"
-                fi
-                ;;
-            0)
-                echo -e "${YELLOW}返回系统工具菜单...${NC}"
-                return
-                ;;
-            *)
-                echo -e "${RED}无效的选项，请重新输入！${NC}"
-                ;;
-        esac
+        # 2. 确保 SSH 端口开放（防止失联）
+        iptables -A INPUT -p tcp --dport "$ssh_port" -j ACCEPT
+        iptables -A INPUT -p tcp --dport "22" -j ACCEPT
         
-        read -p "按回车键继续..."
+        # 3. 允许本地回环
+        iptables -A INPUT -i lo -j ACCEPT
+        
+        # 4. 允许已建立的连接
+        iptables -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
+        
+        # 5. 设置默认策略为 DROP
+        iptables -P INPUT DROP
+        iptables -P FORWARD DROP
+        iptables -P OUTPUT ACCEPT # OUTPUT通常保持ACCEPT以保证正常对外访问
+        
+        save_iptables_rules
+        echo -e "${GREEN}✅ 所有端口已关闭，SSH(tcp/$ssh_port) 端口已保留。${NC}"
+    else
+        echo -e "${GREEN}已取消操作。${NC}"
+    fi
+}
+
+# -------------------------------
+# 5/6. IP 白名单/黑名单 辅助函数
+# -------------------------------
+manage_ip_set() {
+    local set_name="$1"
+    local ip_or_cidr="$2"
+    local action="$3" # add or del
+    
+    if ! ipset list "$set_name" &>/dev/null; then
+        echo -e "${YELLOW}创建 IPset 集合 $set_name...${NC}"
+        ipset create "$set_name" hash:net
+        # 针对黑名单，确保 iptables 规则存在 (DROP)
+        if [ "$set_name" == "IP_BLACKLIST" ]; then
+            if ! iptables -C INPUT -m set --match-set "$set_name" src -j DROP 2>/dev/null; then
+                iptables -I INPUT -m set --match-set "$set_name" src -j DROP
+                save_iptables_rules
+            fi
+        # 针对白名单，确保 iptables 规则存在 (ACCEPT)
+        elif [ "$set_name" == "IP_WHITELIST" ]; then
+            if ! iptables -C INPUT -m set --match-set "$set_name" src -j ACCEPT 2>/dev/null; then
+                iptables -I INPUT -m set --match-set "$set_name" src -j ACCEPT
+                save_iptables_rules
+            fi
+        fi
+    fi
+    
+    echo -e "${YELLOW}正在 ${action} IP/CIDR ${ip_or_cidr} 到 $set_name...${NC}"
+    if ipset "$action" "$set_name" "$ip_or_cidr" 2>/dev/null; then
+        echo -e "${GREEN}✅ 操作成功。${NC}"
+        ipset save > /etc/ipset/rules.v4 2>/dev/null # 保存 ipset 规则
+    else
+        echo -e "${RED}❌ 操作失败，请检查 IP/CIDR 格式。${NC}"
+    fi
+}
+
+# 5. IP 白名单
+ip_whitelist() {
+    read -p "请输入要添加到白名单的 IP 地址或 CIDR (e.g., 1.1.1.1 或 1.1.1.0/24): " IP
+    manage_ip_set "IP_WHITELIST" "$IP" "add"
+}
+
+# 6. IP 黑名单
+ip_blacklist() {
+    read -p "请输入要添加到黑名单的 IP 地址或 CIDR (e.g., 2.2.2.2 或 2.2.2.0/24): " IP
+    manage_ip_set "IP_BLACKLIST" "$IP" "add"
+}
+
+# 7. 清除指定 IP
+clear_specified_ip() {
+    read -p "请输入要清除的 IP 地址或 CIDR: " IP
+    
+    if ipset del "IP_WHITELIST" "$IP" 2>/dev/null; then
+        echo -e "${GREEN}✅ IP ${IP} 已从白名单中清除。${NC}"
+    fi
+    
+    if ipset del "IP_BLACKLIST" "$IP" 2>/dev/null; then
+        echo -e "${GREEN}✅ IP ${IP} 已从黑名单中清除。${NC}"
+    fi
+    
+    if [ $? -eq 0 ]; then
+        ipset save > /etc/ipset/rules.v4 2>/dev/null
+    else
+        echo -e "${YELLOW}⚠️ IP ${IP} 不在任何列表中。${NC}"
+    fi
+}
+
+# -------------------------------
+# 11/12. 允许/禁止 PING
+# -------------------------------
+# 辅助函数: 检查和移除 PING 规则
+remove_ping_rule() {
+    local chain="$1"
+    # 查找并删除所有 icmp-echo-request 规则
+    iptables -L "$chain" --line-numbers -n | grep "icmp.*echo-request" | sort -nr | while read -r LINE; do
+        local num=$(echo "$LINE" | awk '{print $1}')
+        if [[ "$num" =~ ^[0-9]+$ ]]; then
+            iptables -D "$chain" "$num"
+        fi
     done
 }
 
+# 11. 允许 PING
+allow_ping() {
+    echo -e "${YELLOW}正在设置允许 PING (ICMP Echo Request)...${NC}"
+    remove_ping_rule "INPUT" # 先清除所有 PING 规则
+    iptables -A INPUT -p icmp --icmp-type echo-request -j ACCEPT
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✅ PING 已允许。${NC}"
+        save_iptables_rules
+    else
+        echo -e "${RED}❌ 允许 PING 失败。${NC}"
+    fi
+}
+
+# 12. 禁止 PING
+forbid_ping() {
+    echo -e "${YELLOW}正在设置禁止 PING (ICMP Echo Request)...${NC}"
+    remove_ping_rule "INPUT" # 先清除所有 PING 规则
+    # 将 DROP 规则插入到链的顶部
+    iptables -I INPUT -p icmp --icmp-type echo-request -j DROP
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✅ PING 已禁止。${NC}"
+        save_iptables_rules
+    else
+        echo -e "${RED}❌ 禁止 PING 失败。${NC}"
+    fi
+}
+
+# -------------------------------
+# 13/14. DDOS 防御 (简易)
+# -------------------------------
+# 辅助函数: 检查和清除 DDOS 规则
+remove_ddos_rules() {
+    # 移除 syn-flood 规则
+    iptables -D INPUT -p tcp --syn -m limit --limit 1/s --limit-burst 3 -j ACCEPT 2>/dev/null
+    iptables -D INPUT -p tcp --syn -j DROP 2>/dev/null
+    # 移除单个 IP 连接数限制规则
+    iptables -D INPUT -p tcp -m connlimit --connlimit-above 50 --connlimit-mask 32 -j REJECT --reject-with tcp-reset 2>/dev/null
+    # 移除单个 IP 新连接速率限制规则
+    iptables -D INPUT -p tcp --syn -m connlimit --connlimit-above 20 --connlimit-mask 32 -j DROP 2>/dev/null
+}
+
+# 13. 启动 DDOS 防御
+start_ddos_protection() {
+    echo -e "${YELLOW}正在启动简易 DDOS 防御 (限制 SYN/连接数)...${NC}"
+    
+    # 1. SYN-Flood 防御 (限制每秒 1 个新连接，爆发 3 个)
+    iptables -A INPUT -p tcp --syn -m limit --limit 1/s --limit-burst 3 -j ACCEPT
+    iptables -A INPUT -p tcp --syn -j DROP
+    
+    # 2. 限制单个 IP 的总连接数 (超过 50 个连接的 IP)
+    iptables -A INPUT -p tcp -m connlimit --connlimit-above 50 --connlimit-mask 32 -j REJECT --reject-with tcp-reset
+    
+    # 3. 限制单个 IP 的新连接速率 (每秒 20 个新连接)
+    iptables -A INPUT -p tcp --syn -m connlimit --connlimit-above 20 --connlimit-mask 32 -j DROP
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✅ 简易 DDOS 防御已启动。${NC}"
+        save_iptables_rules
+    else
+        echo -e "${RED}❌ 启动 DDOS 防御失败。${NC}"
+        remove_ddos_rules # 失败后尝试回滚
+    fi
+}
+
+# 14. 关闭 DDOS 防御
+close_ddos_protection() {
+    echo -e "${YELLOW}正在关闭 DDOS 防御...${NC}"
+    remove_ddos_rules
+    save_iptables_rules
+    echo -e "${GREEN}✅ DDOS 防御规则已清除。${NC}"
+}
+
+# -------------------------------
+# 15/16/17. 国家 IP 限制
+# -------------------------------
+
+# 国家 IP 限制辅助函数
+manage_country_ip() {
+    local action="$1" # block/allow/clear
+    local country_code
+    local set_name="COUNTRY_SET"
+    local geoip_url="https://raw.githubusercontent.com/ip2location/ip2location-country-blocklists/master/firewall/iptables/$country_code.net"
+
+    if [ "$action" != "clear" ]; then
+        read -p "请输入国家代码 (e.g., CN, US, RU): " country_code
+        if [ -z "$country_code" ]; then
+            echo -e "${RED}❌ 国家代码不能为空。${NC}"; return
+        fi
+        
+        local ip_list_file="/tmp/${country_code}_ip.txt"
+        echo -e "${YELLOW}正在下载 ${country_code} 的 IP 列表...${NC}"
+        wget -qO "$ip_list_file" "https://raw.githubusercontent.com/ip2location/ip2location-country-blocklists/master/firewall/iptables/${country_code}.net"
+        
+        if [ ! -f "$ip_list_file" ] || [ ! -s "$ip_list_file" ]; then
+            echo -e "${RED}❌ 下载 IP 列表失败或文件为空。${NC}"; return
+        fi
+    fi
+    
+    # 核心 IPSET 和 IPTABLES 规则设置
+    if ! ipset list "$set_name" &>/dev/null; then
+        ipset create "$set_name" hash:net
+    fi
+
+    if [ "$action" == "block" ]; then
+        echo -e "${YELLOW}正在添加 ${country_code} 到 IPset 并设置 DROP 规则...${NC}"
+        # 1. 导入 IP 到 IPset
+        cat "$ip_list_file" | grep -v '^#' | while read -r IP_CIDR; do
+            if [ -n "$IP_CIDR" ]; then ipset add "$set_name" "$IP_CIDR" 2>/dev/null; fi
+        done
+        # 2. 设置 IPTABLES 规则 (DROP)
+        if ! iptables -C INPUT -m set --match-set "$set_name" src -j DROP 2>/dev/null; then
+            # 插入到 INPUT 链的靠前位置
+            iptables -I INPUT 2 -m set --match-set "$set_name" src -j DROP
+            echo -e "${GREEN}✅ 国家 ${country_code} 已被成功阻止。${NC}"
+        fi
+    elif [ "$action" == "allow" ]; then
+        echo -e "${YELLOW}正在设置仅允许 ${country_code} 访问...${NC}"
+        # 1. 导入 IP 到 IPset
+        cat "$ip_list_file" | grep -v '^#' | while read -r IP_CIDR; do
+            if [ -n "$IP_CIDR" ]; then ipset add "$set_name" "$IP_CIDR" 2>/dev/null; fi
+        done
+        # 2. 设置 IPTABLES 规则 (DROP 其他所有 IP)
+        # 必须先添加允许规则，再设置默认策略为 DROP
+        if ! iptables -C INPUT -m set --match-set "$set_name" src -j ACCEPT 2>/dev/null; then
+            iptables -I INPUT 1 -m set --match-set "$set_name" src -j ACCEPT
+        fi
+        
+        # 3. 设置默认策略为 DROP（如果 INPUT 策略不是 DROP）
+        if ! iptables -L INPUT -n | grep 'Chain INPUT' | grep -q "policy DROP"; then
+            echo -e "${RED}!!! 警告：设置默认策略为 DROP，仅 ${country_code} 可访问！${NC}"
+            read -p "输入 'yes' 确认设置: " confirm_drop
+            if [ "$confirm_drop" == "yes" ]; then
+                 # 确保 SSH 和 ESTABLISHED/RELATED 规则在 DROP 之前
+                 close_all_ports # 此函数会先设置 SSH 规则，然后设置 DROP
+                 echo -e "${GREEN}✅ 已设置 INPUT 链默认 DROP，且仅 ${country_code} IP 可访问。${NC}"
+            else
+                echo -e "${YELLOW}已取消设置默认 DROP 策略。${NC}"
+                return
+            fi
+        fi
+    fi
+    
+    # 清理
+    rm -f "$ip_list_file"
+    save_iptables_rules
+    ipset save > /etc/ipset/rules.v4 2>/dev/null
+}
+
+# 15. 阻止指定国家 IP
+block_country_ip() {
+    manage_country_ip "block"
+}
+
+# 16. 仅允许指定国家 IP
+allow_only_country_ip() {
+    manage_country_ip "allow"
+}
+
+# 17. 解除指定国家 IP 限制
+clear_country_ip_restriction() {
+    echo -e "${YELLOW}正在清除所有国家/地区 IP 限制规则和集合...${NC}"
+    
+    # 1. 删除 iptables 中与 COUNTRY_SET 相关的规则
+    if iptables -D INPUT -m set --match-set COUNTRY_SET src -j DROP 2>/dev/null; then
+        echo -e "${GREEN}✅ DROP 规则已删除。${NC}"
+    fi
+    if iptables -D INPUT -m set --match-set COUNTRY_SET src -j ACCEPT 2>/dev/null; then
+        echo -e "${GREEN}✅ ACCEPT 规则已删除。${NC}"
+    fi
+
+    # 2. 销毁 IPset 集合
+    if ipset destroy COUNTRY_SET 2>/dev/null; then
+        echo -e "${GREEN}✅ IPset 集合 COUNTRY_SET 已销毁。${NC}"
+    else
+        echo -e "${YELLOW}⚠️ IPset 集合不存在或已被清除。${NC}"
+    fi
+
+    save_iptables_rules
+    ipset save > /etc/ipset/rules.v4 2>/dev/null
+    read -p "按回车键返回..."
+}
+
+# -------------------------------
+# 高级防火墙管理主菜单
+# -------------------------------
+firewall_management_menu() {
+    # 确保依赖已安装
+    if ! check_firewall_deps; then
+        read -p "依赖安装失败，按回车键返回主菜单..."
+        return
+    fi
+    
+    while true; do
+        clear
+        show_firewall_status # 显示当前规则和策略
+        echo "------------------------------------------"
+        echo "1. 开放指定端口        2. 关闭指定端口"
+        echo "3. 开放所有端口        4. 关闭所有端口"
+        echo "------------------------------------------"
+        echo "5. IP 白名单           6. IP 黑名单"
+        echo "7. 清除指定 IP         "
+        echo "------------------------------------------"
+        echo "11. 允许 PING           12. 禁止 PING"
+        echo "13. 启动 DDOS 防御      14. 关闭 DDOS 防御"
+        echo "------------------------------------------"
+        echo "15. 阻止指定国家 IP     16. 仅允许指定国家 IP"
+        echo "17. 解除指定国家 IP 限制"
+        echo "------------------------------------------"
+        echo "0. 返回上一级选单"
+        echo "------------------------------------------"
+        read -p "请输入你的选择: " fw_choice
+
+        case $fw_choice in
+            1) open_specified_port ;;
+            2) close_specified_port ;;
+            3) open_all_ports ;;
+            4) close_all_ports ;;
+            5) ip_whitelist ;;
+            6) ip_blacklist ;;
+            7) clear_specified_ip ;;
+            11) allow_ping ;;
+            12) forbid_ping ;;
+            13) start_ddos_protection ;;
+            14) close_ddos_protection ;;
+            15) block_country_ip ;;
+            16) allow_only_country_ip ;;
+            17) clear_country_ip_restriction ;;
+            0) return ;;
+            *) echo -e "${RED}无效的选项，请重新输入！${NC}"; sleep 1 ;;
+        esac
+        # 确保每个操作后能看到结果
+        read -p "按回车键继续..."
+    done
+}
 
 # -------------------------------
 # 系统工具菜单 (新增功能入口)
