@@ -31,6 +31,45 @@ show_menu() {
     echo "=========================================="
 }
 
+# -------------------------------
+# root 权限检查
+# -------------------------------
+check_root() {
+    if [ "$(id -u)" -ne 0 ]; then
+        echo -e "${RED}❌❌ 错误：请使用 root 权限运行本脚本${RESET}"
+        echo "👉 使用方法: sudo bash $0"
+        exit 1
+    fi
+}
+
+# -------------------------------
+# 依赖安装
+# -------------------------------
+install_deps() {
+    PKGS="curl wget git speedtest-cli net-tools build-essential iptables"
+    if command -v apt >/dev/null 2>&1; then
+        apt update -y
+        apt install -y $PKGS
+    elif command -v yum >/dev/null 2>&1; then
+        yum install -y $PKGS
+    elif command -v dnf >/dev/null 2>&1; then
+        dnf install -y $PKGS
+    else
+        echo -e "${YELLOW}⚠️ 未知系统，请手动安装依赖: $PKGS${RESET}"
+        read -n1 -p "按任意键继续菜单..."
+    fi
+}
+
+check_deps() {
+    for CMD in curl wget git speedtest-cli iptables; do
+        if ! command -v $CMD >/dev/null 2>&1; then
+            echo -e "${YELLOW}未检测到 $CMD，正在尝试安装依赖...${RESET}"
+            install_deps
+            break
+        fi
+    done
+}
+
 # 检查BBR状态函数
 check_bbr() {
     # 检查是否启用了BBR
