@@ -1045,28 +1045,28 @@ backup_restore_docker() {
             echo "正在备份所有容器为镜像..."
             for container in $(docker ps -aq); do
                 name=$(docker inspect --format='{{.Name}}' $container | sed 's/^\///')
-                docker commit $container $name-backup
+                docker commit $container "${name}-backup"
             done
             echo "容器备份完成"
             ;;
         2)
             read -p "请输入导出目录(默认/tmp): " backup_dir
             backup_dir=${backup_dir:-/tmp}
-            mkdir -p $backup_dir
+            mkdir -p "$backup_dir"
             echo "正在导出所有镜像..."
             for image in $(docker images --format "{{.Repository}}:{{.Tag}}" | grep -v "<none>"); do
-                filename=$(echo $image | tr '/:' '_').tar
-                docker save -o $backup_dir/$filename $image
+                filename=$(echo "$image" | tr '/:' '_').tar
+                docker save -o "$backup_dir/$filename" "$image"
             done
             echo "镜像导出完成到 $backup_dir 目录"
             ;;
         3)
             read -p "请输入备份目录(默认/tmp): " backup_dir
-            backup_dir=${backup_dir:-极tmp}
-            mkdir -p $backup_dir/docker-volumes
+            backup_dir=${backup_dir:-/tmp}
+            mkdir -p "$backup_dir/docker-volumes"
             echo "正在备份Docker数据卷..."
             for volume in $(docker volume ls -q); do
-                docker run --rm -v $volume:/source -v $backup_dir/docker-volumes:/backup alpine tar czf /backup/$volume.tar.gz -C /source .
+                docker run --rm -v "$volume:/source" -v "$backup_dir/docker-volumes:/backup" alpine tar czf "/backup/${volume}.tar.gz" -C /source .
             done
             echo "数据卷备份完成"
             ;;
