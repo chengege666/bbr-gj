@@ -1,4 +1,4 @@
-# 🚀 自用 VPS 工具箱 v3.0
+# 🚀 自用 VPS 工具箱 v1.0
 
 **GitHub:** `https://github.com/chengege666/bbr-gj`
 
