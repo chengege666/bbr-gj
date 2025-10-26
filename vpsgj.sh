@@ -835,37 +835,44 @@ docker_network_management() {
 }
 
 # -------------------------------
-# Docker卷管理子菜单
+# Docker镜像管理子菜单
 # -------------------------------
-docker_volume_management() {
+docker_image_management() {
     while true; do
         clear
-        echo "=== Docker卷管理 ==="
-        docker volume ls
+        echo "=== Docker镜像管理 ==="
+        docker images
         echo ""
-        echo "1. 创建卷"
-        echo "2. 删除卷"
-        echo "3. 查看卷详情"
-        echo "4. 清理未使用卷"
+        echo "1. 拉取镜像"
+        echo "2. 删除镜像"
+        echo "3. 查看镜像历史"
+        echo "4. 导出镜像"
+        echo "5. 导入镜像"
         echo "0. 返回上级菜单"
         echo ""
         read -p "请选择操作: " choice
 
         case $choice in
             1)
-                read -p "请输入卷名称: " volume
-                docker volume create "$volume"
+                read -p "请输入镜像名称(如ubuntu:latest): " image
+                docker pull "$image"
                 ;;
             2)
-                read -p "请输入卷名称: " volume
-                docker volume rm "$volume"
+                read -p "请输入镜像ID或名称: " image
+                docker rmi "$image"
                 ;;
             3)
-                read -p "请输入卷名称: " volume
-                docker volume inspect "$volume"
+                read -p "请输入镜像ID或名称: " image
+                docker history "$image"
                 ;;
             4)
-                docker volume prune
+                read -p "请输入镜像名称: " image
+                read -p "请输入导出文件名(如image.tar): " filename
+                docker save -o "$filename" "$image"
+                ;;
+            5)
+                read -p "请输入导入的文件名: " filename
+                docker load -i "$filename"
                 ;;
             0)
                 break
