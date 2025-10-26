@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# cggVPS一键管理脚本 v0.8 (新增系统工具子菜单，并移入卸载功能)
+# cggVPS一键管理脚本 v0.9 (修正 if/elif/else 语法错误)
 # 作者: cgg (基于用户提供的代码修改)
 # 最后更新: 2025-10-27
 
@@ -35,12 +35,14 @@ check_root() {
 # -------------------------------
 install_deps() {
     PKGS="curl wget git net-tools"
+    
+    # 确保 if 结构完整，避免 Line 46 错误
     if command -v apt >/dev/null 2>&1; then
         echo -e "${YELLOW}正在更新软件包列表...${NC}"
         apt update -y
         echo -e "${YELLOW}正在安装依赖: $PKGS${NC}"
         apt install -y $PKGS
-    elif command -v yum >/dev/null 2>&1; 键，然后
+    elif command -v yum >/dev/null 2>&1; then
         echo -e "${YELLOW}正在安装依赖: $PKGS${NC}"
         yum install -y $PKGS
     elif command -v dnf >/dev/null 2>&1; then
@@ -53,7 +55,7 @@ install_deps() {
 }
 
 check_deps() {
-    for CMD 在 curl wget git; do
+    for CMD in curl wget git; do
         if ! command -v $CMD >/dev/null 2>&1; then
             echo -e "${YELLOW}未检测到 $CMD，正在尝试安装依赖...${NC}"
             install_deps
@@ -63,7 +65,7 @@ check_deps() {
 }
 
 # -------------------------------
-# 功能: 卸载脚本 (已从主菜单移入系统工具子菜单)
+# 功能: 卸载脚本
 # -------------------------------
 uninstall_script() {
     clear
@@ -71,14 +73,12 @@ uninstall_script() {
     echo -e "${YELLOW}             ⚠️ 警告：脚本卸载操作 ⚠️             ${NC}"
     echo -e "${CYAN}==================================================${NC}"
     
-    # 将用户提供的 RESET 替换为 NC
     read -p "确定要卸载本脚本并清理相关文件吗 (y/n)? ${RED}此操作不可逆!${NC}: " confirm_uninstall
     
     if [[ "$confirm_uninstall" == "y" || "$confirm_uninstall" == "Y" ]]; then
         echo -e "${YELLOW}正在清理 ${SCRIPT_FILE}, ${RESULT_FILE} 等文件...${NC}"
         rm -f "$SCRIPT_FILE" "$RESULT_FILE" tcp.sh
         
-        # 记录卸载成功
         echo "Script uninstalled on $(date)" > "$UNINSTALL_NOTE"
         
         echo -e "${GREEN}✅ 脚本文件清理完成。${NC}"
@@ -91,16 +91,14 @@ uninstall_script() {
         
         if [[ "$auto_clean" == "y" || "$auto_clean" == "Y" ]]; then
             echo -e "${CYAN}>>> 正在尝试自动清理依赖包...${NC}"
-            # 移除脚本中明确安装的依赖，包括speedtest-cli (如果存在)
             DEPS="curl wget git net-tools speedtest-cli htop vim tmux dnsutils lsof tree zip unzip"
             
             if command -v apt >/dev/null 2>&1; then
-                # 使用 --purge 彻底删除配置文件
                 apt remove --purge -y $DEPS
                 apt autoremove -y
-            elif command -v yum >/dev/null 2>&1; 键，然后
+            elif command -v yum >/dev/null 2>&1; then
                 yum remove -y $DEPS
-            elif command -v dnf >/dev/null 2>&1; 键，然后
+            elif command -v dnf >/dev/null 2>&1; then
                 dnf remove -y $DEPS
             else
                 echo -e "${RED}❌❌ 无法识别包管理器，请手动清理${NC}"
@@ -116,7 +114,7 @@ uninstall_script() {
         echo -e "${CYAN}==================================================${NC}"
         echo -e "${GREEN}卸载完成！感谢使用 VPS 工具箱。${NC}"
         echo -e "${CYAN}==================================================${NC}"
-        exit 0 # 卸载后直接退出脚本
+        exit 0
     else
         echo -e "${YELLOW}已取消卸载操作，返回上级菜单。${NC}"
         sleep 1
@@ -168,7 +166,7 @@ show_menu() {
     clear
     echo -e "${CYAN}"
     echo "=========================================="
-    echo "          VPS 脚本管理菜单 v0.8           "
+    echo "          VPS 脚本管理菜单 v0.9           "
     echo "=========================================="
     echo -e "${NC}"
     echo "1. 系统信息查询"
@@ -177,16 +175,15 @@ show_menu() {
     echo "4. 基础工具"
     echo "5. BBR管理"
     echo "6. Docker管理"
-    echo "7. 系统工具" # 已激活，指向子菜单
+    echo "7. 系统工具"
     echo "0. 退出脚本"
     echo "=========================================="
 }
 
 # -------------------------------
-# 检查BBR状态函数 (保持不变)
+# 检查BBR状态函数
 # -------------------------------
 check_bbr() {
-    # ... (与上一次提供的代码一致) ...
     local bbr_enabled=$(sysctl net.ipv4.tcp_congestion_control | awk '{print $3}')
     local bbr_module=$(lsmod | grep bbr)
     local default_qdisc=$(sysctl net.core.default_qdisc | awk '{print $3}')
@@ -216,10 +213,9 @@ check_bbr() {
 }
 
 # -------------------------------
-# 系统信息查询函数 (保持不变)
+# 系统信息查询函数
 # -------------------------------
 system_info() {
-    # ... (与上一次提供的代码一致) ...
     clear
     echo -e "${CYAN}"
     echo "=========================================="
@@ -302,10 +298,9 @@ system_info() {
 }
 
 # -------------------------------
-# 系统更新函数 (保持不变)
+# 系统更新函数
 # -------------------------------
 system_update() {
-    # ... (与上一次提供的代码一致) ...
     clear
     echo -e "${CYAN}"
     echo "=========================================="
@@ -369,10 +364,9 @@ system_update() {
 }
 
 # -------------------------------
-# 系统清理函数 (保持不变)
+# 系统清理函数
 # -------------------------------
 system_clean() {
-    # ... (与上一次提供的代码一致) ...
     clear
     echo -e "${CYAN}"
     echo "=========================================="
@@ -392,7 +386,7 @@ system_clean() {
         return
     fi
     
-    # 检查系统类型
+    # 检查系统类型 (这是另一个 if/elif 结构，也需要确保正确闭合)
     if [ -f /etc/debian_version ]; then
         # Debian/Ubuntu系统
         echo -e "${BLUE}检测到 Debian/Ubuntu 系统${NC}"
@@ -467,10 +461,9 @@ system_clean() {
 }
 
 # -------------------------------
-# 基础工具安装函数 (保持不变)
+# 基础工具安装函数
 # -------------------------------
 basic_tools() {
-    # ... (与上一次提供的代码一致) ...
     clear
     echo -e "${CYAN}"
     echo "=========================================="
@@ -529,10 +522,9 @@ basic_tools() {
 }
 
 # -------------------------------
-# BBR 测试函数 (依赖 speedtest-cli) (保持不变)
+# BBR 测试函数 (依赖 speedtest-cli)
 # -------------------------------
 run_test() {
-    # ... (与上一次提供的代码一致) ...
     local mode="$1"
     local result=""
     
@@ -546,7 +538,7 @@ run_test() {
     echo -e "${YELLOW}正在测试: $mode${NC}"
     
     # 设置拥塞控制算法
-    case "$mode" in
+    case "$mode" 在
         "BBR")
             sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
             ;;
@@ -598,10 +590,9 @@ run_test() {
 }
 
 # -------------------------------
-# BBR 综合测速菜单 (保持不变)
+# BBR 综合测速菜单
 # -------------------------------
 bbr_test_menu() {
-    # ... (与上一次提供的代码一致) ...
     clear
     echo -e "${CYAN}"
     echo "=========================================="
@@ -643,10 +634,9 @@ bbr_test_menu() {
 }
 
 # -------------------------------
-# 安装/切换 BBR 内核 (保持不变)
+# 安装/切换 BBR 内核
 # -------------------------------
 run_bbr_switch() {
-    # ... (与上一次提供的代码一致) ...
     clear
     echo -e "${CYAN}"
     echo "=========================================="
@@ -683,10 +673,9 @@ run_bbr_switch() {
 }
 
 # -------------------------------
-# BBR 管理菜单 (保持不变)
+# BBR 管理菜单
 # -------------------------------
 bbr_management() {
-    # ... (与上一次提供的代码一致) ...
     while true; do
         clear
         echo -e "${CYAN}"
@@ -732,11 +721,11 @@ bbr_management() {
 }
 
 # ====================================================================
-# +++ Docker管理函数 (保持不变) +++
+# +++ Docker管理 +++
 # ====================================================================
 
 # -------------------------------
-# 检查Docker环境状态 (保持不变)
+# 检查Docker环境状态
 # -------------------------------
 check_docker_status() {
     if command -v docker >/dev/null 2>&1; then
@@ -755,10 +744,9 @@ check_docker_status() {
 }
 
 # -------------------------------
-# 安装/更新Docker环境 (保持不变)
+# 安装/更新Docker环境
 # -------------------------------
 install_update_docker() {
-    # ... (与上一次提供的代码一致) ...
     clear
     echo "正在安装/更新Docker环境..."
     
@@ -788,10 +776,9 @@ install_update_docker() {
 }
 
 # -------------------------------
-# 查看Docker全局状态 (保持不变)
+# 查看Docker全局状态
 # -------------------------------
 show_docker_status() {
-    # ... (与上一次提供的代码一致) ...
     clear
     echo "=== Docker全局状态 ==="
     docker system df
@@ -802,10 +789,9 @@ show_docker_status() {
 }
 
 # -------------------------------
-# Docker卷管理菜单 (保持不变)
+# Docker卷管理菜单
 # -------------------------------
 docker_volume_management() {
-    # ... (与上一次提供的代码一致) ...
     while true; do
         clear
         echo "=== Docker 卷管理 ==="
@@ -845,10 +831,9 @@ docker_volume_management() {
 
 
 # -------------------------------
-# Docker容器管理子菜单 (保持不变)
+# Docker容器管理子菜单
 # -------------------------------
 docker_container_management() {
-    # ... (与上一次提供的代码一致) ...
     while true; do
         clear
         echo "=== Docker容器管理 ==="
@@ -908,10 +893,9 @@ docker_container_management() {
 }
 
 # -------------------------------
-# Docker镜像管理子菜单 (保持不变)
+# Docker镜像管理子菜单
 # -------------------------------
 docker_image_management() {
-    # ... (与上一次提供的代码一致) ...
     while true; do
         clear
         echo "=== Docker镜像管理 ==="
@@ -962,10 +946,9 @@ docker_image_management() {
 }
 
 # -------------------------------
-# Docker网络管理子菜单 (保持不变)
+# Docker网络管理子菜单
 # -------------------------------
 docker_network_management() {
-    # ... (与上一次提供的代码一致) ...
     while true; do
         clear
         echo "=== Docker网络管理 ==="
@@ -1019,10 +1002,9 @@ docker_network_management() {
 
 
 # -------------------------------
-# 清理无用的Docker资源 (保持不变)
+# 清理无用的Docker资源
 # -------------------------------
 clean_docker_resources() {
-    # ... (与上一次提供的代码一致) ...
     clear
     echo "正在清理无用的Docker资源..."
     
@@ -1040,10 +1022,9 @@ clean_docker_resources() {
 }
 
 # -------------------------------
-# 更换Docker镜像源 (保持不变)
+# 更换Docker镜像源
 # -------------------------------
 change_docker_registry() {
-    # ... (与上一次提供的代码一致) ...
     clear
     echo "请选择Docker镜像源:"
     echo "1. Docker官方源(国外，恢复默认)"
@@ -1102,10 +1083,9 @@ EOF
 }
 
 # -------------------------------
-# 编辑daemon.json文件 (保持不变)
+# 编辑daemon.json文件
 # -------------------------------
 edit_daemon_json() {
-    # ... (与上一次提供的代码一致) ...
     clear
     if [ ! -f /etc/docker/daemon.json ]; then
         mkdir -p /etc/docker
@@ -1130,10 +1110,9 @@ edit_daemon_json() {
 }
 
 # -------------------------------
-# 开启Docker IPv6访问 (保持不变)
+# 开启Docker IPv6访问
 # -------------------------------
 enable_docker_ipv6() {
-    # ... (与上一次提供的代码一致) ...
     clear
     echo "正在启用Docker IPv6访问..."
     
@@ -1160,10 +1139,9 @@ EOF
 }
 
 # -------------------------------
-# 关闭Docker IPv6访问 (保持不变)
+# 关闭Docker IPv6访问
 # -------------------------------
 disable_docker_ipv6() {
-    # ... (与上一次提供的代码一致) ...
     clear
     echo "正在禁用Docker IPv6访问..."
     
@@ -1187,10 +1165,9 @@ disable_docker_ipv6() {
 }
 
 # -------------------------------
-# 备份/迁移/还原Docker环境 (保持不变)
+# 备份/迁移/还原Docker环境
 # -------------------------------
 backup_restore_docker() {
-    # ... (与上一次提供的代码一致) ...
     clear
     echo "=== Docker环境备份/迁移/还原 ==="
     echo "1. 备份所有容器为镜像"
@@ -1248,10 +1225,9 @@ backup_restore_docker() {
 }
 
 # -------------------------------
-# 卸载Docker环境 (保持不变)
+# 卸载Docker环境
 # -------------------------------
 uninstall_docker() {
-    # ... (与上一次提供的代码一致) ...
     clear
     echo -e "${RED}警告：此操作将彻底卸载Docker并删除所有数据！${NC}"
     read -p "确定要卸载Docker吗？(y/N): " confirm
@@ -1292,10 +1268,9 @@ uninstall_docker() {
 }
 
 # -------------------------------
-# Docker管理主菜单 (保持不变)
+# Docker管理主菜单
 # -------------------------------
 docker_management_menu() {
-    # ... (与上一次提供的代码一致) ...
     while true; do
         clear
         echo -e "${CYAN}"
@@ -1364,6 +1339,7 @@ check_deps
 # 无限循环，直到用户选择退出
 while true; do
     show_menu
+    # 选项编号现在是 0-7
     read -p "请输入你的选择 (0-7): " main_choice
 
     case $main_choice in
@@ -1386,7 +1362,7 @@ while true; do
             docker_management_menu
             ;;
         7)
-            system_tools_menu # 调用新的系统工具子菜单
+            system_tools_menu # 调用系统工具子菜单
             ;;
         0)
             echo -e "${GREEN}感谢使用，正在退出脚本...${NC}"
