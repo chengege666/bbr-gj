@@ -75,21 +75,19 @@ check_deps() {
     done
 }
 
-
 # ====================================================================
 # +++ 模块加载核心 (V2.0.0 新增) +++
 # ====================================================================
 load_module() {
-    MODULE_NAME=$1
-    MODULE_PATH="modules/$MODULE_NAME"
+    local MODULE_NAME=$1
+    local MODULE_PATH="$SCRIPT_DIR/modules/$MODULE_NAME"
     
     if [ -f "$MODULE_PATH" ]; then
-        echo -e "${CYAN}=== 调用模块: ${MODULE_NAME} ===${RESET}"
         # source 引入模块，使其函数在当前脚本可用
         source "$MODULE_PATH"
         
         # 模块的菜单函数名约定为 [文件名]_menu (例如 bbr_manager.sh -> bbr_manager_menu)
-        MODULE_FUNC=$(echo "$MODULE_NAME" | sed 's/\.sh$/_menu/') 
+        local MODULE_FUNC=$(echo "$MODULE_NAME" | sed 's/\.sh$/_menu/') 
         
         if command -v "$MODULE_FUNC" >/dev/null 2>&1; then
             echo -e "${GREEN}✅ 加载模块: ${MODULE_NAME}${RESET}"
@@ -105,7 +103,7 @@ load_module() {
 }
 
 # -------------------------------
-# 功能 00: 脚本更新 (待实现)
+# 功能 00: 脚本更新
 # -------------------------------
 script_update() {
     echo -e "${CYAN}=== 脚本更新 ===${RESET}"
@@ -128,9 +126,19 @@ script_update() {
 }
 
 # -------------------------------
-# 功能 0: 卸载脚本 (保留在主脚本)
+# 功能 0: 卸载脚本 (需要实现)
 # -------------------------------
-# 注意: 原始 v1.3.0 中的 uninstall_script 函数需要移动到主脚本中，这里只保留主菜单调用逻辑。
+uninstall_script() {
+    echo -e "${CYAN}=== 卸载脚本 ===${RESET}"
+    echo -e "${YELLOW}此功能将清理脚本安装的相关组件${RESET}"
+    read -p "确定要卸载吗？(y/N): " confirm_uninstall
+    if [[ "$confirm_uninstall" == "y" || "$confirm_uninstall" == "Y" ]]; then
+        # 这里添加卸载逻辑
+        echo -e "${GREEN}✅ 卸载功能待实现${RESET}"
+        touch "$UNINSTALL_NOTE"
+    fi
+    read -n1 -p "按任意键返回菜单..."
+}
 
 # -------------------------------
 # 交互菜单 (与 V2.0.0 截图对齐)
