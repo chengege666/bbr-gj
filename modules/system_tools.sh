@@ -1,23 +1,34 @@
 #!/bin/bash
-# 基础工具安装模块
+# 系统工具模块
 
 main() {
-    echo -e "${CYAN}=== 安装基础工具 ===${RESET}"
-    local tools=("htop" "vim" "git" "wget" "curl" "unzip" "tar" "gzip" "net-tools")
+    echo -e "${CYAN}=== 系统工具 ===${RESET}"
+    echo "1) 查看系统日志"
+    echo "2) 查看服务状态"
+    echo "3) 进程管理"
+    echo "4) 返回主菜单"
     
-    for tool in "${tools[@]}"; do
-        if ! command -v "$tool" >/dev/null 2>&1; then
-            echo -e "${YELLOW}安装 $tool...${RESET}"
-            if command -v apt >/dev/null 2>&1; then
-                apt install -y "$tool"
-            elif command -v yum >/dev/null 2>&1; then
-                yum install -y "$tool"
+    read -p "请输入选择: " tool_choice
+    case "$tool_choice" in
+        1)
+            echo -e "${CYAN}系统日志 (最后50行):${RESET}"
+            tail -50 /var/log/syslog 2>/dev/null || tail -50 /var/log/messages 2>/dev/null || echo "无法查看系统日志"
+            ;;
+        2)
+            echo -e "${CYAN}服务状态:${RESET}"
+            systemctl list-units --type=service --state=running | head -20
+            ;;
+        3)
+            echo -e "${CYAN}进程管理:${RESET}"
+            if command -v htop >/dev/null 2>&1; then
+                htop
+            else
+                top
             fi
-        else
-            echo -e "${GREEN}$tool 已安装${RESET}"
-        fi
-    done
-    echo -e "${GREEN}基础工具安装完成${RESET}"
+            ;;
+        4) return ;;
+        *) echo -e "${RED}无效选择${RESET}" ;;
+    esac
     read -n1 -p "按任意键继续..."
     echo
 }
