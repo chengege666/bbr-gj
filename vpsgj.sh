@@ -910,15 +910,17 @@ change_docker_registry() {
     echo "5. 腾讯云镜像源"
     read -p "请输入选择(1-5): " registry_choice
 
+    local registry_url=""
+
     case $registry_choice in
         1)
-            registry_url=""
+            # Choice 1 will reset to the default mirror
             ;;
         2)
             registry_url="https://registry.cn-hangzhou.aliyuncs.com"
             ;;
         3)
-            registry_url="https://docker.mirrors.ust极.edu.cn"
+            registry_url="https://docker.mirrors.ustc.edu.cn"
             ;;
         4)
             registry_url="http://hub-mirror.c.163.com"
@@ -927,29 +929,30 @@ change_docker_registry() {
             registry_url="https://mirror.ccs.tencentyun.com"
             ;;
         *)
-            echo "无效选择，使用默认源"
-            registry_url=""
+            echo "无效选择，操作已取消。"
+            return
             ;;
     esac
 
     # 创建或修改daemon.json
     mkdir -p /etc/docker
-    if [ -n "$registry_url" ]; then
+    
+    if [ -z "$registry_url" ]; then
+        # If the URL is empty (Choice 1), restore the default configuration.
+        echo '{}' > /etc/docker/daemon.json
+        echo "已恢复默认镜像源"
+    else
+        # For other choices, set the new registry mirror.
         cat > /etc/docker/daemon.json << EOF
 {
   "registry-mirrors": ["$registry_url"]
 }
 EOF
-        echo "已设置镜像源: $registry_url"
-    else
-        # 恢复默认配置
-        cat > /etc/docker/daemon.json << EOF
-{}
-EOF
-        echo "已恢复默认镜像源"
+        echo "已设置镜像源：$registry_url"
     fi
 
-    # 重启Docker服务
+    # 重启Docker服务以应用更改
+    echo "正在重启Docker服务..."
     systemctl restart docker
     echo "Docker服务已重启，镜像源设置完成"
 }
