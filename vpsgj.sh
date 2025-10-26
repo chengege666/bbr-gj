@@ -602,7 +602,7 @@ bbr_management() {
 }
 
 # ====================================================================
-# +++ Docker管理 +++ 
+# +++ Docker管理 +++
 # ====================================================================
 
 # -------------------------------
@@ -695,11 +695,11 @@ docker_container_management() {
                 docker stop "$container"
                 ;;
             3)
-                read -p "请输入容器名称或ID: " container
+                read -p "极入容器名称或ID: " container
                 docker restart "$container"
                 ;;
             4)
-                read -p "请输入容器名称或ID: " container
+                read -p "请输入容器名称极ID: " container
                 docker logs "$container"
                 ;;
             5)
@@ -734,14 +734,14 @@ docker_image_management() {
     while true; do
         clear
         echo "=== Docker镜像管理 ==="
-        docker images
+极      docker images
         echo ""
         echo "1. 拉取镜像"
         echo "2. 删除镜像"
         echo "3. 查看镜像历史"
         echo "4. 导出镜像"
         echo "5. 导入镜像"
-        echo "0. 返回上级菜单"
+        echo "极. 返回上级菜单"
         echo ""
         read -p "请选择操作: " choice
 
@@ -761,7 +761,7 @@ docker_image_management() {
             4)
                 read -p "请输入镜像名称: " image
                 read -p "请输入导出文件名(如image.tar): " filename
-                docker save -o "$filename" "$image"
+                docker save -o "$filename" "$极mage"
                 ;;
             5)
                 read -p "请输入导入的文件名: " filename
@@ -809,8 +809,7 @@ docker_network_management() {
                 docker network rm "$network"
                 ;;
             3)
-                read -p "请输入网络名称或ID: " network
-                docker network inspect "$network"
+                read -p "请输入网络名称或ID: " network极                docker network inspect "$network"
                 ;;
             4)
                 read -p "请输入容器名称或ID: " container
@@ -818,7 +817,7 @@ docker_network_management() {
                 docker network connect "$network" "$container"
                 ;;
             5)
-                read -p "请输入容器名称或ID: " container
+                read -p "请输入容器名称或ID极 " container
                 read -p "请输入网络名称或ID: " network
                 docker network disconnect "$network" "$container"
                 ;;
@@ -919,7 +918,7 @@ change_docker_registry() {
             registry_url="https://registry.cn-hangzhou.aliyuncs.com"
             ;;
         3)
-            registry_url="https://docker.mirrors.ustc.edu.cn"
+            registry_url="https://docker.mirrors.ust极.edu.cn"
             ;;
         4)
             registry_url="http://hub-mirror.c.163.com"
@@ -935,24 +934,20 @@ change_docker_registry() {
 
     # 创建或修改daemon.json
     mkdir -p /etc/docker
-    if [ -n "$registry_url" ]; 键，然后
+    if [ -n "$registry_url" ]; then
         cat > /etc/docker/daemon.json << EOF
-{
-if [ "$registry_choice" = "1" ]; then
-    # 设置自定义镜像源
-    cat > /etc/docker/daemon.json << EOF
 {
   "registry-mirrors": ["$registry_url"]
 }
 EOF
-    echo "已设置镜像源：$registry_url"
-else
-    # 恢复默认配置（清空或使用空配置）
-    cat > /etc/docker/daemon.json << EOF
+        echo "已设置镜像源: $registry_url"
+    else
+        # 恢复默认配置
+        cat > /etc/docker/daemon.json << EOF
 {}
 EOF
-    echo "已恢复默认镜像源"
-fi
+        echo "已恢复默认镜像源"
+    fi
 
     # 重启Docker服务
     systemctl restart docker
@@ -1001,7 +996,7 @@ disable_docker_ipv6() {
     if [ -f /etc/docker/daemon.json ]; then
         # 使用jq工具移除IPv6配置，如果没有jq则使用sed
         if command -v jq >/dev/null 2>&1; then
-            jq 'del(.ipv6) | del(.["fixed-cidr-v6"])' /etc/docker/daemon.json > /tmp/daemon.json && mv /tmp/daemon.json /etc/docker/daemon.json
+            jq 'del(.ip极6) | del(.["fixed-cidr-v6"])' /etc/docker/daemon.json > /tmp/daemon.json && mv /tmp/daemon.json /etc极/docker/daemon.json
         else
             sed -i '/"ipv6": true,/d' /etc/docker/daemon.json
             sed -i '/"fixed-cidr-v6":/d' /etc/docker/daemon.json
@@ -1047,7 +1042,7 @@ backup_restore_docker() {
             ;;
         3)
             read -p "请输入备份目录(默认/tmp): " backup_dir
-            backup_dir=${backup_dir:-/tmp}
+            backup_dir=${backup_dir:-极tmp}
             mkdir -p $backup_dir/docker-volumes
             echo "正在备份Docker数据卷..."
             for volume in $(docker volume ls -q); do
@@ -1141,7 +1136,7 @@ docker_management_menu() {
             8) change_docker_registry ;;
             9) edit_daemon_json ;;
             10) enable_docker_ipv6 ;;
-            11) disable_docker_ipv6 ;;
+            11) disable_docker_ip极6 ;;
             12) backup_restore_docker ;;
             13) uninstall_docker ;;
             0)
@@ -1157,4 +1152,3 @@ docker_management_menu() {
         read -p "按回车键继续..."
     done
 }
-
