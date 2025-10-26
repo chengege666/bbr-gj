@@ -1,0 +1,77 @@
+#!/bin/bash
+# 公共函数模块
+
+# -------------------------------
+# 颜色定义
+# -------------------------------
+RED="\033[1;31m"
+GREEN="\033[1;32m"
+YELLOW="\033[1;33m"
+MAGENTA="\033[1;35m"
+CYAN="\033[1;36m"
+RESET="\033[0m"
+
+# -------------------------------
+# 基础函数
+# -------------------------------
+print_welcome() {
+    clear
+    echo -e "${CYAN}==================================================${RESET}"
+    echo -e "${MAGENTA}              增强版 VPS 工具箱 v1.3.0           ${RESET}"
+    echo -e "${CYAN}--------------------------------------------------${RESET}"
+    echo -e "${YELLOW}功能: BBR, 系统管理, 防火墙, Docker, NPM等${RESET}"
+    echo -e "${GREEN}测速结果保存: bbr_result.txt${RESET}"
+    echo -e "${CYAN}==================================================${RESET}"
+    echo ""
+}
+
+check_root() {
+    if [ "$(id -u)" -ne 0 ]; then
+        echo -e "${RED}❌❌❌❌ 错误：请使用 root 权限运行本脚本${RESET}"
+        echo "👉 使用方法: sudo bash vpsgj.sh"
+        exit 1
+    fi
+}
+
+check_deps() {
+    PKGS="curl wget git speedtest-cli net-tools build-essential iptables"
+    for CMD in curl wget git speedtest-cli iptables; do
+        if ! command -v $CMD >/dev/null 2>&1; then
+            echo -e "${YELLOW}未检测到 $CMD，正在尝试安装依赖...${RESET}"
+            install_deps
+            break
+        fi
+    done
+}
+
+install_deps() {
+    PKGS="curl wget git speedtest-cli net-tools build-essential iptables"
+    if command -v apt >/dev/null 2>&1; then
+        apt update -y
+        apt install -y $PKGS
+    elif command -v yum >/dev/null 2>&1; then
+        yum install -y $PKGS
+    elif command -v dnf >/dev/null 2>&1; then
+        dnf install -y $PKGS
+    else
+        echo -e "${YELLOW}⚠️ 未知系统，请手动安装依赖: $PKGS${RESET}"
+        read -n1 -p "按任意键继续菜单..."
+    fi
+}
+
+# 卸载功能
+uninstall_script() {
+    read -p "确定要卸载本脚本并清理相关文件吗 (y/n)? ${RED}此操作不可逆!${RESET}: " confirm_uninstall
+    if [[ "$confirm_uninstall" == "y" || "$confirm_uninstall" == "Y" ]]; then
+        echo -e "${YELLOW}正在清理脚本文件...${RESET}"
+        
+        # 删除主脚本和模块目录
+        rm -f vpsgj.sh
+        rm -rf modules/
+        rm -f bbr_result.txt
+        
+        echo "Script uninstalled on $(date)" > "vps_toolbox_uninstall_done.txt"
+        echo -e "${GREEN}✅ 脚本卸载完成。${RESET}"
+        exit 0
+    fi
+}
