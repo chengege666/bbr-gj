@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# VPS一键管理脚本 v0.5
+# VPS一键管理脚本 v0.3
 # 作者: 智能助手
 # 最后更新: 2025-10-27
 
@@ -11,9 +11,6 @@ YELLOW='\033[0;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m' # 重置颜色
-
-# 结果文件路径
-RESULT_FILE="/tmp/bbr_test_results.txt"
 
 # -------------------------------
 # root 权限检查
@@ -63,7 +60,7 @@ show_menu() {
     clear
     echo -e "${CYAN}"
     echo "=========================================="
-    echo "          VPS 脚本管理菜单 v0.5           "
+    echo "          VPS 脚本管理菜单 v0.3           "
     echo "=========================================="
     echo -e "${NC}"
     echo "1. 系统信息查询"
@@ -260,7 +257,7 @@ system_update() {
     echo -e "${CYAN}"
     echo "=========================================="
     echo -e "${NC}"
-    read -p "按回车极返回主菜单..."
+    read -p "按回车键返回主菜单..."
 }
 
 # 系统清理函数
@@ -323,7 +320,7 @@ system_clean() {
         echo ""
         
         # 清理YUM缓存
-        echo -极 "${BLUE}[步骤1/4] 清理YUM缓存...${NC}"
+        echo -e "${BLUE}[步骤1/4] 清理YUM缓存...${NC}"
         yum clean all
         echo ""
         
@@ -374,7 +371,7 @@ basic_tools() {
     # 检查系统类型
     if [ -f /etc/debian_version ]; then
         # Debian/Ubuntu系统
-        echo -e "${BL极}检测到 Debian/Ubuntu 系统${NC}"
+        echo -e "${BLUE}检测到 Debian/Ubuntu 系统${NC}"
         echo -e "${YELLOW}开始安装基础工具...${NC}"
         echo ""
         
@@ -417,233 +414,250 @@ basic_tools() {
     read -p "按回车键返回主菜单..."
 }
 
-# -------------------------------
-# BBR 测试函数
-# -------------------------------
-run_test() {
-    local mode="$1"
-    local result=""
-    
-    echo -e "${YELLOW}正在测试: $mode${NC}"
-    
-    # 设置拥塞控制算法
-    case "$mode" in
-        "BBR")
-            sysctl -w net.ipv4.tcp_congestion_control=bbr
-            ;;
-        "BBR Plus")
-            sysctl -w net.ipv4.tcp_congestion_control=bbr_plus
-            ;;
-        "BBRv2")
-            sysctl -w net.ipv4.tcp_congestion_control=bbr2
-            ;;
-        "BBRv3")
-            sysctl -w net.ipv4.tcp_congestion_control=bbr3
-            ;;
-        *)
-            echo -e "${RED}未知模式: $mode${NC}"
-            return
-            ;;
-    esac
-    
-    # 执行测速
-    result=$(speedtest --simple --timeout 15 2>&1)
-    
-    if echo "$result" | grep -q "ERROR"; then
-        echo -e "${RED}测试失败: $mode${NC}"
-        echo "$mode: 测试失败" >> "$RESULT_FILE"
-    else
-        # 提取测速结果
-        local ping=$(echo "$result" | grep "Ping" | awk '{print $2}')
-        local download=$(echo "$result" | grep "Download" | awk '{print $2}')
-        local upload=$(echo "$result" | grep "Upload" | awk '{print $2}')
-        
-        # 显示结果
-        echo -e "  ${BLUE}延迟: ${GREEN}$ping ms${NC}"
-        echo -e "  ${BLUE}下载: ${GREEN}$download Mbps${NC}"
-        echo -e "  ${BLUE}上传: ${GREEN}$upload Mbps${NC}"
-        
-        # 保存结果
-        echo "$mode: 延迟 ${ping}ms | 下载 ${download}Mbps | 上传 ${upload}Mbps" >> "$RESULT_FILE"
+# ====================================================================
+# +++ 高级Docker管理模块 (v2.1) +++
+# ====================================================================
+
+# 检查jq并安装
+check_jq() {
+    if ! command -v jq &> /dev/null; then
+        echo -e "${YELLOW}检测到需要使用 jq 工具来处理JSON配置，正在尝试安装...${RESET}"
+        if command -v apt >/dev/null 2>&1; then
+            apt update && apt install -y jq
+        elif command -v yum >/dev/null 2>&1; then
+            yum install -y jq
+        elif command -v dnf >/dev/null 2>&1; then
+            dnf install -y jq
+        fi
+        if ! command -v jq &> /dev/null; then
+            echo -e "${RED}jq 安装失败，相关功能可能无法使用。${RESET}"
+            return 1
+        fi
+        echo -e "${GREEN}jq 安装成功。${RESET}"
     fi
-    
-    echo ""
+    return 0
 }
 
-# -------------------------------
-# BBR 综合测速
-# -------------------------------
-bbr_test_menu() {
-    clear
-    echo -e "${CYAN}"
-    echo "=========================================="
-    echo "              BBR 综合测速                "
-    echo "=========================================="
-    echo -e "${NC}"
+# 编辑daemon.json的辅助函数
+edit_daemon_json() {
+    local key=$1
+    local value=$2
+    DAEMON_FILE="/etc/docker/daemon.json"
     
-    # 警告信息
-    echo -e "${YELLOW}⚠️ 注意：此测试将临时修改网络配置${NC}"
-    echo -e "${YELLOW}测试完成后将恢复原始设置${NC}"
-    echo ""
+    check_jq || return 1
     
-    # 保存当前拥塞控制算法
-    local current_cc=$(sysctl net.ipv4.tcp_congestion_control | awk '{print $3}')
-    
-    # 清空结果文件
-    > "$RESULT_FILE"
-    
-    # 尝试所有算法
-    for MODE in "BBR" "BBR Plus" "BBRv2" "BBRv3"; do
-        run_test "$MODE"
-    done
-    
-    # 恢复原始设置
-    sysctl -w net.ipv4.tcp_congestion_control="$current_cc" >/dev/null 2>&1
-    
-    # 显示结果汇总
-    echo -e "${CYAN}=== 测试完成，结果汇总 ===${NC}"
-    if [ -f "$RESULT_FILE" ] && [ -s "$RESULT_FILE" ]; then
-        cat "$RESULT_FILE"
-    else
-        echo -e "${YELLOW}无测速结果${NC}"
+    if [ ! -f "$DAEMON_FILE" ]; then
+        echo "{}" > "$DAEMON_FILE"
     fi
     
-    echo -e "${CYAN}"
-    echo "=========================================="
-    echo -e "${NC}"
-    read -p "按回车键返回BBR管理菜单..."
+    # 使用jq来修改json文件
+    tmp_json=$(jq ".${key} = ${value}" "$DAEMON_FILE")
+    echo "$tmp_json" > "$DAEMON_FILE"
+    
+    echo -e "${GREEN}配置文件 $DAEMON_FILE 已更新。${RESET}"
+    echo -e "${YELLOW}正在重启Docker以应用更改...${RESET}"
+    systemctl restart docker
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}Docker重启成功。${RESET}"
+    else
+        echo -e "${RED}Docker重启失败，请手动检查: systemctl status docker${RESET}"
+    fi
 }
 
-# -------------------------------
-# 安装/切换 BBR 内核
-# -------------------------------
-run_bbr_switch() {
-    clear
-    echo -e "${CYAN}"
-    echo "=========================================="
-    echo "           BBR 内核安装/切换             "
-    echo "=========================================="
-    echo -e "${NC}"
-    
-    echo -e "${YELLOW}正在下载并运行 BBR 切换脚本...${NC}"
-    echo -e "${YELLOW}来源: ylx2016/Linux-NetSpeed${NC}"
-    echo ""
-    
-    # 下载脚本
-    wget -O tcp.sh "https://github.com/ylx2016/Linux-NetSpeed/raw/master/tcp.sh"
-    
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}❌❌ 下载脚本失败，请检查网络连接${NC}"
-        read -p "按回车键返回BBR管理菜单..."
+# 安装/更新Docker
+install_update_docker() {
+    echo -e "${CYAN}正在使用官方脚本安装/更新 Docker...${RESET}"
+    curl -fsSL https://get.docker.com -o get-docker.sh
+    sh get-docker.sh --mirror Aliyun
+    rm get-docker.sh
+    systemctl enable docker
+    systemctl start docker
+    if command -v docker >/dev/null 2>&1; then
+        echo -e "${GREEN}✅ Docker 安装/更新并启动成功！${RESET}"
+    else
+        echo -e "${RED}❌❌ Docker 安装/更新失败，请检查日志。${RESET}"
+    fi
+}
+
+# 卸载Docker
+uninstall_docker() {
+    echo -e "${RED}警告：此操作将彻底卸载Docker并删除所有数据（容器、镜像、卷）！${RESET}"
+    read -p "确定要继续吗？(y/N): " confirm
+    if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
+        echo -e "${GREEN}操作已取消。${RESET}"
         return
     fi
     
-    # 设置执行权限
-    chmod +x tcp.sh
+    systemctl stop docker
+    if command -v apt >/dev/null 2>&1; then
+        apt-get purge -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+        apt-get autoremove -y
+    elif command -v yum >/dev/null 2>&1; then
+        yum remove -y docker-ce docker-ce-cli containerd.io
+    elif command -v dnf >/dev/null 2>&1; then
+        dnf remove -y docker-ce docker-ce-cli containerd.io
+    fi
     
-    # 运行脚本
-    ./tcp.sh
-    
-    # 清理文件
-    rm -f tcp.sh
-    
-    echo -e "${CYAN}"
-    echo "=========================================="
-    echo -e "${NC}"
-    read -p "按回车键返回BBR管理菜单..."
+    rm -rf /var/lib/docker
+    rm -rf /var/lib/containerd
+    echo -e "${GREEN}Docker 已彻底卸载。${RESET}"
 }
 
-# -------------------------------
-# BBR 管理菜单
-# -------------------------------
-bbr_management() {
+# Docker子菜单：容器管理 (v2.1 修复返回逻辑)
+container_management_menu() {
     while true; do
         clear
-        echo -e "${CYAN}"
-        echo "=========================================="
-        echo "              BBR 管理菜单                "
-        echo "=========================================="
-        echo -e "${NC}"
-        echo "1. BBR综合测速"
-        echo "2. 安装/切换BBR内核"
-        echo "3. 查看当前BBR状态"
-        echo "0. 返回主菜单"
-        echo "=========================================="
+        echo -e "${CYAN}=== Docker 容器管理 ===${RESET}"
+        docker ps -a
+        echo "------------------------------------------------"
+        echo "1. 启动容器    2. 停止容器    3. 重启容器"
+        echo "4. 查看日志    5. 进入容器    6. 删除容器"
+        echo "0. 返回上级菜单"
+        read -p "请选择操作: " choice
         
-        read -p "请输入选项编号: " bbr_choice
-        
-        case $bbr_choice in
-            1)
-                bbr_test_menu
-                ;;
-            2)
-                run_bbr_switch
-                ;;
-            3)
-                clear
-                echo -e "${CYAN}"
-                echo "=========================================="
-                echo "              当前BBR状态                "
-                echo "=========================================="
-                echo -e "${NC}"
-                check_bbr
-                echo ""
-                read -p "按回车键返回BBR管理菜单..."
-                ;;
-            0)
-                return
-                ;;
-            *)
-                echo -e "${RED}无效的选项，请重新输入！${NC}"
-                sleep 1
-                ;;
-        esac
+        # 检查是否是返回操作
+        if [[ "$choice" == "0" ]]; then
+            break
+        fi
+
+        # 检查是否是需要容器ID的有效操作
+        if [[ "$choice" =~ ^[1-6]$ ]]; then
+            read -p "请输入容器ID或名称 (留空则取消): " container
+            if [ -z "$container" ]; then
+                continue # 取消操作，返回子菜单循环
+            fi
+
+            case "$choice" in
+                1) docker start "$container" ;;
+                2) docker stop "$container" ;;
+                3) docker restart "$container" ;;
+                4) docker logs "$container" ;;
+                5) docker exec -it "$container" /bin/sh -c "[ -x /bin/bash ] && /bin/bash || /bin/sh" ;;
+                6) docker rm "$container" ;;
+            esac
+            read -n1 -p "操作完成。按任意键继续..."
+        else
+            echo -e "${RED}无效选择，请输入 0-6 之间的数字。${RESET}"
+            sleep 2
+        fi
     done
 }
 
-# 主循环
-main() {
-    # 检查root权限
-    check_root
-    
-    # 检查依赖
-    check_deps
+
+# Docker子菜单：镜像管理
+image_management_menu() {
+    while true; do
+        clear
+        echo -e "${CYAN}=== Docker 镜像管理 ===${RESET}"
+        docker images
+        echo "------------------------------------------------"
+        echo "1. 拉取镜像    2. 删除镜像    3. 查看历史"
+        echo "0. 返回上级菜单"
+        read -p "请选择操作: " choice
+        
+        case "$choice" in
+            1) 
+                read -p "请输入要拉取的镜像名称 (例如: ubuntu:latest): " image_name
+                [ -n "$image_name" ] && docker pull "$image_name"
+                ;;
+            2) 
+                read -p "请输入要删除的镜像ID或名称: " image_id
+                [ -n "$image_id" ] && docker rmi "$image_id"
+                ;;
+            3)
+                read -p "请输入要查看历史的镜像ID或名称: " image_id
+                [ -n "$image_id" ] && docker history "$image_id"
+                ;;
+            0) break ;;
+            *) echo -e "${RED}无效选择${RESET}" ;;
+        esac
+        read -n1 -p "按任意键继续..."
+    done
+}
+
+# 主Docker菜单
+docker_menu() {
+    if ! command -v docker >/dev/null 2>&1; then
+        echo -e "${RED}未检测到 Docker 环境！${RESET}"
+        read -p "是否现在安装 Docker? (y/n): " install_docker
+        if [[ "$install_docker" == "y" || "$install_docker" == "Y" ]]; then
+            install_update_docker
+        fi
+        return
+    fi
     
     while true; do
-        show_menu
-        read -p "请输入选项编号: " choice
-        
-        case $choice in
-            1)
-                system_info
+        clear
+        echo -e "${CYAN}Docker管理${RESET}"
+        if systemctl is-active --quiet docker; then
+            containers=$(docker ps -a --format '{{.ID}}' | wc -l)
+            images=$(docker images -q | wc -l)
+            networks=$(docker network ls -q | wc -l)
+            volumes=$(docker volume ls -q | wc -l)
+            echo -e "${GREEN}环境已经安装 容器: ${containers} 镜像: ${images} 网络: ${networks} 卷: ${volumes}${RESET}"
+        else
+            echo -e "${RED}Docker服务未运行！请先启动Docker。${RESET}"
+        fi
+        echo "------------------------------------------------"
+        echo "1.  安装/更新Docker环境"
+        echo "2.  查看Docker全局状态 (docker system df)"
+        echo "3.  Docker容器管理"
+        echo "4.  Docker镜像管理"
+        echo "5.  Docker网络管理"
+        echo "6.  Docker卷管理"
+        echo "7.  清理无用的Docker资源 (prune)"
+        echo "8.  更换Docker镜像源"
+        echo "9.  编辑daemon.json文件"
+        echo "11. 开启Docker-ipv6访问"
+        echo "12. 关闭Docker-ipv6访问"
+        echo "19. 备份/还原Docker环境"
+        echo "20. 卸载Docker环境"
+        echo "0.  返回主菜单"
+        echo "------------------------------------------------"
+        read -p "请输入你的选择: " choice
+
+        case "$choice" in
+            1) install_update_docker ;;
+            2) docker system df ;;
+            3) container_management_menu ;;
+            4) image_management_menu ;;
+            5) docker network ls && echo "网络管理功能待扩展" ;;
+            6) docker volume ls && echo "卷管理功能待扩展" ;;
+            7) 
+                read -p "这将删除所有未使用的容器、网络、镜像，确定吗? (y/N): " confirm
+                [[ "$confirm" == "y" || "$confirm" == "Y" ]] && docker system prune -af --volumes
                 ;;
-            2)
-                system_update
+            8)
+                echo "请选择镜像源:"
+                echo "1. 阿里云 (推荐国内)"
+                echo "2. 网易"
+                echo "3. 中科大"
+                echo "4. Docker官方 (国外)"
+                read -p "输入选择: " mirror_choice
+                mirror_url=""
+                case "$mirror_choice" in
+                    1) mirror_url='"https://mirror.aliyuncs.com"' ;;
+                    2) mirror_url='"http://hub-mirror.c.163.com"' ;;
+                    3) mirror_url='"https://docker.mirrors.ustc.edu.cn"' ;;
+                    4) mirror_url='""' ;;
+                    *) echo "无效选择"; continue ;;
+                esac
+                edit_daemon_json '"registry-mirrors"' "[$mirror_url]"
                 ;;
-            3)
-                system_clean
+            9)
+                [ -f /etc/docker/daemon.json ] || echo "{}" > /etc/docker/daemon.json
+                editor=${EDITOR:-vi}
+                $editor /etc/docker/daemon.json
                 ;;
-            4)
-                basic_tools
+            11) edit_daemon_json '"ipv6"' "true" ;;
+            12) edit_daemon_json '"ipv6"' "false" ;;
+            19) 
+                echo "功能开发中..." 
                 ;;
-            5)
-                bbr_management
-                ;;
-            6|7)
-                echo -e "${YELLOW}功能正在开发中，敬请期待！${NC}"
-                sleep 1
-                ;;
-            0)
-                echo -e "${GREEN}感谢使用，再见！${NC}"
-                exit 0
-                ;;
-            *)
-                echo -e "${RED}无效的选项，请重新输入！${NC}"
-                sleep 1
-                ;;
+            20) uninstall_docker ;;
+            0) break ;;
+            *) echo -e "${RED}无效选项${RESET}" ;;
         esac
+        read -n1 -p "按任意键返回Docker菜单..."
     done
 }
-
-# 运行主函数
-main
