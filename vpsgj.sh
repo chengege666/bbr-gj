@@ -31,6 +31,39 @@ show_menu() {
     echo "=========================================="
 }
 
+# 检查BBR状态函数
+check_bbr() {
+    # 检查是否启用了BBR
+    local bbr_enabled=$(sysctl net.ipv4.tcp_congestion_control | awk '{print $3}')
+    local bbr_module=$(lsmod | grep bbr)
+    
+    if [[ "$bbr_enabled" == *"bbr"* ]]; then
+        # 获取BBR版本信息
+        local bbr_version=""
+        if [[ "$bbr_enabled" == "bbr" ]]; then
+            bbr_version="BBR v1"
+        elif [[ "$bbr_enabled" == "bbr2" ]]; then
+            bbr_version="BBR v2"
+        else
+            bbr_version="未知BBR类型"
+        fi
+        
+        # 获取BBR参数
+        local bbr_params=$(sysctl -a 2>/dev/null | grep -E "bbr|tcp_congestion_control" | grep -v '^net.core' | sort)
+        
+        # 返回BBR信息
+        echo -e "${GREEN}已启用${NC} ($bbr_version)"
+        echo -e "${BLUE}BBR参数:${NC}"
+        echo "$bbr_params" | while read -r line; do
+            echo "  $line"
+        done
+    elif [[ -n "$bbr_module" ]]; then
+        echo -e "${YELLOW}已加载但未启用${NC}"
+    else
+        echo -e "${RED}未启用${NC}"
+    fi
+}
+
 # 系统信息查询函数
 system_info() {
     clear
@@ -95,12 +128,16 @@ system_info() {
         ipv6="${YELLOW}$ipv6${NC}"
     fi
     echo -e "${BLUE}公网IPv6: $ipv6"
+    
+    # 9. BBR状态
+    echo -e "${BLUE}BBR状态: ${NC}"
+    check_bbr
 
-    # 9. 系统运行时间
+    # 10. 系统运行时间
     uptime_info=$(uptime -p | sed 's/up //')
     echo -e "${BLUE}系统运行时间: ${NC}$uptime_info"
 
-    # 10. 当前时间（北京时间）
+    # 11. 当前时间（北京时间）
     beijing_time=$(TZ='Asia/Shanghai' date +'%Y-%m-%d %H:%M:%S')
     echo -e "${BLUE}北京时间: ${NC}$beijing_time"
 
