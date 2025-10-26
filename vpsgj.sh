@@ -65,7 +65,7 @@ show_menu() {
     clear
     echo -e "${CYAN}"
     echo "=========================================="
-    echo "       CGGVPS 脚本管理菜单 v0.8.2         "
+    echo "          VPS 脚本管理菜单 v0.8.2         "
     echo "=========================================="
     echo -e "${NC}"
     echo "1. 系统信息查询"
@@ -237,7 +237,7 @@ bbr_management() {
     echo "0. 返回主菜单"
     echo "------------------------------------------"
     read -p "请输入选项: " bbr_choice
-    case $bbr_choice 在
+    case $bbr_choice in
         0) return ;;
         *) echo -e "${YELLOW}功能占位，请提供 BBR 完整函数代码。${NC}"; read -p "按回车键继续..." ;;
     esac
@@ -279,7 +279,7 @@ advanced_firewall_menu() {
         echo "=========================================="
         echo "              高级防火墙管理              "
         echo "=========================================="
-        if command -v iptables &>/dev/null; 键，然后
+        if command -v iptables &>/dev/null; then
             echo -e "${BLUE}当前防火墙 (iptables/nftables) 状态:${NC}"
             iptables -L INPUT -n --line-numbers 2>/dev/null | head -n 5
         fi
