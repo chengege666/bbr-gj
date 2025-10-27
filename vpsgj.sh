@@ -1345,13 +1345,13 @@ vps_speed_test() {
     echo -e "${BLUE}来源: NodeQuality.com${NC}"
     
     # 检查是否安装curl
-    if ! command -v curl &> /dev/null; then
+    if ! command -v curl > /dev/null 2>&1; then
         echo -e "${YELLOW}未检测到curl，正在尝试安装...${NC}"
-        if command -v apt &> /dev/null; then
+        if command -v apt > /dev/null 2>&1; then
             apt update -y && apt install -y curl
-        elif command -v yum &> /dev/null; then
+        elif command -v yum > /dev/null 2>&1; then
             yum install -y curl
-        elif command -v dnf &> /dev/null; then
+        elif command -v dnf > /dev/null 2>&1; then
             dnf install -y curl
         else
             echo -e "${RED}无法安装curl，请手动安装后重试${NC}"
@@ -1389,13 +1389,13 @@ network_health_check() {
     echo "• 详细的诊断报告"
     
     # 检查是否安装curl
-    if ! command -v curl &> /dev/null; 键，然后
+    if ! command -v curl > /dev/null 2>&1; then
         echo -e "${YELLOW}未检测到curl，正在尝试安装...${NC}"
-        if command -v apt &> /dev/null; then
+        if command -v apt > /dev/null 2>&1; then
             apt update -y && apt install -y curl
-        elif command -v yum &> /dev/null; 键，然后
+        elif command -v yum > /dev/null 2>&1; then
             yum install -y curl
-        elif command -v dnf &> /dev/null; 键，然后
+        elif command -v dnf > /dev/null 2>&1; then
             dnf install -y curl
         else
             echo -e "${RED}无法安装curl，请手动安装后重试${NC}"
