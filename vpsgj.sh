@@ -1199,7 +1199,7 @@ EOF
         echo -e " - ${CYAN}Email:${RESET}    admin@example.com"
         echo -e " - ${CYAN}Password:${RESET} changeme"
     else
-        echo -e "${RED}❌❌ Nginx Proxy Manager 安装失败，请检查 Docker 环境和日志。${RESET}"
+        echo -e "${RED}❌❌❌❌ Nginx Proxy Manager 安装失败，请检查 Docker 环境和日志。${RESET}"
     fi
 }
 
@@ -1276,7 +1276,7 @@ npm_menu() {
         echo -e "${CYAN}=== Nginx Proxy Manager 管理 ===${RESET}"
         
         # 检查安装状态
-        if [ -f "$NPM_COMPOSE_FILE" ]; 键，然后
+        if [ -f "$NPM_COMPOSE_FILE" ]; then
             # 尝试获取运行状态
             if docker ps --format '{{.Image}}' | grep -q "jc21/nginx-proxy-manager"; then
                  echo -e "${GREEN}状态: 已安装并正在运行${RESET}"
@@ -1302,7 +1302,7 @@ npm_menu() {
         echo ""
         read -p "请输入你的选择: " choice
 
-        case "$choice" 在
+        case "$choice" in
             1) install_npm ;;
             2) uninstall_npm ;;
             3) manage_npm_service "start" ;;
