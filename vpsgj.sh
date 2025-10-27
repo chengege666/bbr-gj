@@ -1072,7 +1072,7 @@ reboot_server() {
     echo "=========================================="
     echo -e "${NC}"
     
-    echo -e "${RED}!!! 警告：此操作将立即重启您的服务器！ !!!${NC}"
+    echo -e "${RED}!!! 警告：此操作将立即重启您的服务器！手动重启命令 reboot !!!${NC}"
     read -p "确定要重启吗？(y/N): " confirm
     
     if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then
