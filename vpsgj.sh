@@ -1306,8 +1306,8 @@ vps_network_test_menu() {
         echo "            VPS网络全面测试             "
         echo "=========================================="
         echo -e "${NC}"
-        echo "1. 网络速度测速"
-        echo "2. 网络质量体检"
+        echo "1. 网络速度测速（完整测速NodeQuality）"
+        echo "2. 网络质量体检"（延迟测速）
         echo "0. 返回主菜单"
         echo "=========================================="
 
@@ -1338,7 +1338,7 @@ vps_network_test_menu() {
 vps_speed_test() {
     clear
     echo -e "${CYAN}=========================================="
-    echo "              网络速度测速                "
+    echo "         网络速度测速（NodeQuality）           "
     echo "=========================================="
     echo -e "${NC}"
     echo -e "${YELLOW}正在下载并运行网络测速脚本...${NC}"
@@ -1377,7 +1377,7 @@ vps_speed_test() {
 network_health_check() {
     clear
     echo -e "${CYAN}=========================================="
-    echo "              网络质量体检                "
+    echo "             网络质量延迟脚本                "
     echo "=========================================="
     echo -e "${NC}"
     echo -e "${YELLOW}正在下载并运行网络质量检测脚本...${NC}"
