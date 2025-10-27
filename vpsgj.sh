@@ -83,25 +83,63 @@ show_menu() {
 # -------------------------------
 system_info() {
     clear; echo -e "${CYAN}"; echo "=========================================="; echo "              系统信息查询                "; echo "=========================================="; echo -e "${NC}"
-    echo -e "${BLUE}主机名: ${GREEN}$(hostname)${NC}"
-    if [ -f /etc/os-release ]; then source /etc/os-release; echo -e "${BLUE}操作系统: ${NC}$PRETTY_NAME"; else echo -e "${BLUE}操作系统: ${NC}未知"; fi
-    echo -e "${BLUE}内核版本: ${NC}$(uname -r)"
-    cpu_model=$(grep 'model name' /proc/cpuinfo | head -1 | cut -d ':' -f2 | sed 's/^ *//')
-    cpu_cores=$(grep -c '^processor' /proc/cpuinfo)
-    echo -e "${BLUE}CPU型号: ${NC}$cpu_model"; echo -e "${BLUE}CPU核心数: ${NC}$cpu_cores"
-    total_mem=$(free -m | awk '/Mem:/ {print $2}'); available_mem=$(free -m | awk '/Mem:/ {print $7}')
-    echo -e "${BLUE}总内存: ${NC}${total_mem}MB"; echo -e "${BLUE}可用内存: ${NC}${available_mem}MB"
-    disk_usage=$(df -h / | awk 'NR==2 {print $5}'); disk_total=$(df -h / | awk 'NR==2 {print $2}'); disk_used=$(df -h / | awk 'NR==2 {print $3}')
-    echo -e "${BLUE}根分区使用率: ${NC}$disk_usage (已用 ${disk_used} / 总共 ${disk_total})"
-    ipv4=$(curl -s --connect-timeout 2 ipv4.icanhazip.com); if [ -z "$ipv4" ]; then ipv4=$(curl -s --connect-timeout 2 ipv4.ip.sb); fi
-    if [ -z "$ipv4" ]; then ipv4="${RED}无法获取${NC}"; else ipv4="${YELLOW}$ipv4${NC}"; fi; echo -e "${BLUE}公网IPv4: $ipv4"
-    ipv6=$(curl -s --connect-timeout 2 ipv6.icanhazip.com); if [ -z "$ipv6" ]; then ipv6=$(curl -s --connect-timeout 2 ipv6.ip.sb); fi
-    if [ -z "$ipv6" ]; then ipv6="${RED}未检测到${NC}"; else ipv6="${YELLOW}$ipv6${NC}"; fi; echo -e "${BLUE}公网IPv6: $ipv6"
-    echo -e "${BLUE}BBR状态: ${NC}"; check_bbr
-    uptime_info=$(uptime -p | sed 's/up //'); echo -e "${BLUE}系统运行时间: ${NC}$uptime_info"
-    beijing_time=$(TZ='Asia/Shanghai' date +'%Y-%m-%d %H:%M:%S'); echo -e "${BLUE}北京时间: ${NC}$beijing_time"
-    echo -e "${CYAN}"; echo "=========================================="; echo -e "${NC}"; read -p "按回车键返回主菜单..."
+    # 操作系统信息
+    echo -e "${GREEN}操作系统:${RESET} $(cat /etc/os-release | grep PRETTY_NAME | cut -d "=" -f 2 | tr -d '"' 2>/dev/null || echo '未知')"
+    echo -e "${GREEN}系统架构:${RESET} $(uname -m)"
+    echo -e "${GREEN}内核版本:${RESET} $(uname -r)"
+    echo -e "${GREEN}主机名:${RESET} $(hostname)"
+    
+    # CPU信息
+    echo -e "${GREEN}CPU型号:${RESET} $(grep -m1 'model name' /proc/cpuinfo | awk -F': ' '{print $2}' 2>/dev/null || echo '未知')"
+    echo -e "${GREEN}CPU核心数:${RESET} $(grep -c 'processor' /proc/cpuinfo 2>/dev/null || echo '未知')"
+    echo -e "${GREEN}CPU频率:${RESET} $(grep -m1 'cpu MHz' /proc/cpuinfo | awk -F': ' '{print $2}' 2>/dev/null || echo '未知') MHz"
+    
+    # 内存信息
+    MEM_TOTAL=$(free -h | grep Mem | awk '{print $2}' 2>/dev/null || echo '未知')
+    MEM_USED=$(free -h | grep Mem | awk '{print $3}' 2>/dev/null || echo '未知')
+    MEM_FREE=$(free -h | grep Mem | awk '{print $4}' 2>/dev/null || echo '未知')
+    echo -e "${GREEN}内存总量:${RESET} $MEM_TOTAL | ${GREEN}已用:${RESET} $MEM_USED | ${GREEN}可用:${RESET} $MEM_FREE"
+    
+    # Swap信息
+    SWAP_TOTAL=$(free -h | grep Swap | awk '{print $2}' 2>/dev/null || echo '未知')
+    SWAP_USED=$(free -h | grep Swap | awk '{print $3}' 2>/dev/null || echo '未知')
+    SWAP_FREE=$(free -h | grep Swap | awk '{print $4}' 2>/dev/null || echo '未知')
+    echo -e "${GREEN}Swap总量:${RESET} $SWAP_TOTAL | ${GREEN}已用:${RESET} $SWAP_USED | ${GREEN}可用:${RESET} $SWAP_FREE"
+    
+    # 磁盘信息
+    echo -e "${GREEN}磁盘使用情况:${RESET}"
+    df -h | grep -E '^(/dev/|Filesystem)' | head -5
+    
+    # 网络信息
+    echo -e "${GREEN}公网IPv4:${RESET} $(curl -s4 ifconfig.me 2>/dev/null || echo '获取失败')"
+    echo -e "${GREEN}公网IPv6:${RESET} $(curl -s6 ifconfig.me 2>/dev/null || echo '获取失败')"
+    echo -e "${GREEN}内网IP:${RESET} $(hostname -I 2>/dev/null || ip addr show | grep -E 'inet (192\.168|10\.|172\.)' | head -1 | awk '{print $2}' || echo '未知')"
+    
+    # BBR信息
+    CURRENT_BBR=$(sysctl net.ipv4.tcp_congestion_control 2>/dev/null | awk '{print $3}')
+    CURRENT_QDISC=$(sysctl net.core.default_qdisc 2>/dev/null | awk '{print $3}')
+    echo -e "${GREEN}当前拥塞控制算法:${RESET} $CURRENT_BBR"
+    echo -e "${GREEN}当前队列规则:${RESET} $CURRENT_QDISC"
+    
+    # GLIBC信息
+    GLIBC_VERSION=$(ldd --version 2>/dev/null | head -n1 | awk '{print $NF}')
+    if [ -z "$GLIBC_VERSION" ]; then
+        GLIBC_VERSION="未知"
+    fi
+    echo -e "${GREEN}GLIBC版本:${RESET} $GLIBC_VERSION"
+    
+    # 系统运行状态
+    echo -e "${GREEN}系统运行时间:${RESET} $(uptime -p 2>/dev/null || uptime | awk '{print $3,$4,$5}' | sed 's/,//g')"
+    echo -e "${GREEN}系统负载:${RESET} $(uptime | awk -F'load average: ' '{print $2}' 2>/dev/null || echo '未知')"
+    echo -e "${GREEN}当前登录用户:${RESET} $(who | wc -l 2>/dev/null || echo '未知')"
+    
+    # 进程信息
+    echo -e "${GREEN}运行进程数:${RESET} $(ps aux | wc -l 2>/dev/null || echo '未知')"
+    
+    echo ""
+    read -n1 -p "按任意键返回菜单..."
 }
+
 # -------------------------------
 # 系统更新函数
 # -------------------------------
