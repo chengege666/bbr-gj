@@ -173,6 +173,51 @@ basic_tools() {
 }
 
 # -------------------------------
+# BBR 管理主菜单
+# -------------------------------
+bbr_management() {
+    while true; do
+        clear
+        echo -e "${CYAN}"
+        echo "=========================================="
+        echo "                 BBR管理                  "
+        echo "=========================================="
+        echo -e "${NC}"
+        # 实时显示BBR状态
+        echo -e "${BLUE}当前BBR状态: ${NC}"
+        check_bbr # 调用您已有的检查函数
+        echo "------------------------------------------"
+        echo "1. BBR 综合测速 (BBR, BBR Plus, BBRv2, BBRv3)"
+        echo "2. 安装/切换 BBR 内核 (使用 ylx2016 脚本)"
+        echo "3. 查看系统详细信息 (含BBR状态)"
+        echo "0. 返回主菜单"
+        echo "=========================================="
+
+        read -p "请输入你的选择: " bbr_choice
+
+        case $bbr_choice in
+            1)
+                bbr_test_menu
+                ;;
+            2)
+                run_bbr_switch
+                ;;
+            3)
+                show_sys_info
+                ;;
+            0)
+                echo "返回主菜单..."
+                break
+                ;;
+            *)
+                echo -e "${RED}无效选择，请重新输入${NC}"
+                read -p "按回车键继续..."
+                ;;
+        esac
+    done
+}
+
+# -------------------------------
 # 核心功能：BBR 测速
 # -------------------------------
 run_test() {
