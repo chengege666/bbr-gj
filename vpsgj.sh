@@ -13,12 +13,16 @@ NC='\033[0m' # 重置颜色
 # 结果文件路径
 RESULT_FILE="/tmp/bbr_test_results.txt"
 
+# Nginx Proxy Manager 相关配置
+NPM_DIR="/opt/nginx-proxy-manager"
+NPM_COMPOSE_FILE="$NPM_DIR/docker-compose.yml"
+
 # -------------------------------
 # root 权限检查
 # -------------------------------
 check_root() {
     if [ "$(id -u)" -ne 0 ]; then
-        echo -e "${RED}❌❌ 错误：请使用 root 权限运行本脚本${NC}"
+        echo -e "${RED}❌❌❌❌ 错误：请使用 root 权限运行本脚本${NC}"
         echo "👉 使用方法: sudo bash $0"
         exit 1
     fi
