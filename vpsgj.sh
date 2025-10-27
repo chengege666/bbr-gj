@@ -1073,26 +1073,25 @@ reboot_server() {
     echo -e "${NC}"
     
     echo -e "${RED}!!! 警告：此操作将立即重启您的服务器！ !!!${NC}"
-    read -p "确定要重启吗？(y/N): " confirm
+    read -p "确定要立即重启吗？(y/N): " confirm
 
     if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then
-        echo -e "${YELLOW}将在 5 秒后重启服务器，请保存您的工作...${NC}"
-        sleep 5
+        echo -e "${YELLOW}正在重启服务器...${NC}"
 
-        # 检查当前用户是否为 root
+        # 判断是否为root用户
         if [[ $EUID -ne 0 ]]; then
-            echo -e "${YELLOW}正在尝试使用 sudo 执行重启...${NC}"
+            # 普通用户使用sudo
             if command -v shutdown >/dev/null 2>&1; then
-                sudo shutdown -r now "System reboot initiated by script"
+                sudo shutdown -r now
             elif command -v reboot >/dev/null 2>&1; then
                 sudo reboot
             else
                 sudo init 6
             fi
         else
-            echo -e "${YELLOW}正在执行系统重启...${NC}"
+            # root用户直接执行
             if command -v shutdown >/dev/null 2>&1; then
-                shutdown -r now "System reboot initiated by script"
+                shutdown -r now
             elif command -v reboot >/dev/null 2>&1; then
                 reboot
             else
@@ -1101,7 +1100,6 @@ reboot_server() {
         fi
     else
         echo -e "${YELLOW}操作已取消。${NC}"
-        read -p "按回车键继续..."
     fi
 }
 
