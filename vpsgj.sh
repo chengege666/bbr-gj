@@ -1306,8 +1306,8 @@ vps_network_test_menu() {
         echo "            VPS网络全面测试             "
         echo "=========================================="
         echo -e "${NC}"
-        echo "1. 网络速度测速 (NodeQuality)"
-        echo "2. 网络质量体检 (Check.Place)"
+        echo "1. 网络速度测速"
+        echo "2. 网络质量体检"
         echo "0. 返回主菜单"
         echo "=========================================="
 
