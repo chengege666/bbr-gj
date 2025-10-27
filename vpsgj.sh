@@ -1188,6 +1188,70 @@ EOF
 }
 
 # -------------------------------
+# 查看端口占用状态
+# -------------------------------
+check_port_usage() {
+    clear
+    echo -e "${CYAN}=========================================="
+    echo "              查看端口占用状态            "
+    echo "==========================================${NC}"
+    echo ""
+
+    # 检查必要命令
+    if ! command -v ss >/dev/null 2>&1 && ! command -v netstat >/dev/null 2>&1; then
+        echo -e "${YELLOW}未检测到 ss 或 netstat 工具，正在安装...${NC}"
+        if command -v apt >/dev/null 2>&1; then
+            apt update -y && apt install -y net-tools
+        elif command -v yum >/dev/null 2>&1; then
+            yum install -y net-tools
+        elif command -v dnf >/dev/null 2>&1; then
+            dnf install -y net-tools
+        fi
+    fi
+
+    echo "请选择操作："
+    echo "1. 查看所有被占用的端口"
+    echo "2. 查询指定端口的占用情况"
+    echo "0. 返回上级菜单"
+    echo "=========================================="
+    read -p "请输入选项编号: " port_choice
+
+    case $port_choice in
+        1)
+            echo ""
+            echo -e "${GREEN}当前被占用的端口及进程信息:${NC}"
+            if command -v ss >/dev/null 2>&1; then
+                ss -tulpen
+            else
+                netstat -tulpen
+            fi
+            ;;
+        2)
+            read -p "请输入要查询的端口号: " port
+            if [ -z "$port" ]; then
+                echo -e "${YELLOW}未输入端口号，操作取消。${NC}"
+            else
+                echo ""
+                echo -e "${GREEN}端口 ${port} 的占用情况:${NC}"
+                if command -v ss >/dev/null 2>&1; then
+                    ss -tulpen | grep ":${port}\b" || echo -e "${RED}未找到端口 ${port} 的占用信息。${NC}"
+                else
+                    netstat -tulpen | grep ":${port}\b" || echo -e "${RED}未找到端口 ${port} 的占用信息。${NC}"
+                fi
+            fi
+            ;;
+        0)
+            return
+            ;;
+        *)
+            echo -e "${RED}无效的选项，请重新输入！${NC}"
+            ;;
+    esac
+    echo ""
+    read -p "按回车键继续..."
+}
+
+# -------------------------------
 # 系统工具主菜单 (更新，调用实际函数)
 # -------------------------------
 system_tools_menu() {
@@ -1208,6 +1272,7 @@ system_tools_menu() {
         echo "8. 重启服务器"
         echo "9. 卸载本脚本"
         echo "10. Nginx Proxy Manager 管理"
+        echo "11. 查看端口占用状态"
         echo "0. 返回主菜单"
         echo "=========================================="
 
@@ -1224,6 +1289,7 @@ system_tools_menu() {
             8) reboot_server ;;
             9) uninstall_script ;;
             10) nginx_proxy_manager_menu ;;
+            11) check_port_usage ;;
             0) return ;;
             *) echo -e "${RED}无效的选项，请重新输入！${NC}"; sleep 1 ;;
         esac
