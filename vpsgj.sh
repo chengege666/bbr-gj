@@ -172,153 +172,156 @@ basic_tools() {
     echo -e "${CYAN}"; echo "=========================================="; echo -e "${NC}"; read -p "按回车键返回主菜单..."
 }
 
-# BBR 管理函数
+# -------------------------------
+# 核心功能：BBR 测速
+# -------------------------------
 run_test() {
-    local mode="$1"
-    local result=""
-    if ! command -v speedtest >/dev/null 2>&1; then
-        echo -e "${RED}❌❌ 错误：未安装 'speedtest-cli' 或 'speedtest' 命令。${NC}"
-        echo -e "${YELLOW}请先安装 speedtest-cli (如：pip install speedtest-cli)。${NC}"
-        return 1
-    fi
-    echo -e "${YELLOW}正在测试: $mode${NC}"
+    MODE=$1
+    echo -e "${CYAN}>>> 切换到 $MODE 并测速...${RESET}" 
     
-    # 保存当前拥塞控制算法
-    local current_cc=$(sysctl net.ipv4.tcp_congestion_control | awk '{print $3}')
-    
-    # 仅尝试设置支持的算法
-    case "$mode" in
-        "BBR")
+    # 切换算法
+    case $MODE in
+        "BBR") 
+            modprobe tcp_bbr >/dev/null 2>&1
+            sysctl -w net.core.default_qdisc=fq >/dev/null 2>&1
             sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
             ;;
-        "BBR Plus"|"BBRv2"|"BBRv3")
-            # 检查是否支持该算法
-            if ! sysctl net.ipv4.tcp_available_congestion_control | grep -q "${mode,,}"; then
-                echo -e "${RED}❌ 不支持 $mode 算法${NC}"
-                echo "$mode: 不支持" >> "$RESULT_FILE"
-                return 1
-            fi
-            sysctl -w net.ipv4.tcp_congestion_control="${mode,,}" >/dev/null 2>&1
+        "BBR Plus") 
+            modprobe tcp_bbrplus >/dev/null 2>&1
+            sysctl -w net.core.default_qdisc=fq >/dev/null 2>&1
+            sysctl -w net.ipv4.tcp_congestion_control=bbrplus >/dev/null 2>&1
             ;;
-        *)
-            echo -e "${RED}未知模式: $mode${NC}"
-            return 1
+        "BBRv2") 
+            modprobe tcp_bbrv2 >/dev/null 2>&1
+            sysctl -w net.core.default_qdisc=fq >/dev/null 2>&1
+            sysctl -w net.ipv4.tcp_congestion_control=bbrv2 >/dev/null 2>&1
+            ;;
+        "BBRv3") 
+            modprobe tcp_bbrv3 >/dev/null 2>&1
+            sysctl -w net.core.default_qdisc=fq >/dev/null 2>&1
+            sysctl -w net.ipv4.tcp_congestion_control=bbrv3 >/dev/null 2>&1
+            ;;
+        *) # 增加一个默认情况以防意外输入，虽然测速模式通常是固定的
+            echo -e "${YELLOW}未知 BBR 模式: $MODE${RESET}"
             ;;
     esac
     
-    local check_cc=$(sysctl net.ipv4.tcp_congestion_control | awk '{print $3}')
-    if [[ "$check_cc" != *"$mode"* ]]; then
-        echo -e "${RED}配置失败: $mode 算法可能未加载或不支持${NC}"
-        echo "$mode: 配置失败/不支持" >> "$RESULT_FILE"
-        # 恢复原始设置
-        sysctl -w net.ipv4.tcp_congestion_control="$current_cc" >/dev/null 2>&1
-        return 1
+    # 执行测速
+    RAW=$(speedtest-cli --simple 2>/dev/null)
+    if [ -z "$RAW" ]; then
+        echo -e "${YELLOW}⚠️ speedtest-cli 失败，尝试替代方法...${RESET}" 
+        RAW=$(curl -s https://raw.githubusercontent.com/sivel/speedtest-cli/master/speedtest.py | python - --simple 2>/dev/null)
     fi
-    
-    result=$(speedtest --simple --timeout 15 2>&1)
-    if echo "$result" | grep -q "ERROR"; then
-        echo -e "${RED}测试失败: $mode${NC}"
-        echo "$mode: 测试失败" >> "$RESULT_FILE"
-    else
-        local ping=$(echo "$result" | grep "Ping" | awk '{print $2}')
-        local download=$(echo "$result" | grep "Download" | awk '{print $2}')
-        local upload=$(echo "$result" | grep "Upload" | awk '{print $2}')
-        echo -e "  ${BLUE}延迟: ${GREEN}$ping ms${NC}"
-        echo -e "  ${BLUE}下载: ${GREEN}$download Mbps${NC}"
-        echo -e "  ${BLUE}上传: ${GREEN}$upload Mbps${NC}"
-        echo "$mode: 延迟 ${ping}ms | 下载 ${download}Mbps | 上传 ${upload}Mbps" >> "$RESULT_FILE"
+
+    if [ -z "$RAW" ]; then
+        echo -e "${RED}$MODE 测速失败${RESET}" | tee -a "$RESULT_FILE" 
+        echo ""
+        return
     fi
-    
-    # 恢复原始设置
-    sysctl -w net.ipv4.tcp_congestion_control="$current_cc" >/dev/null 2>&1
+
+    PING=$(echo "$RAW" | grep "Ping" | awk '{print $2}')
+    DOWNLOAD=$(echo "$RAW" | grep "Download" | awk '{print $2}')
+    UPLOAD=$(echo "$RAW" | grep "Upload" | awk '{print $2}')
+
+    echo -e "${GREEN}$MODE | Ping: ${PING}ms | Down: ${DOWNLOAD} Mbps | Up: ${UPLOAD} Mbps${RESET}" | tee -a "$RESULT_FILE" 
     echo ""
 }
 
+# -------------------------------
+# 功能 1: BBR 综合测速
+# -------------------------------
 bbr_test_menu() {
-    clear
-    echo -e "${CYAN}"
-    echo "=========================================="
-    echo "              BBR 综合测速                "
-    echo "=========================================="
-    echo -e "${NC}"
-    echo -e "${YELLOW}⚠️ 注意：此测试将临时修改网络配置${NC}"
-    echo -e "${YELLOW}测试完成后将恢复原始设置${NC}"
-    echo ""
-    local current_cc=$(sysctl net.ipv4.tcp_congestion_control | awk '{print $3}')
+    echo -e "${CYAN}=== 开始 BBR 综合测速 ===${RESET}"
     > "$RESULT_FILE"
+    
+    # 无条件尝试所有算法
     for MODE in "BBR" "BBR Plus" "BBRv2" "BBRv3"; do
         run_test "$MODE"
     done
-    sysctl -w net.ipv4.tcp_congestion_control="$current_cc" >/dev/null 2>&1
-    echo -e "${CYAN}=== 测试完成，结果汇总 ===${NC}"
+    
+    echo -e "${CYAN}=== 测试完成，结果汇总 (${RESULT_FILE}) ===${RESET}"
     if [ -f "$RESULT_FILE" ] && [ -s "$RESULT_FILE" ]; then
         cat "$RESULT_FILE"
     else
-        echo -e "${YELLOW}无测速结果（请确保已安装 speedtest-cli）${NC}"
+        echo -e "${YELLOW}无测速结果${RESET}"
     fi
-    echo -e "${CYAN}"
-    echo "=========================================="
-    echo -e "${NC}"
-    read -p "按回车键返回BBR管理菜单..."
-}
-
-run_bbr_switch() {
-    clear
-    echo -e "${CYAN}"
-    echo "=========================================="
-    echo "            BBR 内核安装/切换             "
-    echo "=========================================="
-    echo -e "${NC}"
-    echo -e "${YELLOW}正在下载并运行 BBR 切换脚本...${NC}"
-    echo -e "${YELLOW}来源: ylx2016/Linux-NetSpeed${NC}"
     echo ""
-    wget -O tcp.sh "https://github.com/ylx2016/Linux-NetSpeed/raw/master/tcp.sh"
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}❌❌ 下载脚本失败，请检查网络连接${NC}"
-        read -p "按回车键返回BBR管理菜单..."
-        return
-    fi
-    chmod +x tcp.sh
-    ./tcp.sh
-    rm -f tcp.sh
-    echo -e "${CYAN}"
-    echo "=========================================="
-    echo -e "${NC}"
-    read -p "按回车键返回BBR管理菜单..."
+    read -n1 -p "按任意键返回菜单..."
 }
 
-bbr_management() {
-    while true; do
-        clear
-        echo -e "${CYAN}"
-        echo "=========================================="
-        echo "              BBR 管理菜单                "
-        echo "=========================================="
-        echo -e "${NC}"
-        echo "1. BBR综合测速"
-        echo "2. 安装/切换BBR内核"
-        echo "3. 查看当前BBR状态"
-        echo "0. 返回主菜单"
-        echo "=========================================="
-        read -p "请输入选项编号: " bbr_choice
-        case $bbr_choice in
-            1) bbr_test_menu ;;
-            3)
-                clear
-                echo -e "${CYAN}"
-                echo "=========================================="
-                echo "              当前BBR状态                 "
-                echo "=========================================="
-                echo -e "${NC}"
-                check_bbr
-                echo ""
-                read -p "按回车键返回BBR管理菜单..."
-                ;;
-            2) run_bbr_switch ;;
-            0) return ;;
-            *) echo -e "${RED}无效的选项，请重新输入！${NC}"; sleep 1 ;;
-        esac
-    done
+# -------------------------------
+# 功能 2: 安装/切换 BBR 内核
+# -------------------------------
+run_bbr_switch() {
+    echo -e "${CYAN}正在下载并运行 BBR 切换脚本... (来自 ylx2016/Linux-NetSpeed)${RESET}"
+    wget -O tcp.sh "https://github.com/ylx2016/Linux-NetSpeed/raw/master/tcp.sh" && chmod +x tcp.sh && ./tcp.sh
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}❌❌ 下载或运行脚本失败，请检查网络连接${RESET}"
+    fi
+    read -n1 -p "按任意键返回菜单..."
+}
+
+# -------------------------------
+# 功能 3: 系统信息 (增强版，包含BBR类型和GLIBC版本)
+# -------------------------------
+show_sys_info() {
+    echo -e "${CYAN}=== 系统详细信息 ===${RESET}"
+    
+    # 操作系统信息
+    echo -e "${GREEN}操作系统:${RESET} $(cat /etc/os-release | grep PRETTY_NAME | cut -d "=" -f 2 | tr -d '"' 2>/dev/null || echo '未知')"
+    echo -e "${GREEN}系统架构:${RESET} $(uname -m)"
+    echo -e "${GREEN}内核版本:${RESET} $(uname -r)"
+    echo -e "${GREEN}主机名:${RESET} $(hostname)"
+    
+    # CPU信息
+    echo -e "${GREEN}CPU型号:${RESET} $(grep -m1 'model name' /proc/cpuinfo | awk -F': ' '{print $2}' 2>/dev/null || echo '未知')"
+    echo -e "${GREEN}CPU核心数:${RESET} $(grep -c 'processor' /proc/cpuinfo 2>/dev/null || echo '未知')"
+    echo -e "${GREEN}CPU频率:${RESET} $(grep -m1 'cpu MHz' /proc/cpuinfo | awk -F': ' '{print $2}' 2>/dev/null || echo '未知') MHz"
+    
+    # 内存信息
+    MEM_TOTAL=$(free -h | grep Mem | awk '{print $2}' 2>/dev/null || echo '未知')
+    MEM_USED=$(free -h | grep Mem | awk '{print $3}' 2>/dev/null || echo '未知')
+    MEM_FREE=$(free -h | grep Mem | awk '{print $4}' 2>/dev/null || echo '未知')
+    echo -e "${GREEN}内存总量:${RESET} $MEM_TOTAL | ${GREEN}已用:${RESET} $MEM_USED | ${GREEN}可用:${RESET} $MEM_FREE"
+    
+    # Swap信息
+    SWAP_TOTAL=$(free -h | grep Swap | awk '{print $2}' 2>/dev/null || echo '未知')
+    SWAP_USED=$(free -h | grep Swap | awk '{print $3}' 2>/dev/null || echo '未知')
+    SWAP_FREE=$(free -h | grep Swap | awk '{print $4}' 2>/dev/null || echo '未知')
+    echo -e "${GREEN}Swap总量:${RESET} $SWAP_TOTAL | ${GREEN}已用:${RESET} $SWAP_USED | ${GREEN}可用:${RESET} $SWAP_FREE"
+    
+    # 磁盘信息
+    echo -e "${GREEN}磁盘使用情况:${RESET}"
+    df -h | grep -E '^(/dev/|Filesystem)' | head -5
+    
+    # 网络信息
+    echo -e "${GREEN}公网IPv4:${RESET} $(curl -s4 ifconfig.me 2>/dev/null || echo '获取失败')"
+    echo -e "${GREEN}公网IPv6:${RESET} $(curl -s6 ifconfig.me 2>/dev/null || echo '获取失败')"
+    echo -e "${GREEN}内网IP:${RESET} $(hostname -I 2>/dev/null || ip addr show | grep -E 'inet (192\.168|10\.|172\.)' | head -1 | awk '{print $2}' || echo '未知')"
+    
+    # BBR信息
+    CURRENT_BBR=$(sysctl net.ipv4.tcp_congestion_control 2>/dev/null | awk '{print $3}')
+    CURRENT_QDISC=$(sysctl net.core.default_qdisc 2>/dev/null | awk '{print $3}')
+    echo -e "${GREEN}当前拥塞控制算法:${RESET} $CURRENT_BBR"
+    echo -e "${GREEN}当前队列规则:${RESET} $CURRENT_QDISC"
+    
+    # GLIBC信息
+    GLIBC_VERSION=$(ldd --version 2>/dev/null | head -n1 | awk '{print $NF}')
+    if [ -z "$GLIBC_VERSION" ]; then
+        GLIBC_VERSION="未知"
+    fi
+    echo -e "${GREEN}GLIBC版本:${RESET} $GLIBC_VERSION"
+    
+    # 系统运行状态
+    echo -e "${GREEN}系统运行时间:${RESET} $(uptime -p 2>/dev/null || uptime | awk '{print $3,$4,$5}' | sed 's/,//g')"
+    echo -e "${GREEN}系统负载:${RESET} $(uptime | awk -F'load average: ' '{print $2}' 2>/dev/null || echo '未知')"
+    echo -e "${GREEN}当前登录用户:${RESET} $(who | wc -l 2>/dev/null || echo '未知')"
+    
+    # 进程信息
+    echo -e "${GREEN}运行进程数:${RESET} $(ps aux | wc -l 2>/dev/null || echo '未知')"
+    
+    echo ""
+    read -n1 -p "按任意键返回菜单..."
 }
 
 # Docker 相关函数 (修复版)
