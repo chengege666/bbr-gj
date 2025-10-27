@@ -1297,15 +1297,51 @@ system_tools_menu() {
 }
 
 # -------------------------------
-# 运行VPS网络测试
+# VPS网络测试子菜单
 # -------------------------------
-vps_network_test() {
+vps_network_test_menu() {
+    while true; do
+        clear
+        echo -e "${CYAN}=========================================="
+        echo "            VPS网络全面测试             "
+        echo "=========================================="
+        echo -e "${NC}"
+        echo "1. 网络速度测速 (NodeQuality)"
+        echo "2. 网络质量体检 (Check.Place)"
+        echo "0. 返回主菜单"
+        echo "=========================================="
+
+        read -p "请输入选项编号: " network_choice
+
+        case $network_choice in
+            1)
+                vps_speed_test
+                ;;
+            2)
+                network_health_check
+                ;;
+            0)
+                echo "返回主菜单..."
+                break
+                ;;
+            *)
+                echo -e "${RED}无效的选项，请重新输入！${NC}"
+                sleep 1
+                ;;
+        esac
+    done
+}
+
+# -------------------------------
+# 1. 网络速度测速 (原有功能)
+# -------------------------------
+vps_speed_test() {
     clear
     echo -e "${CYAN}=========================================="
-    echo "            VPS网络全面测试             "
+    echo "              网络速度测速                "
     echo "=========================================="
     echo -e "${NC}"
-    echo -e "${YELLOW}正在下载并运行网络测试脚本...${NC}"
+    echo -e "${YELLOW}正在下载并运行网络测速脚本...${NC}"
     echo -e "${BLUE}来源: NodeQuality.com${NC}"
     
     # 检查是否安装curl
@@ -1319,20 +1355,67 @@ vps_network_test() {
             dnf install -y curl
         else
             echo -e "${RED}无法安装curl，请手动安装后重试${NC}"
-            read -p "按回车键返回主菜单..."
+            read -p "按回车键返回..."
             return
         fi
     fi
     
-    # 运行网络测试
-    echo -e "${GREEN}✅ 开始网络测试...${NC}"
+    # 运行网络测速
+    echo -e "${GREEN}✅ 开始网络测速...${NC}"
     echo -e "${YELLOW}这可能需要几分钟时间，请耐心等待...${NC}"
     bash <(curl -sL https://run.NodeQuality.com)
     
     echo -e "${CYAN}"
     echo "=========================================="
     echo -e "${NC}"
-    read -p "测试完成，按回车键返回主菜单..."
+    read -p "测速完成，按回车键返回..."
+}
+
+# -------------------------------
+# 2. 网络质量体检 (新增功能)
+# -------------------------------
+network_health_check() {
+    clear
+    echo -e "${CYAN}=========================================="
+    echo "              网络质量体检                "
+    echo "=========================================="
+    echo -e "${NC}"
+    echo -e "${YELLOW}正在下载并运行网络质量检测脚本...${NC}"
+    echo -e "${BLUE}来源: Check.Place${NC}"
+    echo -e "${GREEN}功能特点:${NC}"
+    echo "• 全面的网络连接质量分析"
+    echo "• 路由追踪和延迟检测"
+    echo "• 网络稳定性评估"
+    echo "• 详细的诊断报告"
+    
+    # 检查是否安装curl
+    if ! command -v curl &> /dev/null; 键，然后
+        echo -e "${YELLOW}未检测到curl，正在尝试安装...${NC}"
+        if command -v apt &> /dev/null; then
+            apt update -y && apt install -y curl
+        elif command -v yum &> /dev/null; 键，然后
+            yum install -y curl
+        elif command -v dnf &> /dev/null; 键，然后
+            dnf install -y curl
+        else
+            echo -e "${RED}无法安装curl，请手动安装后重试${NC}"
+            read -p "按回车键返回..."
+            return
+        fi
+    fi
+    
+    # 运行网络质量体检
+    echo -e "${GREEN}✅ 开始网络质量体检...${NC}"
+    echo -e "${YELLOW}正在进行全面网络诊断，请稍候...${NC}"
+    echo -e "${BLUE}执行命令: bash <(curl -Ls https://Check.Place) -N${NC}"
+    bash <(curl -Ls https://Check.Place) -N
+    
+    echo -e "${CYAN}"
+    echo "=========================================="
+    echo -e "${NC}"
+    echo -e "${GREEN}网络质量体检完成！${NC}"
+    echo -e "${YELLOW}请参考上面的报告了解网络状况${NC}"
+    read -p "按回车键返回..."
 }
 
 # ====================================================================
@@ -1394,7 +1477,7 @@ while true; do
             system_tools_menu
             ;;
         8)
-            vps_network_test
+            vps_network_test_menu
             ;;
         0)
             echo -e "${GREEN}感谢使用，正在退出脚本...${NC}"
