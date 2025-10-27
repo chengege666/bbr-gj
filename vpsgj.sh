@@ -1314,7 +1314,7 @@ npm_menu() {
 }
 
 # -------------------------------
-# 系统工具主菜单 (更新，调用实际函数)
+# 系统工具主菜单 (更新，添加NPM选项)
 # -------------------------------
 system_tools_menu() {
     while true; do
@@ -1333,7 +1333,7 @@ system_tools_menu() {
         echo "7. 修改虚拟内存大小 (Swap)"
         echo "8. 重启服务器"
         echo "9. 卸载本脚本"
-        echo "10.Nginx Proxy Manager反代"
+        echo "10. Nginx Proxy Manager 管理"
         echo "0. 返回主菜单"
         echo "=========================================="
 
@@ -1349,6 +1349,7 @@ system_tools_menu() {
             7) manage_swap ;;
             8) reboot_server ;;
             9) uninstall_script ;;
+            10) npm_menu ;;  # 添加NPM管理菜单
             0) return ;;
             *) echo -e "${RED}无效的选项，请重新输入！${NC}"; sleep 1 ;;
         esac
