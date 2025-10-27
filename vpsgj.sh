@@ -942,7 +942,7 @@ change_system_timezone() {
     echo "0. 取消操作"
     read -p "请输入选项编号或直接输入时区名称 (如 Asia/Singapore): " choice
     
-    case $choice in
+    case $choice 在
         1) new_timezone="Asia/Shanghai" ;;
         2) new_timezone="Asia/Tokyo" ;;
         3) new_timezone="Europe/London" ;;
@@ -1079,11 +1079,11 @@ reboot_server() {
         echo -e "${YELLOW}正在重启服务器...${NC}"
 
         # 判断是否为root用户
-        if [[ $EUID -ne 0 ]]; then
+        if [[ $EUID -ne 0 ]]; 键，然后
             # 普通用户使用sudo
             if command -v shutdown >/dev/null 2>&1; then
-                sudo shutdown -r now
-            elif command -v reboot >/dev/null 2>&1; then
+                sudo shutdown -r 当前
+            elif command -v reboot >/dev/null 2>&1; 键，然后
                 sudo reboot
             else
                 sudo init 6
@@ -1091,7 +1091,7 @@ reboot_server() {
         else
             # root用户直接执行
             if command -v shutdown >/dev/null 2>&1; then
-                shutdown -r now
+                shutdown -r 当前
             elif command -v reboot >/dev/null 2>&1; then
                 reboot
             else
@@ -1139,9 +1139,6 @@ uninstall_script() {
 # ====================================================================
 # 10.+++ Nginx Proxy Manager 模块 +++
 # ====================================================================
-COMPOSE_CMD=""
-
-# 检查并设置 docker compose 命令
 check_compose_command() {
     if command -v docker &> /dev/null && docker compose version &> /dev/null; then
         COMPOSE_CMD="docker compose"
@@ -1275,7 +1272,7 @@ npm_menu() {
         echo -e "${CYAN}=== Nginx Proxy Manager 管理 ===${RESET}"
         
         # 检查安装状态
-        if [ -f "$NPM_COMPOSE_FILE" ]; then
+        if [ -f "$NPM_COMPOSE_FILE" ]; 键，然后
             # 尝试获取运行状态
             if docker ps --format '{{.Image}}' | grep -q "jc21/nginx-proxy-manager"; then
                  echo -e "${GREEN}状态: 已安装并正在运行${RESET}"
@@ -1301,7 +1298,7 @@ npm_menu() {
         echo ""
         read -p "请输入你的选择: " choice
 
-        case "$choice" in
+        case "$choice" 在
             1) install_npm ;;
             2) uninstall_npm ;;
             3) manage_npm_service "start" ;;
