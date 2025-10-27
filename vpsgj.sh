@@ -942,7 +942,7 @@ change_system_timezone() {
     echo "0. 取消操作"
     read -p "请输入选项编号或直接输入时区名称 (如 Asia/Singapore): " choice
     
-    case $choice 在
+    case $choice in
         1) new_timezone="Asia/Shanghai" ;;
         2) new_timezone="Asia/Tokyo" ;;
         3) new_timezone="Europe/London" ;;
@@ -1072,35 +1072,18 @@ reboot_server() {
     echo "=========================================="
     echo -e "${NC}"
     
-    echo -e "${RED}!!! 警告：此操作将立即重启您的服务器！手动重启reboot !!!${NC}"
-    read -p "确定要立即重启吗？(y/N): " confirm
-
+    echo -e "${RED}!!! 警告：此操作将立即重启您的服务器！ !!!${NC}"
+    read -p "确定要重启吗？(y/N): " confirm
+    
     if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then
-        echo -e "${YELLOW}正在重启服务器...${NC}"
-
-        # 判断是否为root用户
-        if [[ $EUID -ne 0 ]]; 键，然后
-            # 普通用户使用sudo
-            if command -v shutdown >/dev/null 2>&1; then
-                sudo shutdown -r 当前
-            elif command -v reboot >/dev/null 2>&1; 键，然后
-                sudo reboot
-            else
-                sudo init 6
-            fi
-        else
-            # root用户直接执行
-            if command -v shutdown >/dev/null 2>&1; then
-                shutdown -r 当前
-            elif command -v reboot >/dev/null 2>&1; then
-                reboot
-            else
-                init 6
-            fi
-        fi
+        echo -e "${YELLOW}正在发送重启命令...${NC}"
+        # 使用 shutdown 命令提供倒计时和警告
+        shutdown -r now "System reboot initiated by script"
     else
         echo -e "${YELLOW}操作已取消。${NC}"
     fi
+    
+    read -p "按回车键继续..."
 }
 
 # -------------------------------
@@ -1134,183 +1117,6 @@ uninstall_script() {
     fi
     
     read -p "按回车键继续..."
-}
-
-# ====================================================================
-# 10.+++ Nginx Proxy Manager 模块 +++
-# ====================================================================
-check_compose_command() {
-    if command -v docker &> /dev/null && docker compose version &> /dev/null; then
-        COMPOSE_CMD="docker compose"
-    elif command -v docker-compose &> /dev/null; then
-        COMPOSE_CMD="docker-compose"
-    else
-        echo -e "${YELLOW}未检测到 Docker Compose。请先从Docker菜单安装Docker环境，它通常会包含Compose插件。${RESET}"
-        return 1
-    fi
-    return 0
-}
-
-# 安装NPM
-install_npm() {
-    if [ -f "$NPM_COMPOSE_FILE" ]; then
-        echo -e "${YELLOW}Nginx Proxy Manager 似乎已经安装在 $NPM_DIR 中。${RESET}"
-        return
-    fi
-    
-    check_compose_command || return
-    
-    echo -e "${CYAN}>>> 准备安装 Nginx Proxy Manager...${RESET}"
-    mkdir -p "$NPM_DIR"
-    
-    # 创建 docker-compose.yml
-    cat > "$NPM_COMPOSE_FILE" << EOF
-version: '3.8'
-services:
-  app:
-    image: 'jc21/nginx-proxy-manager:latest'
-    restart: unless-stopped
-    ports:
-      # Public HTTP Port:
-      - '80:80'
-      # Public HTTPS Port:
-      - '443:443'
-      # Admin Web Port:
-      - '81:81'
-    volumes:
-      - ./data:/data
-      - ./letsencrypt:/etc/letsencrypt
-EOF
-
-    echo -e "${GREEN}docker-compose.yml 文件已创建。${RESET}"
-    echo -e "${CYAN}>>> 正在使用 Docker Compose 启动 Nginx Proxy Manager...${RESET}"
-    
-    # 使用 cd 来避免在命令中指定 -f 和工作目录，更简洁
-    (cd "$NPM_DIR" && $COMPOSE_CMD up -d)
-    
-    if [ $? -eq 0 ]; then
-        echo -e "${GREEN}✅ Nginx Proxy Manager 安装并启动成功！${RESET}"
-        echo -e "${YELLOW}请访问: http://<你的服务器IP>:81${RESET}"
-        echo -e "${YELLOW}默认管理员用户:${RESET}"
-        echo -e " - ${CYAN}Email:${RESET}    admin@example.com"
-        echo -e " - ${CYAN}Password:${RESET} changeme"
-    else
-        echo -e "${RED}❌❌ Nginx Proxy Manager 安装失败，请检查 Docker 环境和日志。${RESET}"
-    fi
-}
-
-# 卸载NPM
-uninstall_npm() {
-    if [ ! -f "$NPM_COMPOSE_FILE" ]; then
-        echo -e "${YELLOW}未在 $NPM_DIR 中找到 Nginx Proxy Manager 的安装。${RESET}"
-        return
-    fi
-    
-    check_compose_command || return
-
-    echo -e "${RED}警告：此操作将停止并彻底删除 Nginx Proxy Manager 及其所有数据（配置、证书等）！${RESET}"
-    read -p "确定要继续吗？(y/N): " confirm
-    if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
-        echo -e "${GREEN}操作已取消。${RESET}"
-        return
-    fi
-    
-    echo -e "${CYAN}>>> 正在停止并删除 Nginx Proxy Manager 容器和卷...${RESET}"
-    (cd "$NPM_DIR" && $COMPOSE_CMD down --volumes)
-    
-    echo -e "${CYAN}>>> 正在删除安装目录...${RESET}"
-    rm -rf "$NPM_DIR"
-    
-    echo -e "${GREEN}✅ Nginx Proxy Manager 已成功卸载。${RESET}"
-}
-
-# NPM 服务管理 (启动、停止、重启、日志)
-manage_npm_service() {
-    if [ ! -f "$NPM_COMPOSE_FILE" ]; then
-        echo -e "${YELLOW}请先安装 Nginx Proxy Manager。${RESET}"
-        return
-    fi
-    check_compose_command || return
-    
-    ACTION=$1
-    echo -e "${CYAN}>>> 正在执行操作: $ACTION...${RESET}"
-    
-    case "$ACTION" in
-        "start" | "stop" | "restart")
-            (cd "$NPM_DIR" && $COMPOSE_CMD $ACTION)
-            ;;
-        "logs")
-            (cd "$NPM_DIR" && $COMPOSE_CMD logs -f --tail=100)
-            ;;
-        *)
-            echo -e "${RED}未知的服务操作: $ACTION${RESET}"
-            ;;
-    esac
-}
-
-# 更新 NPM
-update_npm() {
-    if [ ! -f "$NPM_COMPOSE_FILE" ]; then
-        echo -e "${YELLOW}请先安装 Nginx Proxy Manager。${RESET}"
-        return
-    fi
-    check_compose_command || return
-    
-    echo -e "${CYAN}>>> 正在拉取最新的 Nginx Proxy Manager 镜像...${RESET}"
-    (cd "$NPM_DIR" && $COMPOSE_CMD pull)
-    
-    echo -e "${CYAN}>>> 正在使用新镜像重启服务...${RESET}"
-    (cd "$NPM_DIR" && $COMPOSE_CMD up -d)
-    
-    echo -e "${GREEN}✅ Nginx Proxy Manager 更新完成。${RESET}"
-}
-
-# NPM 主菜单
-npm_menu() {
-    while true; do
-        clear
-        echo -e "${CYAN}=== Nginx Proxy Manager 管理 ===${RESET}"
-        
-        # 检查安装状态
-        if [ -f "$NPM_COMPOSE_FILE" ]; 键，然后
-            # 尝试获取运行状态
-            if docker ps --format '{{.Image}}' | grep -q "jc21/nginx-proxy-manager"; then
-                 echo -e "${GREEN}状态: 已安装并正在运行${RESET}"
-            else
-                 echo -e "${YELLOW}状态: 已安装但未运行${RESET}"
-            fi
-            echo -e "管理面板: ${CYAN}http://$(curl -s4 ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}'):81${RESET}"
-        else
-            echo -e "${RED}状态: 未安装${RESET}"
-        fi
-        
-        echo "------------------------------------------------"
-        echo "1. 安装 Nginx Proxy Manager"
-        echo "2. 卸载 Nginx Proxy Manager"
-        echo ""
-        echo "3. 启动服务"
-        echo "4. 停止服务"
-        echo "5. 重启服务"
-        echo "6. 查看日志"
-        echo "7. 更新版本"
-        echo "------------------------------------------------"
-        echo "0. 返回主菜单"
-        echo ""
-        read -p "请输入你的选择: " choice
-
-        case "$choice" 在
-            1) install_npm ;;
-            2) uninstall_npm ;;
-            3) manage_npm_service "start" ;;
-            4) manage_npm_service "stop" ;;
-            5) manage_npm_service "restart" ;;
-            6) manage_npm_service "logs" ;;
-            7) update_npm ;;
-            0) break ;;
-            *) echo -e "${RED}无效选项${RESET}" ;;
-        esac
-        read -n1 -p "按任意键返回NPM菜单..."
-    done
 }
 
 # -------------------------------
