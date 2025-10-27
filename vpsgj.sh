@@ -13,16 +13,12 @@ NC='\033[0m' # 重置颜色
 # 结果文件路径
 RESULT_FILE="/tmp/bbr_test_results.txt"
 
-# Nginx Proxy Manager 相关配置
-NPM_DIR="/opt/nginx-proxy-manager"
-NPM_COMPOSE_FILE="$NPM_DIR/docker-compose.yml"
-
 # -------------------------------
 # root 权限检查
 # -------------------------------
 check_root() {
     if [ "$(id -u)" -ne 0 ]; then
-        echo -e "${RED}❌❌❌❌ 错误：请使用 root 权限运行本脚本${NC}"
+        echo -e "${RED}❌❌ 错误：请使用 root 权限运行本脚本${NC}"
         echo "👉 使用方法: sudo bash $0"
         exit 1
     fi
@@ -1199,7 +1195,7 @@ EOF
         echo -e " - ${CYAN}Email:${RESET}    admin@example.com"
         echo -e " - ${CYAN}Password:${RESET} changeme"
     else
-        echo -e "${RED}❌❌❌❌ Nginx Proxy Manager 安装失败，请检查 Docker 环境和日志。${RESET}"
+        echo -e "${RED}❌❌ Nginx Proxy Manager 安装失败，请检查 Docker 环境和日志。${RESET}"
     fi
 }
 
@@ -1276,7 +1272,7 @@ npm_menu() {
         echo -e "${CYAN}=== Nginx Proxy Manager 管理 ===${RESET}"
         
         # 检查安装状态
-        if [ -f "$NPM_COMPOSE_FILE" ]; then
+        if [ -f "$NPM_COMPOSE_FILE" ]; 键，然后
             # 尝试获取运行状态
             if docker ps --format '{{.Image}}' | grep -q "jc21/nginx-proxy-manager"; then
                  echo -e "${GREEN}状态: 已安装并正在运行${RESET}"
@@ -1302,7 +1298,7 @@ npm_menu() {
         echo ""
         read -p "请输入你的选择: " choice
 
-        case "$choice" in
+        case "$choice" 在
             1) install_npm ;;
             2) uninstall_npm ;;
             3) manage_npm_service "start" ;;
@@ -1318,7 +1314,7 @@ npm_menu() {
 }
 
 # -------------------------------
-# 系统工具主菜单 (更新，添加NPM选项)
+# 系统工具主菜单 (更新，调用实际函数)
 # -------------------------------
 system_tools_menu() {
     while true; do
@@ -1337,7 +1333,6 @@ system_tools_menu() {
         echo "7. 修改虚拟内存大小 (Swap)"
         echo "8. 重启服务器"
         echo "9. 卸载本脚本"
-        echo "10. Nginx Proxy Manager 管理"
         echo "0. 返回主菜单"
         echo "=========================================="
 
@@ -1353,7 +1348,6 @@ system_tools_menu() {
             7) manage_swap ;;
             8) reboot_server ;;
             9) uninstall_script ;;
-            10) npm_menu ;;  # 添加NPM管理菜单
             0) return ;;
             *) echo -e "${RED}无效的选项，请重新输入！${NC}"; sleep 1 ;;
         esac
