@@ -1333,6 +1333,7 @@ system_tools_menu() {
         echo "7. 修改虚拟内存大小 (Swap)"
         echo "8. 重启服务器"
         echo "9. 卸载本脚本"
+        echo "10.Nginx Proxy Manager反代"
         echo "0. 返回主菜单"
         echo "=========================================="
 
