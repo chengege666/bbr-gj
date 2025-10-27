@@ -1120,6 +1120,74 @@ uninstall_script() {
 }
 
 # -------------------------------
+# 10. Nginx Proxy Manager 管理
+# -------------------------------
+nginx_proxy_manager_menu() {
+    clear
+    echo -e "${CYAN}=========================================="
+    echo "          Nginx Proxy Manager 管理         "
+    echo "=========================================="
+    echo -e "${NC}"
+
+    # 检查 Docker
+    if ! command -v docker >/dev/null 2>&1; then
+        echo -e "${RED}未检测到 Docker，请先安装 Docker。${NC}"
+        read -p "按回车键返回..." 
+        return
+    fi
+
+    echo "1. 安装并启动 Nginx Proxy Manager"
+    echo "2. 停止并删除 Nginx Proxy Manager"
+    echo "3. 查看 NPM 容器日志"
+    echo "4. 查看访问信息"
+    echo "0. 返回上级菜单"
+    read -p "请输入选项编号: " npm_choice
+
+    case $npm_choice in
+        1)
+            mkdir -p /opt/npm
+            cat > /opt/npm/docker-compose.yml <<EOF
+version: '3'
+services:
+  app:
+    image: jc21/nginx-proxy-manager:latest
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "81:81"
+      - "443:443"
+    volumes:
+      - /opt/npm/data:/data
+      - /opt/npm/letsencrypt:/etc/letsencrypt
+EOF
+            cd /opt/npm && docker compose up -d
+            echo -e "${GREEN}✅ Nginx Proxy Manager 已启动！${NC}"
+            echo -e "${YELLOW}默认登录：http://服务器IP:81${NC}"
+            echo -e "${YELLOW}初始账号：admin@example.com / 密码：admin${NC}"
+            ;;
+        2)
+            cd /opt/npm && docker compose down
+            rm -rf /opt/npm
+            echo -e "${GREEN}✅ 已停止并删除 Nginx Proxy Manager 容器和数据${NC}"
+            ;;
+        3)
+            docker logs -f $(docker ps -qf "ancestor=jc21/nginx-proxy-manager:latest")
+            ;;
+        4)
+            echo -e "${GREEN}访问地址: http://$(curl -s4 ifconfig.me):81${NC}"
+            echo -e "${YELLOW}初始登录：admin@example.com / admin${NC}"
+            ;;
+        0)
+            return
+            ;;
+        *)
+            echo -e "${RED}无效选项，请重试${NC}"
+            ;;
+    esac
+    read -p "按回车键继续..."
+}
+
+# -------------------------------
 # 系统工具主菜单 (更新，调用实际函数)
 # -------------------------------
 system_tools_menu() {
@@ -1139,6 +1207,7 @@ system_tools_menu() {
         echo "7. 修改虚拟内存大小 (Swap)"
         echo "8. 重启服务器"
         echo "9. 卸载本脚本"
+        echo "10. Nginx Proxy Manager 管理"
         echo "0. 返回主菜单"
         echo "=========================================="
 
@@ -1154,6 +1223,7 @@ system_tools_menu() {
             7) manage_swap ;;
             8) reboot_server ;;
             9) uninstall_script ;;
+            10) nginx_proxy_manager_menu ;;
             0) return ;;
             *) echo -e "${RED}无效的选项，请重新输入！${NC}"; sleep 1 ;;
         esac
