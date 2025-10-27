@@ -1198,17 +1198,15 @@ system_tools_menu() {
         echo "              系统工具菜单                "
         echo "=========================================="
         echo -e "${NC}"
-        echo "1. 高级防火墙管理"
-        echo "2. 修改登录密码"
-        echo "3. 修改 SSH 连接端口"
-        echo "4. 切换优先 IPV4/IPV6"
-        echo "5. 修改主机名"
-        echo "6. 系统时区调整"
-        echo "7. 修改虚拟内存大小 (Swap)"
-        echo "8. 重启服务器"
-        echo "9. 卸载本脚本"
-        echo "10. Nginx Proxy Manager 管理"
-        echo "0. 返回主菜单"
+
+        # 两竖排菜单布局
+        printf "%-32s %s\n" "1. 高级防火墙管理" "2. 修改登录密码"
+        printf "%-32s %s\n" "3. 修改 SSH 连接端口" "4. 切换优先 IPV4/IPV6"
+        printf "%-32s %s\n" "5. 修改主机名" "6. 系统时区调整"
+        printf "%-32s %s\n" "7. 修改虚拟内存大小 (Swap)" "8. 重启服务器"
+        printf "%-32s %s\n" "9. 卸载本脚本" "10. Nginx Proxy Manager 管理"
+        printf "%-32s %s\n" "0. 返回主菜单" ""
+
         echo "=========================================="
 
         read -p "请输入选项编号: " tools_choice
