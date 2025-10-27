@@ -1191,46 +1191,6 @@ EOF
 # 系统工具主菜单 (更新，调用实际函数)
 # -------------------------------
 system_tools_menu() {
-    # 目标左列显示宽度（以“列”为单位，含中文按2列计）
-    LEFT_COL_WIDTH=38
-
-    # 计算字符串显示宽度（考虑全角/半角），使用 python3
-    display_width() {
-        # 参数：要计算的字符串
-        python3 - <<PY
-import sys,unicodedata
-s = sys.stdin.read()
-w = 0
-for ch in s:
-    # East Asian Width: 'F','W' -> fullwidth/ wide -> treat as 2
-    # 'A','H','Na','N' treat as 1
-    if unicodedata.east_asian_width(ch) in ('F','W'):
-        w += 2
-    else:
-        w += 1
-print(w)
-PY
-    }
-
-    # 输出左列并根据 display width 补空格到 LEFT_COL_WIDTH，然后输出右列
-    print_two_cols() {
-        local left="$1"
-        local right="$2"
-        # 计算宽度（通过管道把字符串传给 python）
-        local width
-        width=$(printf "%s" "$left" | display_width)
-        # 如果计算失败或为空，默认用字符长度（保险）
-        if [ -z "$width" ] || ! [[ "$width" =~ ^[0-9]+$ ]]; then
-            width=$(printf "%s" "$left" | wc -m)
-        fi
-        # 需要补的空格数（至少 2）
-        local pad=$((LEFT_COL_WIDTH - width))
-        if [ $pad -lt 2 ]; then pad=2; fi
-
-        # 打印：左列 + pad 空格 + 右列
-        printf "%s%*s%s\n" "$left" "$pad" "" "$right"
-    }
-
     while true; do
         clear
         echo -e "${CYAN}"
@@ -1238,15 +1198,17 @@ PY
         echo "              系统工具菜单                "
         echo "=========================================="
         echo -e "${NC}"
-
-        # 使用 print_two_cols 输出，左右会按 display width 对齐
-        print_two_cols "1. 高级防火墙管理" "2. 修改登录密码"
-        print_two_cols "3. 修改 SSH 连接端口" "4. 切换优先 IPV4/IPV6"
-        print_two_cols "5. 修改主机名" "6. 系统时区调整"
-        print_two_cols "7. 修改虚拟内存大小 (Swap)" "8. 重启服务器"
-        print_two_cols "9. 卸载本脚本" "10. Nginx Proxy Manager 管理"
-        print_two_cols "0. 返回主菜单" ""
-
+        echo "1. 高级防火墙管理"
+        echo "2. 修改登录密码"
+        echo "3. 修改 SSH 连接端口"
+        echo "4. 切换优先 IPV4/IPV6"
+        echo "5. 修改主机名"
+        echo "6. 系统时区调整"
+        echo "7. 修改虚拟内存大小 (Swap)"
+        echo "8. 重启服务器"
+        echo "9. 卸载本脚本"
+        echo "10. Nginx Proxy Manager 管理"
+        echo "0. 返回主菜单"
         echo "=========================================="
 
         read -p "请输入选项编号: " tools_choice
@@ -1267,7 +1229,6 @@ PY
         esac
     done
 }
-
 
 # -------------------------------
 # 运行VPS网络测试
