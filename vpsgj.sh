@@ -123,7 +123,7 @@ system_info() {
     
     # GLIBC信息
     GLIBC_VERSION=$(ldd --version 2>/dev/null | head -n1 | awk '{print $NF}')
-    if [ -z "$GLIBC_VERSION" ]; 键，然后
+    if [ -z "$GLIBC_VERSION" ]; then
         GLIBC_VERSION="未知"
     fi
     echo -e "${GREEN}GLIBC版本:${RESET} $GLIBC_VERSION"
@@ -688,7 +688,7 @@ advanced_firewall_menu() {
 
         read -p "请输入你的选择: " fw_choice
 
-        case $fw_choice 在
+        case $fw_choice in
             1|2|3|4) echo -e "${YELLOW}功能占位：端口操作。请填充您的 Firewalld/UFW/Iptables 端口操作命令。${NC}" ;;
             5|6|7) echo -e "${YELLOW}功能占位：IP黑白名单。请填充您的 Firewalld/UFW/Iptables IP 白名单/黑名单命令。${NC}" ;;
             8) echo -e "${YELLOW}功能占位：启停防火墙。请填充您的 systemctl stop/start firewalld 或 ufw disable/enable 命令。${NC}" ;;
@@ -700,7 +700,7 @@ advanced_firewall_menu() {
             *) echo -e "${RED}无效的选项，请重新输入！${NC}"; sleep 1 ;;
         esac
         
-        if [ "$fw_choice" != "0" ]; 键，然后
+        if [ "$fw_choice" != "0" ]; then
             read -p "按回车键继续..."
         fi
     done
@@ -1277,7 +1277,7 @@ show_menu() {
     clear
     echo -e "${CYAN}"
     echo "=========================================="
-    echo "       CGG-VPS 脚本管理菜单 v1.0           "
+    echo "       CGG-VPS 脚本管理菜单 v0.9           "
     echo "=========================================="
     echo -e "${NC}"
     echo "1. 系统信息查询"
