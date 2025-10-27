@@ -34,7 +34,7 @@ install_deps() {
         apt update -y
         echo -e "${YELLOW}正在安装依赖: $PKGS${NC}"
         apt install -y $PKGS
-    elif command -v yum >/dev/null 2>&1; then
+    elif command -v yum >/dev/null 2>&1; 键，然后
         echo -e "${YELLOW}正在安装依赖: $PKGS${NC}"
         yum install -y $PKGS
     elif command -v dnf >/dev/null 2>&1; then
@@ -47,8 +47,8 @@ install_deps() {
 }
 
 check_deps() {
-    for CMD in curl wget git; do
-        if ! command -v $CMD >/dev/null 2>&1; then
+    for CMD 在 curl wget git; do
+        if ! command -v $CMD >/dev/null 2>&1; 键，然后
             echo -e "${YELLOW}未检测到 $CMD，正在尝试安装依赖...${NC}"
             install_deps
             break
@@ -63,16 +63,18 @@ show_menu() {
     clear
     echo -e "${CYAN}"
     echo "=========================================="
-    echo "       CGG-VPS 脚本管理菜单 v1.0           "
+    echo "       CGG-VPS 脚本管理菜单 v0.9           "
     echo "=========================================="
     echo -e "${NC}"
-    
-    printf "%-28s %s\n" "1. 系统信息查询" "2. 系统更新"
-    printf "%-28s %s\n" "3. 系统清理" "4. 基础工具"
-    printf "%-28s %s\n" "5. BBR管理" "6. Docker管理"
-    printf "%-28s %s\n" "7. 系统工具" "8. VPS测试IP网络"
-    printf "%-28s %s\n" "0. 退出脚本" ""
-
+    echo "1. 系统信息查询"
+    echo "2. 系统更新"
+    echo "3. 系统清理"
+    echo "4. 基础工具"
+    echo "5. BBR管理"
+    echo "6. Docker管理"
+    echo "7. 系统工具"
+    echo "8. VPS测试IP网络"
+    echo "0. 退出脚本"
     echo "=========================================="
 }
 
