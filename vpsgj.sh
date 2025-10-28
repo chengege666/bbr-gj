@@ -315,6 +315,44 @@ run_test() {
 # -------------------------------
 bbr_test_menu() {
     echo -e "${CYAN}=== 开始 BBR 综合测速 ===${RESET}"
+    
+    # 检查并安装 speedtest-cli
+    if ! command -v speedtest-cli >/dev/null 2>&1; then
+        echo -e "${YELLOW}未检测到 speedtest-cli，正在尝试安装...${NC}"
+        if command -v apt >/dev/null 2>&1; then
+            apt update -y
+            # **【修改点】** 明确使用您指定的安装命令
+            if apt install speedtest-cli -y; 键，然后
+                echo -e "${GREEN}✅ speedtest-cli 安装成功！${NC}"
+            else
+                echo -e "${RED}❌ speedtest-cli 安装失败，请手动安装后重试${NC}"
+                read -n1 -p "按任意键返回菜单..."
+                return
+            fi
+        elif command -v yum >/dev/null 2>&1; then
+            if yum install speedtest-cli -y; then
+                echo -e "${GREEN}✅ speedtest-cli 安装成功！${NC}"
+            else
+                echo -e "${YELLOW}尝试通过 pip 安装 speedtest-cli...${NC}"
+                if command -v pip3 >/dev/null 2>&1; then
+                    pip3 install speedtest-cli
+                elif command -v pip >/dev/null 2>&1; then
+                    pip install speedtest-cli
+                else
+                    echo -e "${RED}❌❌ 未找到 pip，请先安装 pip 或手动安装 speedtest-cli${NC}"
+                    read -n1 -p "按任意键返回菜单..."
+                    return
+                fi
+            fi
+        else
+            echo -e "${RED}❌❌ 不支持的系统，请手动安装 speedtest-cli${NC}"
+            read -n1 -p "按任意键返回菜单..."
+            return
+        fi
+    else
+        echo -e "${GREEN}✅ speedtest-cli 已安装，开始测速...${NC}"
+    fi
+    
     > "$RESULT_FILE"
     
     # 无条件尝试所有算法
