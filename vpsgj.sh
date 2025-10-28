@@ -361,6 +361,7 @@ bbr_test_menu() {
     done
     
     echo -e "${CYAN}=== 测试完成，结果汇总 (${RESULT_FILE}) ===${RESET}"
+    # 【已修正】确保 if 语句格式正确，特别是 [ -s "$RESULT_FILE" ] ; then
     if [ -f "$RESULT_FILE" ] && [ -s "$RESULT_FILE" ]; then
         cat "$RESULT_FILE"
     else
