@@ -373,10 +373,10 @@ bbr_test_menu() {
 # 功能 2: 安装/切换 BBR 内核
 # -------------------------------
 run_bbr_switch() {
-    echo -e "${CYAN}正在下载并运行 BBR 切换脚本... (来自 ylx2016/Linux-NetSpeed)${RESET}"
+    echo -e "${CYAN}正在下载并运行 BBR 切换脚本... \(来自 ylx2016/Linux-NetSpeed\)${RESET}"
     wget -O tcp.sh "https://github.com/ylx2016/Linux-NetSpeed/raw/master/tcp.sh" && chmod +x tcp.sh && ./tcp.sh
     if [ $? -ne 0 ]; then
-        echo -e "${RED}❌❌ 下载或运行脚本失败，请检查网络连接${RESET}"
+        echo -e "${RED}❌❌❌❌ 下载或运行脚本失败，请检查网络连接${RESET}"
     fi
     read -n1 -p "按任意键返回菜单..."
 }
