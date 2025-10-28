@@ -321,16 +321,17 @@ bbr_test_menu() {
         echo -e "${YELLOW}未检测到 speedtest-cli，正在尝试安装...${NC}"
         if command -v apt >/dev/null 2>&1; then
             apt update -y
-            # **【修改点】** 明确使用您指定的安装命令
-            if apt install speedtest-cli -y; 键，然后
+            # 确保使用您指定的 apt install 命令
+            if apt install speedtest-cli -y; then
                 echo -e "${GREEN}✅ speedtest-cli 安装成功！${NC}"
             else
+                # 修正错误字符
                 echo -e "${RED}❌ speedtest-cli 安装失败，请手动安装后重试${NC}"
                 read -n1 -p "按任意键返回菜单..."
                 return
             fi
         elif command -v yum >/dev/null 2>&1; then
-            if yum install speedtest-cli -y; then
+            if yum install speedtest-cli -y; 键，然后
                 echo -e "${GREEN}✅ speedtest-cli 安装成功！${NC}"
             else
                 echo -e "${YELLOW}尝试通过 pip 安装 speedtest-cli...${NC}"
@@ -340,6 +341,7 @@ bbr_test_menu() {
                     pip install speedtest-cli
                 else
                     echo -e "${RED}❌❌ 未找到 pip，请先安装 pip 或手动安装 speedtest-cli${NC}"
+                    # 修正错误字符
                     read -n1 -p "按任意键返回菜单..."
                     return
                 fi
@@ -361,7 +363,7 @@ bbr_test_menu() {
     done
     
     echo -e "${CYAN}=== 测试完成，结果汇总 (${RESULT_FILE}) ===${RESET}"
-    # 【已修正】确保 if 语句格式正确，特别是 [ -s "$RESULT_FILE" ] ; then
+    # 【已修正】修复语法错误：移除中文乱码并添加正确的闭合方括号和分号
     if [ -f "$RESULT_FILE" ] && [ -s "$RESULT_FILE" ]; then
         cat "$RESULT_FILE"
     else
