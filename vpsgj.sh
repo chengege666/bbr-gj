@@ -224,7 +224,7 @@ bbr_management() {
         echo "1. BBR 综合测速 (BBR, BBR Plus, BBRv2, BBRv3)"
         echo "2. 安装/切换 BBR 内核 (使用 ylx2016 脚本)"
         echo "3. 查看系统详细信息 (含BBR状态)"
-        echo "4. speedtest-cli 工具管理 (安装/卸载)"  # <<< 新增功能
+        echo "4. speedtest-cli 测速依赖 (安装/卸载)"  # <<< 新增功能
         echo "0. 返回主菜单"
         echo "=========================================="
         
