@@ -1369,7 +1369,7 @@ system_tools_menu() {
         echo "9. 卸载本脚本"
         echo "10. Nginx Proxy Manager 管理"
         echo "11. 查看端口占用状态"
-        echo "**12. 修改 DNS 服务器**"
+        echo "12. 修改 DNS 服务器"
         echo "0. 返回主菜单"
         echo "=========================================="
 
@@ -1387,7 +1387,7 @@ system_tools_menu() {
             9) uninstall_script ;;
             10) nginx_proxy_manager_menu ;;
             11) check_port_usage ;;
-            **12) change_dns_servers ;;
+            12) change_dns_servers ;;
             0) return ;;
             *) echo -e "${RED}无效的选项，请重新输入！${NC}"; sleep 1 ;;
         esac
