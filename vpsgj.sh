@@ -200,7 +200,7 @@ basic_tools() {
         echo -e "${BLUE}[步骤1/2] 更新软件包列表...${NC}"; apt update -y; echo ""
         echo -e "${BLUE}[步骤2/2] 安装基础工具...${NC}"; apt install -y $DEBIAN_TOOLS; echo ""
         echo -e "${GREEN}基础工具安装完成！${NC}"; echo -e "${YELLOW}已安装工具: $DEBIAN_TOOLS${NC}"
-    elif [ -f /etc/redhat-release ]; 键，然后
+    elif [ -f /etc/redhat-release ]; then
         echo -e "${BLUE}检测到 CentOS/RHEL 系统${NC}"; echo -e "${YELLOW}开始安装基础工具...${NC}"; echo ""
         echo -e "${BLUE}[步骤1/1] 安装基础工具...${NC}"; yum install -y epel-release; yum install -y $REDHAT_TOOLS; echo ""
         echo -e "${GREEN}基础工具安装完成！${NC}"; echo -e "${YELLOW}已安装工具: $REDHAT_TOOLS${NC}"
@@ -211,7 +211,7 @@ basic_tools() {
 }
 
 # -------------------------------
-# BBR 管理主菜单
+# BBR 管理函数
 # -------------------------------
 bbr_management() {
     while true; do
@@ -359,7 +359,7 @@ show_sys_info() {
 }
 
 # -------------------------------
-# speedtest-cli 管理函数
+# speedtest-cli 管理函数 (新增)
 # -------------------------------
 manage_speedtest_cli() {
     clear
