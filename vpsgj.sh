@@ -359,7 +359,7 @@ show_sys_info() {
 }
 
 # -------------------------------
-# speedtest-cli 管理函数 (新增)
+# speedtest-cli 管理函数
 # -------------------------------
 manage_speedtest_cli() {
     clear
