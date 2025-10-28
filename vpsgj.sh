@@ -200,7 +200,7 @@ basic_tools() {
         echo -e "${BLUE}[步骤1/2] 更新软件包列表...${NC}"; apt update -y; echo ""
         echo -e "${BLUE}[步骤2/2] 安装基础工具...${NC}"; apt install -y $DEBIAN_TOOLS; echo ""
         echo -e "${GREEN}基础工具安装完成！${NC}"; echo -e "${YELLOW}已安装工具: $DEBIAN_TOOLS${NC}"
-    elif [ -f /etc/redhat-release ]; then
+    elif [ -f /etc/redhat-release ]; 键，然后
         echo -e "${BLUE}检测到 CentOS/RHEL 系统${NC}"; echo -e "${YELLOW}开始安装基础工具...${NC}"; echo ""
         echo -e "${BLUE}[步骤1/1] 安装基础工具...${NC}"; yum install -y epel-release; yum install -y $REDHAT_TOOLS; echo ""
         echo -e "${GREEN}基础工具安装完成！${NC}"; echo -e "${YELLOW}已安装工具: $REDHAT_TOOLS${NC}"
@@ -218,38 +218,36 @@ bbr_management() {
         clear
         echo -e "${CYAN}"
         echo "=========================================="
-        echo "                 BBR管理                  "
+        echo "                BBR 管理菜单              "
         echo "=========================================="
         echo -e "${NC}"
-        # 实时显示BBR状态
-        echo -e "${BLUE}当前BBR状态: ${NC}"
-        check_bbr # 调用您已有的检查函数
-        echo "------------------------------------------"
         echo "1. BBR 综合测速 (BBR, BBR Plus, BBRv2, BBRv3)"
         echo "2. 安装/切换 BBR 内核 (使用 ylx2016 脚本)"
         echo "3. 查看系统详细信息 (含BBR状态)"
+        echo "4. speedtest-cli 工具管理 (安装/卸载)"  # <<< 新增功能
         echo "0. 返回主菜单"
         echo "=========================================="
-
-        read -p "请输入你的选择: " bbr_choice
+        
+        read -p "请输入你的选择 (0-4): " bbr_choice
 
         case $bbr_choice in
             1)
                 bbr_test_menu
                 ;;
             2)
-                run_bbr_switch
+                install_bbr_kernel
                 ;;
             3)
-                show_sys_info
+                show_bbr_status
+                ;;
+            4)
+                manage_speedtest_cli  # <<< 调用新增的 speedtest-cli 管理函数
                 ;;
             0)
-                echo "返回主菜单..."
-                break
+                return
                 ;;
             *)
-                echo -e "${RED}无效选择，请重新输入${NC}"
-                read -p "按回车键继续..."
+                echo -e "${RED}无效选项，请重新输入${NC}"; sleep 1
                 ;;
         esac
     done
@@ -357,6 +355,80 @@ show_sys_info() {
     echo -e "${GREEN}当前队列规则:${RESET} $CURRENT_QDISC"
         
     echo ""
+    read -n1 -p "按任意键返回菜单..."
+}
+
+# -------------------------------
+# speedtest-cli 管理函数 (新增)
+# -------------------------------
+manage_speedtest_cli() {
+    clear
+    echo -e "${CYAN}=========================================="
+    echo "           speedtest-cli 管理             "
+    echo "=========================================="
+    echo -e "${NC}"
+    
+    # 检查当前状态
+    if command -v speedtest-cli >/dev/null 2>&1; then
+        STATUS="${GREEN}✅ 已安装 ${YELLOW}$(speedtest-cli --version 2>/dev/null | head -n 1)${NC}"
+    else
+        STATUS="${RED}❌ 未安装${NC}"
+    fi
+    echo -e "${BLUE}当前状态: $STATUS${NC}"
+    
+    echo "请选择操作："
+    echo "1. 安装/更新 speedtest-cli"
+    echo "2. 卸载 speedtest-cli"
+    echo "0. 返回上级菜单"
+    read -p "请输入选项编号: " choice
+
+    case $choice in
+        1) # 安装/更新
+            echo -e "${YELLOW}正在尝试安装 speedtest-cli...${NC}"
+            if [ -f /etc/debian_version ]; then
+                apt update -y
+                apt install -y speedtest-cli
+            elif [ -f /etc/redhat-release ]; then
+                # RHEL/CentOS 需要 EPEL 源
+                yum install -y epel-release; yum install -y speedtest-cli
+            elif command -v dnf >/dev/null 2>&1; then
+                dnf install -y speedtest-cli
+            else
+                echo -e "${RED}不支持的系统或找不到包管理器，请手动安装。${NC}"
+            fi
+            
+            if command -v speedtest-cli >/dev/null 2>&1; then
+                echo -e "${GREEN}✅ speedtest-cli 安装/更新成功！${NC}"
+            else
+                echo -e "${RED}❌ speedtest-cli 安装失败，请检查系统源。${NC}"
+            fi
+            ;;
+        2) # 卸载
+            echo -e "${YELLOW}正在尝试卸载 speedtest-cli...${NC}"
+            if [ -f /etc/debian_version ]; then
+                apt purge -y speedtest-cli; apt autoremove -y
+            elif [ -f /etc/redhat-release ]; then
+                yum remove -y speedtest-cli
+            elif command -v dnf >/dev/null 2>&1; then
+                dnf remove -y speedtest-cli
+            else
+                echo -e "${RED}不支持的系统或找不到包管理器，请手动卸载。${NC}"
+            fi
+
+            if ! command -v speedtest-cli >/dev/null 2>&1; then
+                echo -e "${GREEN}✅ speedtest-cli 卸载成功！${NC}"
+            else
+                echo -e "${RED}❌ speedtest-cli 卸载失败，请检查系统日志。${NC}"
+            fi
+            ;;
+        0)
+            echo -e "${YELLOW}返回上级菜单...${NC}"
+            return
+            ;;
+        *)
+            echo -e "${RED}无效选项，请重新输入${NC}"
+            ;;
+    esac
     read -n1 -p "按任意键返回菜单..."
 }
 
