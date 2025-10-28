@@ -57,6 +57,46 @@ check_deps() {
 }
 
 # -------------------------------
+# 检查并安装 speedtest-cli (BBR测速专用)
+# -------------------------------
+check_and_install_speedtest() {
+    if ! command -v speedtest-cli >/dev/null 2>&1; then
+        echo -e "${YELLOW}⚠️ 警告：未检测到 'speedtest-cli'。BBR 测速功能需要此工具。${NC}"
+        read -r -p "是否现在安装 'speedtest-cli'? (y/n): " install_choice
+        
+        if [[ "$install_choice" =~ ^[Yy]$ ]]; then
+            echo -e "${BLUE}正在尝试安装 'speedtest-cli'... (优先使用 pip3)${NC}"
+            
+            # 1. 尝试使用 pip3 安装 (需要系统已安装 python3-pip)
+            if command -v pip3 >/dev/null 2>&1; then
+                pip3 install speedtest-cli
+            # 2. 尝试使用系统包管理器安装
+            elif command -v apt >/dev/null 2>&1; then
+                apt update -y
+                apt install speedtest-cli -y
+            elif command -v yum >/dev/null 2>&1; then
+                yum install -y epel-release # 确保 epel 源
+                yum install speedtest-cli -y
+            elif command -v dnf >/dev/null 2>&1; then
+                dnf install speedtest-cli -y
+            fi
+            
+            # 3. 检查安装结果
+            if command -v speedtest-cli >/dev/null 2>&1; then
+                echo -e "${GREEN}✅ 'speedtest-cli' 安装成功！${NC}"
+            else
+                echo -e "${RED}❌ 'speedtest-cli' 安装失败，请检查您的系统环境或手动安装。${NC}"
+                return 1 # 安装失败则返回错误状态
+            fi
+        else
+            echo -e "${RED}👎🏻 您选择了跳过安装。BBR 测速功能已取消。${NC}"
+            return 1 # 跳过安装则返回错误状态
+        fi
+    fi
+    return 0 # 安装或已存在则返回成功状态
+}
+
+# -------------------------------
 # 显示主菜单函数
 # -------------------------------
 show_menu() {
@@ -259,8 +299,22 @@ bbr_management() {
 # 核心功能：BBR 测速
 # -------------------------------
 run_test() {
-    MODE=$1
-    echo -e "${CYAN}>>> 切换到 $MODE 并测速...${RESET}" 
+    local MODE="$1"
+
+    # +++ 在测速开始前添加检查 +++
+    if ! check_and_install_speedtest; then
+        echo -e "${YELLOW}⚠️ 无法进行 ${MODE} 测速，缺少依赖。${NC}"
+        return
+    fi
+    # ++++++++++++++++++++++++++++++
+    
+    # ... 后面的测速代码保持不变 ...
+    
+    # 原始的测速代码（作为参考）：
+    RAW=$(speedtest-cli --simple 2>/dev/null)
+    
+    # ...
+} 
     
     # 切换算法
     case $MODE in
