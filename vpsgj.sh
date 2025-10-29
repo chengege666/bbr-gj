@@ -161,53 +161,179 @@ system_update() {
     fi
     echo -e "${CYAN}"; echo "=========================================="; echo -e "${NC}"; read -p "按回车键返回主菜单..."
 }
+
 # -------------------------------
-# 系统清理函数
+# 系统清理函数 (优化版)
 # -------------------------------
 system_clean() {
-    clear; echo -e "${CYAN}"; echo "=========================================="; echo "              系统清理功能                "; echo "=========================================="; echo -e "${NC}"
-    echo -e "${YELLOW}⚠️ 警告：系统清理操作将删除不必要的文件，请谨慎操作！${NC}"; echo ""
+    clear
+    echo -e "${CYAN}"
+    echo "=========================================="
+    echo "              系统清理功能 (优化版)       "
+    echo "=========================================="
+    echo -e "${NC}"
+    
+    echo -e "${YELLOW}⚠️ 警告：系统清理操作将删除不必要的文件，请谨慎操作！${NC}"
+    echo ""
     read -p "是否继续执行系统清理？(y/n): " confirm
-    if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then echo -e "${YELLOW}已取消系统清理操作${NC}"; read -p "按回车键返回主菜单..."; return; fi
-    if [ -f /etc/debian_version ]; then
-        echo -e "${BLUE}检测到 Debian/Ubuntu 系统${NC}"; echo -e "${YELLOW}开始清理系统...${NC}"; echo ""
-        echo -e "${BLUE}[步骤1/4] 清理APT缓存...${NC}"; apt clean; echo ""
-        echo -e "${BLUE}[步骤2/4] 清理旧内核...${NC}"; apt autoremove --purge -y; echo ""
-        echo -e "${BLUE}[步骤3/4] 清理日志文件...${NC}"; journalctl --vacuum-time=1d; find /var/log -type f -regex ".*\.gz$" -delete; find /var/log -type f -regex ".*\.[0-9]$" -delete; echo ""
-        echo -e "${BLUE}[步骤4/4] 清理临时文件...${NC}"; rm -rf /tmp/*; rm -rf /var/tmp/*; echo ""
-        echo -e "${GREEN}系统清理完成！${NC}"
-    elif [ -f /etc/redhat-release ]; then
-        echo -e "${BLUE}检测到 CentOS/RHEL 系统${NC}"; echo -e "${YELLOW}开始清理系统...${NC}"; echo ""
-        echo -e "${BLUE}[步骤1/4] 清理YUM缓存...${NC}"; yum clean all; echo ""
-        echo -e "${BLUE}[步骤2/4] 清理旧内核...${NC}"; package-cleanup --oldkernels --count=1 -y; echo ""
-        echo -e "${BLUE}[步骤3/4] 清理日志文件...${NC}"; journalctl --vacuum-time=1d; find /var/log -type f -regex ".*\.gz$" -delete; find /var/log -type f -regex ".*\.[0-9]$" -delete; echo ""
-        echo -e "${BLUE}[步骤4/4] 清理临时文件...${NC}"; rm -rf /tmp/*; rm -rf /var/tmp/*; echo ""
-        echo -e "${GREEN}系统清理完成！${NC}"
-    else
-        echo -e "${RED}不支持的系统类型！${NC}"; echo -e "${YELLOW}仅支持 Debian/Ubuntu 和 CentOS/RHEL 系统。${NC}"
+    if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then 
+        echo -e "${YELLOW}已取消系统清理操作${NC}"
+        read -p "按回车键返回主菜单..."
+        return
     fi
-    echo -e "${CYAN}"; echo "=========================================="; echo -e "${NC}"; read -p "按回车键返回主菜单..."
-}
-# -------------------------------
-# 基础工具安装函数
-# -------------------------------
-basic_tools() {
-    clear; echo -e "${CYAN}"; echo "=========================================="; echo "              基础工具安装                "; echo "=========================================="; echo -e "${NC}"
-    DEBIAN_TOOLS="htop vim tmux net-tools dnsutils lsof tree zip unzip"
-    REDHAT_TOOLS="htop vim tmux net-tools bind-utils lsof tree zip unzip"
+
+    # 创建备份时间戳
+    BACKUP_DIR="/tmp/system_clean_backup_$(date +%Y%m%d_%H%M%S)"
+    mkdir -p "$BACKUP_DIR"
+    
     if [ -f /etc/debian_version ]; then
-        echo -e "${BLUE}检测到 Debian/Ubuntu 系统${NC}"; echo -e "${YELLOW}开始安装基础工具...${NC}"; echo ""
-        echo -e "${BLUE}[步骤1/2] 更新软件包列表...${NC}"; apt update -y; echo ""
-        echo -e "${BLUE}[步骤2/2] 安装基础工具...${NC}"; apt install -y $DEBIAN_TOOLS; echo ""
-        echo -e "${GREEN}基础工具安装完成！${NC}"; echo -e "${YELLOW}已安装工具: $DEBIAN_TOOLS${NC}"
+        echo -e "${BLUE}检测到 Debian/Ubuntu 系统${NC}"
+        echo -e "${YELLOW}开始深度清理系统...${NC}"
+        echo ""
+        
+        # 1. 清理包管理器缓存
+        echo -e "${BLUE}[步骤1/8] 清理APT缓存和旧包...${NC}"
+        apt clean
+        apt autoclean
+        apt autoremove --purge -y
+        
+        # 2. 清理旧内核 (更彻底的方法)
+        echo -e "${BLUE}[步骤2/8] 清理旧内核...${NC}"
+        current_kernel=$(uname -r | sed 's/-*[a-z]//g' | sed 's/-386//g')
+        installed_kernels=$(dpkg -l | grep linux-image | awk '{print $2}')
+        for kernel in $installed_kernels; do
+            if [[ "$kernel" != *"$current_kernel"* ]]; then
+                apt purge -y "$kernel" 2>/dev/null
+            fi
+        done
+        
+        # 3. 清理日志文件 (更彻底)
+        echo -e "${BLUE}[步骤3/8] 清理日志文件...${NC}"
+        journalctl --vacuum-time=7d 2>/dev/null  # 保留7天日志
+        find /var/log -name "*.log" -type f -mtime +30 -delete 2>/dev/null
+        find /var/log -name "*.gz" -type f -mtime +7 -delete 2>/dev/null
+        find /var/log -name "*.old" -type f -mtime +7 -delete 2>/dev/null
+        find /var/log -name "*.[0-9]" -type f -mtime +7 -delete 2>/dev/null
+        truncate -s 0 /var/log/*.log 2>/dev/null
+        
+        # 4. 清理临时文件 (扩大范围)
+        echo -e "${BLUE}[步骤4/8] 清理临时文件...${NC}"
+        rm -rf /tmp/*
+        rm -rf /var/tmp/*
+        rm -rf /var/cache/apt/archives/*
+        rm -rf /var/cache/debconf/*
+        
+        # 5. 清理缩略图缓存
+        echo -e "${BLUE}[步骤5/8] 清理缩略图缓存...${NC}"
+        find /home -type f -name ".thumbnails" -exec rm -rf {} + 2>/dev/null
+        find /root -type f -name ".thumbnails" -exec rm -rf {} + 2>/dev/null
+        
+        # 6. 清理浏览器缓存 (如果存在)
+        echo -e "${BLUE}[步骤6/8] 清理浏览器缓存...${NC}"
+        find /home -type d -name ".cache" -exec rm -rf {}/* 2>/dev/null \;
+        find /root -type d -name ".cache" -exec rm -rf {}/* 2>/dev/null \;
+        
+        # 7. 清理崩溃报告
+        echo -e "${BLUE}[步骤7/8] 清理崩溃报告...${NC}"
+        rm -rf /var/crash/*
+        find /var/lib/apport/crash -type f -delete 2>/dev/null
+        
+        # 8. 清理软件包列表缓存
+        echo -e "${BLUE}[步骤8/8] 清理软件包列表缓存...${NC}"
+        rm -rf /var/lib/apt/lists/*
+        apt update  # 重新生成干净的列表
+        
     elif [ -f /etc/redhat-release ]; then
-        echo -e "${BLUE}检测到 CentOS/RHEL 系统${NC}"; echo -e "${YELLOW}开始安装基础工具...${NC}"; echo ""
-        echo -e "${BLUE}[步骤1/1] 安装基础工具...${NC}"; yum install -y epel-release; yum install -y $REDHAT_TOOLS; echo ""
-        echo -e "${GREEN}基础工具安装完成！${NC}"; echo -e "${YELLOW}已安装工具: $REDHAT_TOOLS${NC}"
+        echo -e "${BLUE}检测到 CentOS/RHEL 系统${NC}"
+        echo -e "${YELLOW}开始深度清理系统...${NC}"
+        echo ""
+        
+        # 1. 清理YUM/DNF缓存
+        echo -e "${BLUE}[步骤1/8] 清理YUM/DNF缓存...${NC}"
+        if command -v dnf >/dev/null 2>&1; then
+            dnf clean all
+            dnf autoremove -y
+        else
+            yum clean all
+            package-cleanup --oldkernels --count=1 -y 2>/dev/null
+            package-cleanup --leaves -y 2>/dev/null
+        fi
+        
+        # 2. 清理旧内核
+        echo -e "${BLUE}[步骤2/8] 清理旧内核...${NC}"
+        if command -v dnf >/dev/null 2>&1; then
+            dnf remove -y $(dnf repoquery --installonly --latest-limit=-1 -q) 2>/dev/null
+        else
+            package-cleanup --oldkernels --count=1 -y 2>/dev/null
+        fi
+        
+        # 3. 清理日志文件
+        echo -e "${BLUE}[步骤3/8] 清理日志文件...${NC}"
+        journalctl --vacuum-time=7d 2>/dev/null
+        find /var/log -name "*.log" -type f -mtime +30 -delete 2>/dev/null
+        find /var/log -name "*.gz" -type f -mtime +7 -delete 2>/dev/null
+        find /var/log -name "*.[0-9]" -type f -mtime +7 -delete 2>/dev/null
+        truncate -s 0 /var/log/*.log 2>/dev/null
+        
+        # 4. 清理临时文件
+        echo -e "${BLUE}[步骤4/8] 清理临时文件...${NC}"
+        rm -rf /tmp/*
+        rm -rf /var/tmp/*
+        rm -rf /var/cache/yum/*
+        rm -rf /var/cache/dnf/*
+        
+        # 5. 清理缩略图缓存
+        echo -e "${BLUE}[步骤5/8] 清理缩略图缓存...${NC}"
+        find /home -type f -name ".thumbnails" -exec rm -rf {} + 2>/dev/null
+        find /root -type f -name ".thumbnails" -exec rm -rf {} + 2>/dev/null
+        
+        # 6. 清理浏览器缓存
+        echo -e "${BLUE}[步骤6/8] 清理浏览器缓存...${NC}"
+        find /home -type d -name ".cache" -exec rm -rf {}/* 2>/dev/null \;
+        find /root -type d -name ".cache" -exec rm -rf {}/* 2>/dev/null \;
+        
+        # 7. 清理崩溃报告
+        echo -e "${BLUE}[步骤7/8] 清理崩溃报告...${NC}"
+        rm -rf /var/crash/*
+        find /var/spool/abrt -type f -delete 2>/dev/null
+        
+        # 8. 清理系统缓存
+        echo -e "${BLUE}[步骤8/8] 清理系统缓存...${NC}"
+        sync
+        echo 3 > /proc/sys/vm/drop_caches 2>/dev/null
+        
     else
-        echo -e "${RED}不支持的系统类型！${NC}"; echo -e "${YELLOW}仅支持 Debian/Ubuntu 和 CentOS/RHEL 系统。${NC}"
+        echo -e "${RED}不支持的系统类型！${NC}"
+        echo -e "${YELLOW}仅支持 Debian/Ubuntu 和 CentOS/RHEL 系统。${NC}"
+        read -p "按回车键返回主菜单..."
+        return
     fi
-    echo -e "${CYAN}"; echo "=========================================="; echo -e "${NC}"; read -p "按回车键返回主菜单..."
+    
+    # 通用清理步骤 (所有系统)
+    echo -e "${BLUE}[通用步骤] 执行通用清理...${NC}"
+    
+    # 清理垃圾文件
+    find /tmp -name "*.tmp" -type f -delete 2>/dev/null
+    find /tmp -name "*.swp" -type f -delete 2>/dev/null
+    find /home -name "*.bak" -type f -mtime +30 -delete 2>/dev/null
+    
+    # 清理空目录
+    find /tmp -type d -empty -delete 2>/dev/null
+    find /var/tmp -type d -empty -delete 2>/dev/null
+    
+    # 显示清理结果
+    echo ""
+    echo -e "${GREEN}✅ 系统深度清理完成！${NC}"
+    echo -e "${YELLOW}释放的磁盘空间：${NC}"
+    df -h / | tail -1 | awk '{print "根分区可用空间: " $4}'
+    
+    # 清理备份目录
+    rm -rf "$BACKUP_DIR"
+    
+    echo -e "${CYAN}"
+    echo "=========================================="
+    echo -e "${NC}"
+    read -p "按回车键返回主菜单..."
 }
 
 # -------------------------------
@@ -1486,6 +1612,64 @@ EOF
 }
 
 # -------------------------------
+# 磁盘空间分析函数 (新增)
+# -------------------------------
+analyze_disk_usage() {
+    clear
+    echo -e "${CYAN}"
+    echo "=========================================="
+    echo "             磁盘空间分析工具            "
+    echo "=========================================="
+    echo -e "${NC}"
+    
+    echo -e "${YELLOW}正在分析磁盘使用情况，这可能需要一些时间...${NC}"
+    echo ""
+    
+    # 显示总体磁盘使用情况
+    echo -e "${GREEN}=== 总体磁盘使用情况 ===${NC}"
+    df -h
+    
+    echo ""
+    echo -e "${GREEN}=== 前10大目录（按大小排序）===${NC}"
+    # 避免扫描特殊文件系统，从根目录开始但排除某些目录
+    du -h --max-depth=1 / 2>/dev/null | grep -v -E '/(proc|sys|dev|run|snap)' | sort -hr | head -n 10 | while read size path; do
+        echo -e "${BLUE}$size\t$path${NC}"
+    done
+    
+    echo ""
+    echo -e "${GREEN}=== 前10大文件（大于100MB）===${NC}"
+    find / -type f -size +100M 2>/dev/null | xargs ls -lh 2>/dev/null | sort -k5 -hr | head -n 10 | while read line; do
+        echo -e "${YELLOW}$line${NC}"
+    done
+    
+    echo ""
+    echo -e "${GREEN}=== 按文件类型统计大小 ===${NC}"
+    echo -e "${BLUE}日志文件 (.log):${NC}"
+    find /var/log -name "*.log" -type f -exec du -ch {} + 2>/dev/null | tail -1 | awk '{print $1}'
+    
+    echo -e "${BLUE}缓存文件:${NC}"
+    du -sh /var/cache/ 2>/dev/null || echo "无法访问"
+    
+    echo -e "${BLUE}临时文件:${NC}"
+    du -sh /tmp/ /var/tmp/ 2>/dev/null | while read size path; do
+        echo -e "$size\t$path"
+    done
+    
+    echo ""
+    echo -e "${GREEN}=== 清理建议 ===${NC}"
+    echo -e "${YELLOW}1. 可安全清理的项目：${NC}"
+    echo "   - /tmp/*, /var/tmp/* (临时文件)"
+    echo "   - /var/cache/ (包管理器缓存)"
+    echo "   - 旧日志文件 (/var/log/*.log.*)"
+    echo -e "${YELLOW}2. 谨慎清理的项目：${NC}"
+    echo "   - /var/lib/docker/ (Docker镜像和容器)"
+    echo "   - 用户家目录的大文件"
+    
+    echo ""
+    read -p "按回车键返回菜单..."
+}
+
+# -------------------------------
 # 系统工具主菜单 (更新，调用实际函数)
 # -------------------------------
 system_tools_menu() {
@@ -1508,6 +1692,7 @@ system_tools_menu() {
         echo "10. Nginx Proxy Manager 管理"
         echo "11. 查看端口占用状态"
         echo "12. 修改 DNS 服务器"
+        echo "13. 磁盘空间分析"
         echo "0. 返回主菜单"
         echo "=========================================="
 
@@ -1526,6 +1711,7 @@ system_tools_menu() {
             10) nginx_proxy_manager_menu ;;
             11) check_port_usage ;;
             12) change_dns_servers ;;
+            13) analyze_disk_usage ;;
             0) return ;;
             *) echo -e "${RED}无效的选项，请重新输入！${NC}"; sleep 1 ;;
         esac
