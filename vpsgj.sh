@@ -2333,7 +2333,191 @@ disk_performance_test() {
     case $disk_choice in
         1)
             echo -e "${GREEN}顺序读写测试中...${NC}"
-            fio
+            fio --name=seq_read --filename=$TEST_FILE --size=$SIZE --rw=read --direct=1 --output=seq_read.txt
+            fio --name=seq_write --filename=$TEST_FILE --size=$SIZE --rw=write --direct=1 --output=seq_write.txt
+            echo -e "${GREEN}顺序读取结果:${NC}"
+            cat seq_read.txt | grep -E "read.*bw="
+            echo -e "${GREEN}顺序写入结果:${NC}"
+            cat seq_write.txt | grep -E "write.*bw="
+            rm -f $TEST_FILE seq_read.txt seq_write.txt
+            ;;
+        2)
+            echo -e "${GREEN}随机读写测试中...${NC}"
+            fio --name=rand_read --filename=$TEST_FILE --size=$SIZE --rw=randread --direct=1 --output=rand_read.txt
+            fio --name=rand_write --filename=$TEST_FILE --size=$SIZE --rw=randwrite --direct=1 --output=rand_write.txt
+            echo -e "${GREEN}随机读取结果:${NC}"
+            cat rand_read.txt | grep -E "read.*bw="
+            echo -e "${GREEN}随机写入结果:${NC}"
+            cat rand_write.txt | grep -E "write.*bw="
+            rm -f $TEST_FILE rand_read.txt rand_write.txt
+            ;;
+        3)
+            echo -e "${GREEN}IOPS测试中...${NC}"
+            fio --name=iops_test --filename=$TEST_FILE --size=$SIZE --rw=randrw --direct=1 --output=iops_test.txt
+            echo -e "${GREEN}IOPS测试结果:${NC}"
+            cat iops_test.txt | grep -E "iops="
+            rm -f $TEST_FILE iops_test.txt
+            ;;
+        0)
+            return
+            ;;
+        *)
+            echo -e "${RED}无效选择!${NC}"
+            ;;
+    esac
+    
+    read -p "按回车键返回..."
+}
+
+# -------------------------------
+# 11. 系统安全扫描
+# -------------------------------
+system_security_scan() {
+    clear
+    echo -e "${CYAN}"
+    echo "=========================================="
+    echo "           系统安全扫描                 "
+    echo "=========================================="
+    echo -e "${NC}"
+    
+    echo -e "${YELLOW}请选择安全扫描工具：${NC}"
+    echo "1. Lynis (系统安全审计)"
+    echo "2. Rkhunter (Rootkit检测)"
+    echo "3. Chkrootkit (Rootkit检测)"
+    echo "4. ClamAV (病毒扫描)"
+    echo "0. 返回"
+    
+    read -p "请输入选择: " security_choice
+    
+    case $security_choice in
+        1)
+            if ! command -v lynis >/dev/null 2>&1; then
+                echo -e "${YELLOW}正在安装Lynis...${NC}"
+                if command -v apt >/dev/null 2>&1; then
+                    apt update && apt install -y lynis
+                elif command -v yum >/dev/null 2>&1; then
+                    yum install -y epel-release && yum install -y lynis
+                fi
+            fi
+            echo -e "${GREEN}运行Lynis系统安全审计...${NC}"
+            lynis audit system
+            ;;
+        2)
+            if ! command -v rkhunter >/dev/null 2>&1; then
+                echo -e "${YELLOW}正在安装Rkhunter...${NC}"
+                if command -v apt >/dev/null 2>&1; then
+                    apt update && apt install -y rkhunter
+                elif command -v yum >/dev/null 2>&1; then
+                    yum install -y rkhunter
+                fi
+            fi
+            echo -e "${GREEN}运行Rkhunter Rootkit检测...${NC}"
+            rkhunter --check
+            ;;
+        3)
+            if ! command -v chkrootkit >/dev/null 2>&1; then
+                echo -e "${YELLOW}正在安装Chkrootkit...${NC}"
+                if command -v apt >/dev/null 2>&1; then
+                    apt update && apt install -y chkrootkit
+                elif command -v yum >/dev/null 2>&1; then
+                    yum install -y chkrootkit
+                fi
+            fi
+            echo -e "${GREEN}运行Chkrootkit Rootkit检测...${NC}"
+            chkrootkit
+            ;;
+        4)
+            if ! command -v clamscan >/dev/null 2>&1; then
+                echo -e "${YELLOW}正在安装ClamAV...${NC}"
+                if command -v apt >/dev/null 2>&1; then
+                    apt update && apt install -y clamav clamav-daemon
+                elif command -v yum >/dev/null 2>&1; then
+                    yum install -y clamav clamav-update
+                fi
+            fi
+            echo -e "${GREEN}运行ClamAV病毒扫描...${NC}"
+            clamscan --recursive --infected /home
+            ;;
+        0)
+            return
+            ;;
+        *)
+            echo -e "${RED}无效选择!${NC}"
+            ;;
+    esac
+    
+    read -p "按回车键返回..."
+}
+
+# -------------------------------
+# 12. 文件完整性检查
+# -------------------------------
+file_integrity_check() {
+    clear
+    echo -e "${CYAN}"
+    echo "=========================================="
+    echo "           文件完整性检查               "
+    echo "=========================================="
+    echo -e "${NC}"
+    
+    echo -e "${YELLOW}请选择完整性检查工具：${NC}"
+    echo "1. AIDE (高级入侵检测环境)"
+    echo "2. Tripwire (文件完整性检查)"
+    echo "3. 手动MD5校验"
+    echo "0. 返回"
+    
+    read -p "请输入选择: " integrity_choice
+    
+    case $integrity_choice in
+        1)
+            if ! command -v aide >/dev/null 2>&1; then
+                echo -e "${YELLOW}正在安装AIDE...${NC}"
+                if command -v apt >/dev/null 2>&1; then
+                    apt update && apt install -y aide
+                elif command -v yum >/dev/null 2>&1; then
+                    yum install -y aide
+                fi
+            fi
+            echo -e "${GREEN}初始化AIDE数据库...${NC}"
+            aide --init
+            echo -e "${GREEN}运行AIDE完整性检查...${NC}"
+            aide --check
+            ;;
+        2)
+            if ! command -v tripwire >/dev/null 2>&1; then
+                echo -e "${YELLOW}正在安装Tripwire...${NC}"
+                if command -v apt >/dev/null 2>&1; then
+                    apt update && apt install -y tripwire
+                elif command -v yum >/dev/null 2>&1; then
+                    yum install -y tripwire
+                fi
+            fi
+            echo -e "${GREEN}初始化Tripwire数据库...${NC}"
+            tripwire --init
+            echo -e "${GREEN}运行Tripwire完整性检查...${NC}"
+            tripwire --check
+            ;;
+        3)
+            read -p "请输入要校验的文件路径: " file_path
+            if [ -f "$file_path" ]; then
+                echo -e "${GREEN}计算文件MD5校验和...${NC}"
+                md5sum "$file_path"
+                echo -e "${GREEN}计算文件SHA256校验和...${NC}"
+                sha256sum "$file_path"
+            else
+                echo -e "${RED}文件不存在!${NC}"
+            fi
+            ;;
+        0)
+            return
+            ;;
+        *)
+            echo -e "${RED}无效选择!${NC}"
+            ;;
+    esac
+    
+    read -p "按回车键返回..."
+}
 
 # -------------------------------
 # 系统工具主菜单 (更新，调用实际函数)
