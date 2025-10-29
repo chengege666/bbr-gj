@@ -1758,6 +1758,584 @@ accelerate_memory_clean() {
 }
 
 # -------------------------------
+# 实用工具箱函数 (新增)
+# -------------------------------
+utility_tools_menu() {
+    while true; do
+        clear
+        echo -e "${CYAN}"
+        echo "=========================================="
+        echo "               实用工具箱                 "
+        echo "=========================================="
+        echo -e "${NC}"
+        echo "1. 服务器性能全面测试 (Bench.sh)"
+        echo "2. 流媒体解锁检测 (RegionRestrictionCheck)"
+        echo "3. 回程路由测试 (BestTrace)"
+        echo "4. 炫酷系统信息显示 (neofetch)"
+        echo "5. 实时系统监控仪表板 (gtop/bpytop)"
+        echo "6. 网速多节点测试 (Speedtest-X)"
+        echo "7. 端口扫描工具 (nmap)"
+        echo "8. 证书管理工具 (acme.sh)"
+        echo "9. 服务器延迟测试 (Ping测试)"
+        echo "10. 磁盘性能测试 (fio/iozone)"
+        echo "11. 系统安全扫描 (Lynis)"
+        echo "12. 文件完整性检查 (AIDE)"
+        echo "0. 返回上级菜单"
+        echo "=========================================="
+        
+        read -p "请输入选项编号: " utility_choice
+        
+        case $utility_choice in
+            1) server_benchmark ;;
+            2) streaming_unlock_test ;;
+            3) routing_test ;;
+            4) cool_system_info ;;
+            5) system_monitor_dashboard ;;
+            6) multi_speedtest ;;
+            7) port_scanner_tool ;;
+            8) ssl_cert_manager ;;
+            9) server_latency_test ;;
+            10) disk_performance_test ;;
+            11) system_security_scan ;;
+            12) file_integrity_check ;;
+            0) return ;;
+            *) echo -e "${RED}无效选项!${NC}"; sleep 1 ;;
+        esac
+    done
+}
+
+# -------------------------------
+# 1. 服务器性能全面测试
+# -------------------------------
+server_benchmark() {
+    clear
+    echo -e "${CYAN}"
+    echo "=========================================="
+    echo "          服务器性能全面测试             "
+    echo "=========================================="
+    echo -e "${NC}"
+    
+    echo -e "${YELLOW}请选择测试脚本：${NC}"
+    echo "1. Bench.sh (综合性能测试)"
+    echo "2. SuperBench.sh (超级基准测试)"
+    echo "3. LemonBench (综合检测)"
+    echo "0. 返回"
+    
+    read -p "请输入选择: " bench_choice
+    
+    case $bench_choice in
+        1)
+            echo -e "${GREEN}正在运行 Bench.sh 测试...${NC}"
+            curl -Lso- bench.sh | bash
+            ;;
+        2)
+            echo -e "${GREEN}正在运行 SuperBench.sh 测试...${NC}"
+            wget -qO- --no-check-certificate https://raw.githubusercontent.com/oooldking/script/master/superbench.sh | bash
+            ;;
+        3)
+            echo -e "${GREEN}正在运行 LemonBench 测试...${NC}"
+            curl -fsL https://ilemonra.in/LemonBenchIntl | bash -s fast
+            ;;
+        0)
+            return
+            ;;
+        *)
+            echo -e "${RED}无效选择!${NC}"
+            ;;
+    esac
+    
+    read -p "按回车键返回..."
+}
+
+# -------------------------------
+# 2. 流媒体解锁检测
+# -------------------------------
+streaming_unlock_test() {
+    clear
+    echo -e "${CYAN}"
+    echo "=========================================="
+    echo "           流媒体解锁检测               "
+    echo "=========================================="
+    echo -e "${NC}"
+    
+    echo -e "${YELLOW}请选择检测脚本：${NC}"
+    echo "1. RegionRestrictionCheck (综合检测)"
+    echo "2. NFCheck (Netflix专用)"
+    echo "3. Disney+ 解锁检测"
+    echo "0. 返回"
+    
+    read -p "请输入选择: " stream_choice
+    
+    case $stream_choice in
+        1)
+            echo -e "${GREEN}正在运行流媒体解锁检测...${NC}"
+            bash <(curl -L -s https://raw.githubusercontent.com/lmc999/RegionRestrictionCheck/main/check.sh)
+            ;;
+        2)
+            echo -e "${GREEN}正在检测Netflix解锁情况...${NC}"
+            wget -O nfcheck.sh -q https://github.com/sjlleo/nf-check/raw/main/check.sh && bash nfcheck.sh
+            ;;
+        3)
+            echo -e "${GREEN}正在检测Disney+解锁情况...${NC}"
+            wget -O dpcheck.sh -q https://github.com/sjlleo/VerifyDisneyPlus/raw/main/verify.sh && bash dpcheck.sh
+            ;;
+        0)
+            return
+            ;;
+        *)
+            echo -e "${RED}无效选择!${NC}"
+            ;;
+    esac
+    
+    read -p "按回车键返回..."
+}
+
+# -------------------------------
+# 3. 回程路由测试
+# -------------------------------
+routing_test() {
+    clear
+    echo -e "${CYAN}"
+    echo "=========================================="
+    echo "            回程路由测试                "
+    echo "=========================================="
+    echo -e "${NC}"
+    
+    echo -e "${YELLOW}请选择路由测试工具：${NC}"
+    echo "1. BestTrace (IPIP.net)"
+    echo "2. NextTrace (新式路由跟踪)"
+    echo "3. MTR (综合路由测试)"
+    echo "0. 返回"
+    
+    read -p "请输入选择: " route_choice
+    
+    case $route_choice in
+        1)
+            echo -e "${GREEN}正在安装并运行BestTrace...${NC}"
+            wget -qO /tmp/besttrace.tar.gz https://cdn.ipip.net/17mon/besttrace4linux.tar.gz
+            tar -zxvf /tmp/besttrace.tar.gz -C /tmp/
+            chmod +x /tmp/besttrace
+            /tmp/besttrace 114.114.114.114
+            ;;
+        2)
+            echo -e "${GREEN}正在安装并运行NextTrace...${NC}"
+            bash <(curl -Ls https://raw.githubusercontent.com/sjlleo/nexttrace/main/nt_install.sh)
+            nexttrace 114.114.114.114
+            ;;
+        3)
+            echo -e "${GREEN}正在运行MTR路由测试...${NC}"
+            if ! command -v mtr >/dev/null 2>&1; then
+                echo -e "${YELLOW}正在安装mtr...${NC}"
+                if command -v apt >/dev/null 2>&1; then
+                    apt update && apt install -y mtr
+                elif command -v yum >/dev/null 2>&1; then
+                    yum install -y mtr
+                fi
+            fi
+            mtr -r -c 10 114.114.114.114
+            ;;
+        0)
+            return
+            ;;
+        *)
+            echo -e "${RED}无效选择!${NC}"
+            ;;
+    esac
+    
+    read -p "按回车键返回..."
+}
+
+# -------------------------------
+# 4. 炫酷系统信息显示
+# -------------------------------
+cool_system_info() {
+    clear
+    echo -e "${CYAN}"
+    echo "=========================================="
+    echo "          炫酷系统信息显示              "
+    echo "=========================================="
+    echo -e "${NC}"
+    
+    echo -e "${YELLOW}请选择信息显示工具：${NC}"
+    echo "1. Neofetch (推荐)"
+    echo "2. ScreenFetch"
+    echo "3. Linux_Logo"
+    echo "4. Macchina (现代化)"
+    echo "0. 返回"
+    
+    read -p "请输入选择: " info_choice
+    
+    case $info_choice in
+        1)
+            if ! command -v neofetch >/dev/null 2>&1; then
+                echo -e "${YELLOW}正在安装neofetch...${NC}"
+                if command -v apt >/dev/null 2>&1; then
+                    apt update && apt install -y neofetch
+                elif command -v yum >/dev/null 2>&1; then
+                    yum install -y epel-release && yum install -y neofetch
+                elif command -v dnf >/dev/null 2>&1; then
+                    dnf install -y neofetch
+                fi
+            fi
+            neofetch
+            ;;
+        2)
+            if ! command -v screenfetch >/dev/null 2>&1; then
+                echo -e "${YELLOW}正在安装screenfetch...${NC}"
+                if command -v apt >/dev/null 2>&1; then
+                    apt update && apt install -y screenfetch
+                elif command -v yum >/dev/null 2>&1; then
+                    yum install -y epel-release && yum install -y screenfetch
+                fi
+            fi
+            screenfetch
+            ;;
+        3)
+            if ! command -v linuxlogo >/dev/null 2>&1; then
+                echo -e "${YELLOW}正在安装linux-logo...${NC}"
+                if command -v apt >/dev/null 2>&1; then
+                    apt update && apt install -y linuxlogo
+                elif command -v yum >/dev/null 2>&1; then
+                    yum install -y linuxlogo
+                fi
+            fi
+            linuxlogo
+            ;;
+        4)
+            echo -e "${YELLOW}正在安装macchina...${NC}"
+            curl -Ls https://github.com/Macchina-CLI/macchina/releases/latest/download/macchina-linux-x86_64 -o /tmp/macchina
+            chmod +x /tmp/macchina
+            /tmp/macchina
+            ;;
+        0)
+            return
+            ;;
+        *)
+            echo -e "${RED}无效选择!${NC}"
+            ;;
+    esac
+    
+    read -p "按回车键返回..."
+}
+
+# -------------------------------
+# 5. 实时系统监控仪表板
+# -------------------------------
+system_monitor_dashboard() {
+    clear
+    echo -e "${CYAN}"
+    echo "=========================================="
+    echo "         实时系统监控仪表板             "
+    echo "=========================================="
+    echo -e "${NC}"
+    
+    echo -e "${YELLOW}请选择监控工具：${NC}"
+    echo "1. Gtop (Node.js仪表板)"
+    echo "2. Bpytop (Python高级监控)"
+    echo "3. Htop (增强版top)"
+    echo "4. Vtop (可视化top)"
+    echo "0. 返回"
+    
+    read -p "请输入选择: " monitor_choice
+    
+    case $monitor_choice in
+        1)
+            if ! command -v gtop >/dev/null 2>&1; then
+                echo -e "${YELLOW}正在安装gtop...${NC}"
+                npm install -g gtop
+            fi
+            gtop
+            ;;
+        2)
+            if ! command -v bpytop >/dev/null 2>&1; then
+                echo -e "${YELLOW}正在安装bpytop...${NC}"
+                pip3 install bpytop
+            fi
+            bpytop
+            ;;
+        3)
+            if ! command -v htop >/dev/null 2>&1; then
+                echo -e "${YELLOW}正在安装htop...${NC}"
+                if command -v apt >/dev/null 2>&1; then
+                    apt update && apt install -y htop
+                elif command -v yum >/dev/null 2>&1; then
+                    yum install -y htop
+                fi
+            fi
+            htop
+            ;;
+        4)
+            if ! command -v vtop >/dev/null 2>&1; then
+                echo -e "${YELLOW}正在安装vtop...${NC}"
+                npm install -g vtop
+            fi
+            vtop
+            ;;
+        0)
+            return
+            ;;
+        *)
+            echo -e "${RED}无效选择!${NC}"
+            ;;
+    esac
+    
+    read -p "按回车键返回..."
+}
+
+# -------------------------------
+# 6. 网速多节点测试
+# -------------------------------
+multi_speedtest() {
+    clear
+    echo -e "${CYAN}"
+    echo "=========================================="
+    echo "           网速多节点测试               "
+    echo "=========================================="
+    echo -e "${NC}"
+    
+    echo -e "${YELLOW}请选择测速工具：${NC}"
+    echo "1. Speedtest-cli (Ookla)"
+    echo "2. LibreSpeed (开源测速)"
+    echo "3. Speedtest-X (自建测速)"
+    echo "0. 返回"
+    
+    read -p "请输入选择: " speed_choice
+    
+    case $speed_choice in
+        1)
+            if ! command -v speedtest-cli >/dev/null 2>&1; then
+                echo -e "${YELLOW}正在安装speedtest-cli...${NC}"
+                if command -v apt >/dev/null 2>&1; then
+                    apt update && apt install -y speedtest-cli
+                elif command -v yum >/dev/null 2>&1; then
+                    yum install -y speedtest-cli
+                fi
+            fi
+            speedtest-cli
+            ;;
+        2)
+            echo -e "${GREEN}正在运行LibreSpeed测试...${NC}"
+            curl -s https://raw.githubusercontent.com/librespeed/speedtest-cli/master/speedtest.py | python3 -
+            ;;
+        3)
+            echo -e "${GREEN}正在运行Speedtest-X测试...${NC}"
+            bash <(curl -Ls https://raw.githubusercontent.com/BadApple9/speedtest-x/master/speedtest.sh)
+            ;;
+        0)
+            return
+            ;;
+        *)
+            echo -e "${RED}无效选择!${NC}"
+            ;;
+    esac
+    
+    read -p "按回车键返回..."
+}
+
+# -------------------------------
+# 7. 端口扫描工具
+# -------------------------------
+port_scanner_tool() {
+    clear
+    echo -e "${CYAN}"
+    echo "=========================================="
+    echo "             端口扫描工具               "
+    echo "=========================================="
+    echo -e "${NC}"
+    
+    if ! command -v nmap >/dev/null 2>&1; then
+        echo -e "${YELLOW}正在安装nmap...${NC}"
+        if command -v apt >/dev/null 2>&1; then
+            apt update && apt install -y nmap
+        elif command -v yum >/dev/null 2>&1; then
+            yum install -y nmap
+        fi
+    fi
+    
+    read -p "请输入要扫描的目标IP或域名: " target
+    if [ -z "$target" ]; then
+        echo -e "${RED}目标不能为空!${NC}"
+        read -p "按回车键返回..."
+        return
+    fi
+    
+    echo -e "${YELLOW}请选择扫描类型：${NC}"
+    echo "1. 快速扫描 (常用端口)"
+    echo "2. 全面扫描 (所有端口)"
+    echo "3. 服务版本检测"
+    echo "4. 操作系统检测"
+    echo "0. 返回"
+    
+    read -p "请输入选择: " scan_choice
+    
+    case $scan_choice in
+        1)
+            echo -e "${GREEN}正在快速扫描 $target ...${NC}"
+            nmap -T4 -F $target
+            ;;
+        2)
+            echo -e "${GREEN}正在全面扫描 $target ...${NC}"
+            nmap -T4 -p- $target
+            ;;
+        3)
+            echo -e "${GREEN}正在服务版本检测 $target ...${NC}"
+            nmap -T4 -sV $target
+            ;;
+        4)
+            echo -e "${GREEN}正在操作系统检测 $target ...${NC}"
+            nmap -T4 -O $target
+            ;;
+        0)
+            return
+            ;;
+        *)
+            echo -e "${RED}无效选择!${NC}"
+            ;;
+    esac
+    
+    read -p "按回车键返回..."
+}
+
+# -------------------------------
+# 8. 证书管理工具
+# -------------------------------
+ssl_cert_manager() {
+    clear
+    echo -e "${CYAN}"
+    echo "=========================================="
+    echo "            SSL证书管理工具             "
+    echo "=========================================="
+    echo -e "${NC}"
+    
+    echo -e "${YELLOW}请选择证书管理工具：${NC}"
+    echo "1. Acme.sh (推荐)"
+    echo "2. Certbot (官方)"
+    echo "3. 查看当前证书"
+    echo "0. 返回"
+    
+    read -p "请输入选择: " cert_choice
+    
+    case $cert_choice in
+        1)
+            echo -e "${GREEN}正在安装acme.sh...${NC}"
+            curl https://get.acme.sh | sh
+            echo -e "${YELLOW}acme.sh已安装，请使用: ~/.acme.sh/acme.sh 管理证书${NC}"
+            ;;
+        2)
+            if command -v apt >/dev/null 2>&1; then
+                apt update && apt install -y certbot
+            elif command -v yum >/dev/null 2>&1; then
+                yum install -y certbot
+            fi
+            echo -e "${YELLOW}certbot已安装，请使用: certbot 管理证书${NC}"
+            ;;
+        3)
+            echo -e "${GREEN}当前SSL证书信息：${NC}"
+            find /etc -name "*.crt" -o -name "*.pem" 2>/dev/null | head -10 | while read cert; do
+                echo -e "${BLUE}证书: $cert${NC}"
+                openssl x509 -in "$cert" -noout -subject -dates 2>/dev/null | head -2
+                echo "---"
+            done
+            ;;
+        0)
+            return
+            ;;
+        *)
+            echo -e "${RED}无效选择!${NC}"
+            ;;
+    esac
+    
+    read -p "按回车键返回..."
+}
+
+# -------------------------------
+# 9. 服务器延迟测试
+# -------------------------------
+server_latency_test() {
+    clear
+    echo -e "${CYAN}"
+    echo "=========================================="
+    echo "           服务器延迟测试               "
+    echo "=========================================="
+    echo -e "${NC}"
+    
+    echo -e "${YELLOW}选择测试节点类型：${NC}"
+    echo "1. 国内节点测试"
+    echo "2. 国际节点测试"
+    echo "3. 自定义节点测试"
+    echo "0. 返回"
+    
+    read -p "请输入选择: " latency_choice
+    
+    case $latency_choice in
+        1)
+            nodes=("114.114.114.114" "119.29.29.29" "223.5.5.5" "180.76.76.76")
+            echo -e "${GREEN}测试国内节点延迟...${NC}"
+            for node in "${nodes[@]}"; do
+                ping -c 4 $node | grep -E "statistics|min/avg/max"
+            done
+            ;;
+        2)
+            nodes=("8.8.8.8" "1.1.1.1" "9.9.9.9" "208.67.222.222")
+            echo -e "${GREEN}测试国际节点延迟...${NC}"
+            for node in "${nodes[@]}"; do
+                ping -c 4 $node | grep -E "statistics|min/avg/max"
+            done
+            ;;
+        3)
+            read -p "请输入要测试的IP或域名: " custom_node
+            if [ -n "$custom_node" ]; then
+                ping -c 10 $custom_node
+            fi
+            ;;
+        0)
+            return
+            ;;
+        *)
+            echo -e "${RED}无效选择!${NC}"
+            ;;
+    esac
+    
+    read -p "按回车键返回..."
+}
+
+# -------------------------------
+# 10. 磁盘性能测试
+# -------------------------------
+disk_performance_test() {
+    clear
+    echo -e "${CYAN}"
+    echo "=========================================="
+    echo "           磁盘性能测试                 "
+    echo "=========================================="
+    echo -e "${NC}"
+    
+    if ! command -v fio >/dev/null 2>&1; then
+        echo -e "${YELLOW}正在安装fio...${NC}"
+        if command -v apt >/dev/null 2>&1; then
+            apt update && apt install -y fio
+        elif command -v yum >/dev/null 2>&1; then
+            yum install -y fio
+        fi
+    fi
+    
+    echo -e "${YELLOW}请选择测试类型：${NC}"
+    echo "1. 顺序读写测试"
+    echo "2. 随机读写测试"
+    echo "3. IOPS测试"
+    echo "0. 返回"
+    
+    read -p "请输入选择: " disk_choice
+    
+    TEST_FILE="/tmp/testfile"
+    SIZE="1G"
+    
+    case $disk_choice in
+        1)
+            echo -e "${GREEN}顺序读写测试中...${NC}"
+            fio
+
+# -------------------------------
 # 系统工具主菜单 (更新，调用实际函数)
 # -------------------------------
 system_tools_menu() {
@@ -1782,6 +2360,7 @@ system_tools_menu() {
         echo "12. 查看端口占用状态"
         echo "13. 修改 DNS 服务器"
         echo "14. 磁盘空间分析"
+        echo "15. 实用工具箱"
         echo "0. 返回主菜单"
         echo "=========================================="
 
@@ -1802,6 +2381,7 @@ system_tools_menu() {
             12) check_port_usage ;;
             13) change_dns_servers ;;
             14) analyze_disk_usage ;;
+            15) utility_tools_menu ;;
             0) return ;;
             *) echo -e "${RED}无效的选项，请重新输入！${NC}"; sleep 1 ;;
         esac
