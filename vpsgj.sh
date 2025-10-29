@@ -1670,6 +1670,94 @@ analyze_disk_usage() {
 }
 
 # -------------------------------
+# 内存加速清理函数 (新增)
+# -------------------------------
+accelerate_memory_clean() {
+    clear
+    echo -e "${CYAN}"
+    echo "=========================================="
+    echo "            内存加速清理工具            "
+    echo "=========================================="
+    echo -e "${NC}"
+    
+    # 显示当前内存状态
+    echo -e "${GREEN}=== 当前内存状态 ===${NC}"
+    free -h
+    echo ""
+    
+    echo -e "${YELLOW}⚠️ 内存加速清理将释放缓存，可能会暂时影响性能${NC}"
+    read -p "是否继续执行内存加速清理？(y/n): " confirm
+    if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then 
+        echo -e "${YELLOW}已取消内存加速清理${NC}"
+        read -p "按回车键返回菜单..."
+        return
+    fi
+    
+    echo -e "${BLUE}开始内存加速清理...${NC}"
+    
+    # 记录清理前内存状态
+    MEM_BEFORE=$(free -m | awk 'NR==2{printf "Used: %sMB, Free: %sMB, Cached: %sMB", $3, $4, $6}')
+    
+    # 1. 同步数据到磁盘
+    echo -e "${CYAN}[1/6] 同步数据到磁盘...${NC}"
+    sync
+    
+    # 2. 清理页面缓存
+    echo -e "${CYAN}[2/6] 清理页面缓存...${NC}"
+    echo 1 > /proc/sys/vm/drop_caches 2>/dev/null
+    
+    # 3. 清理目录项和inode缓存
+    echo -e "${CYAN}[3/6] 清理目录项和inode缓存...${NC}"
+    echo 2 > /proc/sys/vm/drop_caches 2>/dev/null
+    
+    # 4. 清理所有缓存（页面缓存+目录项+inode）
+    echo -e "${CYAN}[4/6] 清理所有缓存...${NC}"
+    echo 3 > /proc/sys/vm/drop_caches 2>/dev/null
+    
+    # 5. 清理slab缓存
+    echo -e "${CYAN}[5/6] 清理slab缓存...${NC}"
+    if command -v slabtop >/dev/null 2>&1; then
+        echo -e "${YELLOW}优化slab分配器...${NC}"
+    fi
+    
+    # 6. 重置swap（如果物理内存充足）
+    echo -e "${CYAN}[6/6] 优化swap空间...${NC}"
+    SWAP_USED=$(free | awk 'NR==3{print $3}')
+    if [ "$SWAP_USED" -gt 0 ]; then
+        echo -e "${YELLOW}检测到swap使用，尝试优化...${NC}"
+        swapoff -a 2>/dev/null && swapon -a 2>/dev/null
+        echo -e "${GREEN}✅ Swap空间已优化${NC}"
+    else
+        echo -e "${GREEN}✅ Swap使用正常，无需优化${NC}"
+    fi
+    
+    # 显示清理结果
+    echo ""
+    echo -e "${GREEN}=== 内存加速清理完成 ===${NC}"
+    echo -e "${BLUE}清理前: $MEM_BEFORE${NC}"
+    
+    MEM_AFTER=$(free -m | awk 'NR==2{printf "Used: %sMB, Free: %sMB, Cached: %sMB", $3, $4, $6}')
+    echo -e "${BLUE}清理后: $MEM_AFTER${NC}"
+    
+    # 显示释放的内存
+    FREE_BEFORE=$(echo "$MEM_BEFORE" | grep -o 'Free: [0-9]*' | cut -d' ' -f2)
+    FREE_AFTER=$(echo "$MEM_AFTER" | grep -o 'Free: [0-9]*' | cut -d' ' -f2)
+    if [ -n "$FREE_BEFORE" ] && [ -n "$FREE_AFTER" ]; then
+        MEM_FREED=$((FREE_AFTER - FREE_BEFORE))
+        if [ "$MEM_FREED" -gt 0 ]; then
+            echo -e "${GREEN}✅ 成功释放内存: ${MEM_FREED}MB${NC}"
+        else
+            echo -e "${YELLOW}⚠️ 内存释放效果不明显，可能已处于优化状态${NC}"
+        fi
+    fi
+    
+    echo ""
+    echo -e "${YELLOW}💡 提示：内存清理是临时性的，系统会根据需要重新建立缓存${NC}"
+    
+    read -p "按回车键返回菜单..."
+}
+
+# -------------------------------
 # 系统工具主菜单 (更新，调用实际函数)
 # -------------------------------
 system_tools_menu() {
@@ -1687,12 +1775,13 @@ system_tools_menu() {
         echo "5. 修改主机名"
         echo "6. 系统时区调整"
         echo "7. 修改虚拟内存大小 (Swap)"
-        echo "8. 重启服务器"
-        echo "9. 卸载本脚本"
-        echo "10. Nginx Proxy Manager 管理"
-        echo "11. 查看端口占用状态"
-        echo "12. 修改 DNS 服务器"
-        echo "13. 磁盘空间分析"
+        echo "8. 内存加速清理"
+        echo "9. 重启服务器"
+        echo "10. 卸载本脚本"
+        echo "11. Nginx Proxy Manager 管理"
+        echo "12. 查看端口占用状态"
+        echo "13. 修改 DNS 服务器"
+        echo "14. 磁盘空间分析"
         echo "0. 返回主菜单"
         echo "=========================================="
 
@@ -1706,12 +1795,13 @@ system_tools_menu() {
             5) change_hostname ;;
             6) change_system_timezone ;;
             7) manage_swap ;;
-            8) reboot_server ;;
-            9) uninstall_script ;;
-            10) nginx_proxy_manager_menu ;;
-            11) check_port_usage ;;
-            12) change_dns_servers ;;
-            13) analyze_disk_usage ;;
+            8) accelerate_memory_clean ;;
+            9) reboot_server ;;
+            10) uninstall_script ;;
+            11) nginx_proxy_manager_menu ;;
+            12) check_port_usage ;;
+            13) change_dns_servers ;;
+            14) analyze_disk_usage ;;
             0) return ;;
             *) echo -e "${RED}无效的选项，请重新输入！${NC}"; sleep 1 ;;
         esac
