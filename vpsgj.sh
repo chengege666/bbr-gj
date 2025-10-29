@@ -1961,64 +1961,146 @@ EOF
 }
 
 # -------------------------------
-# 卸载acme.sh证书工具（选择性删除）
+# 安装/更新 acme.sh 工具（集成依赖检测和自动安装）
 # -------------------------------
-uninstall_acme_sh() {
+install_acme_sh() {
     clear
     echo -e "${CYAN}=========================================="
-    echo "           卸载 acme.sh 证书工具         "
+    echo "           安装/更新 acme.sh 工具         "
     echo "=========================================="
     echo -e "${NC}"
     
-    # 检查是否已安装
-    if [ ! -f ~/.acme.sh/acme.sh ]; then
-        echo -e "${YELLOW}acme.sh 未安装，无需卸载${NC}"
+    # 检查是否已安装acme.sh
+    if [ -f ~/.acme.sh/acme.sh ]; then
+        CURRENT_VERSION=$(~/.acme.sh/acme.sh --version 2>/dev/null | head -1)
+        echo -e "${GREEN}✅ acme.sh 已安装 (版本: $CURRENT_VERSION)${NC}"
+        read -p "是否更新到最新版本？(y/N): " update_choice
+        if [[ "$update_choice" != "y" && "$update_choice" != "Y" ]]; then
+            echo -e "${YELLOW}操作已取消${NC}"
+            read -p "按回车键继续..."
+            return
+        fi
+        # 执行更新
+        echo -e "${YELLOW}正在更新 acme.sh...${NC}"
+        ~/.acme.sh/acme.sh --upgrade
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}✅ acme.sh 更新成功！${NC}"
+        else
+            echo -e "${RED}❌ acme.sh 更新失败！${NC}"
+        fi
         read -p "按回车键继续..."
         return
     fi
     
-    # 获取已申请的证书列表
-    cert_list=()
-    if [ -d ~/.acme.sh ]; then
-        for domain_dir in ~/.acme.sh/*/; do
-            if [ -d "$domain_dir" ] && [ -f "${domain_dir}${domain_dir##*/}.cer" ]; then
-                domain_name=$(basename "$domain_dir")
-                cert_list+=("$domain_name")
-            fi
-        done
+    # 未安装acme.sh，开始安装流程
+    echo -e "${YELLOW}开始安装 acme.sh SSL证书工具...${NC}"
+    
+    # 检查并安装依赖
+    echo -e "${BLUE}[步骤1/3] 检查系统依赖...${NC}"
+    local missing_deps=()
+    local need_install_deps=false
+    
+    # 定义必要的依赖包
+    local required_deps=("curl" "socat" "openssl")
+    local cron_service=""
+    
+    # 检测系统类型和对应的包管理器
+    if command -v apt >/dev/null 2>&1; then
+        PACKAGE_MANAGER="apt"
+        required_deps+=("cron")
+        cron_service="cron"
+    elif command -v yum >/dev/null 2>&1; then
+        PACKAGE_MANAGER="yum"
+        required_deps+=("crontabs")
+        cron_service="crond"
+    elif command -v dnf >/dev/null 2>&1; then
+        PACKAGE_MANAGER="dnf"
+        required_deps+=("cronie")
+        cron_service="crond"
+    else
+        echo -e "${RED}❌ 无法识别的系统类型或包管理器${NC}"
+        read -p "按回车键继续..."
+        return
     fi
     
-    echo -e "${YELLOW}请选择要执行的操作：${NC}"
-    echo ""
-    echo "1. 选择性删除证书（保留acme.sh工具）"
-    echo "2. 完全卸载acme.sh（删除所有证书和工具）"
-    echo "3. 仅清理配置（保留证书文件）"
-    echo "0. 取消操作"
-    echo ""
+    # 检查缺失的依赖
+    for dep in "${required_deps[@]}"; do
+        if ! command -v "${dep%% *}" >/dev/null 2>&1; then
+            missing_deps+=("$dep")
+            need_install_deps=true
+        fi
+    done
     
-    read -p "请输入选项编号: " uninstall_choice
-    
-    case $uninstall_choice in
-        1)
-            selective_delete_certificates
-            ;;
-        2)
-            full_uninstall_acme
-            ;;
-        3)
-            cleanup_config_only
-            ;;
-        0)
-            echo -e "${YELLOW}操作已取消${NC}"
+    if [ "$need_install_deps" = true ]; then
+        echo -e "${YELLOW}检测到缺失的依赖: ${missing_deps[*]}${NC}"
+        echo -e "${BLUE}正在自动安装依赖包...${NC}"
+        
+        # 更新包管理器
+        if [ "$PACKAGE_MANAGER" = "apt" ]; then
+            apt update -y
+            apt install -y "${missing_deps[@]}"
+        elif [ "$PACKAGE_MANAGER" = "yum" ]; then
+            yum install -y "${missing_deps[@]}"
+        elif [ "$PACKAGE_MANAGER" = "dnf" ]; then
+            dnf install -y "${missing_deps[@]}"
+        fi
+        
+        # 验证依赖安装
+        local install_failed=()
+        for dep in "${missing_deps[@]}"; do
+            dep_name="${dep%% *}"  # 获取基础命令名（去掉可能的包名后缀）
+            if ! command -v "$dep_name" >/dev/null 2>&1; then
+                install_failed+=("$dep")
+            fi
+        done
+        
+        if [ ${#install_failed[@]} -gt 0 ]; then
+            echo -e "${RED}❌ 以下依赖安装失败: ${install_failed[*]}${NC}"
+            echo -e "${YELLOW}请尝试手动安装后重试${NC}"
             read -p "按回车键继续..."
             return
-            ;;
-        *)
-            echo -e "${RED}无效选项${NC}"
-            read -p "按回车键继续..."
-            return
-            ;;
-    esac
+        else
+            echo -e "${GREEN}✅ 所有依赖安装成功！${NC}"
+        fi
+        
+        # 启动cron服务
+        if [ -n "$cron_service" ] && command -v systemctl >/dev/null 2>&1; then
+            if ! systemctl is-active "$cron_service" >/dev/null 2>&1; then
+                echo -e "${YELLOW}启动定时任务服务...${NC}"
+                systemctl start "$cron_service"
+                systemctl enable "$cron_service" 2>/dev/null
+            fi
+        fi
+    else
+        echo -e "${GREEN}✅ 所有必要依赖已安装${NC}"
+    fi
+    
+    # 安装acme.sh
+    echo -e "${BLUE}[步骤2/3] 下载安装 acme.sh...${NC}"
+    curl https://get.acme.sh | sh -s email=admin@$(hostname).local
+    
+    if [ $? -eq 0 ] && [ -f ~/.acme.sh/acme.sh ]; then
+        echo -e "${BLUE}[步骤3/3] 配置acme.sh...${NC}"
+        ~/.acme.sh/acme.sh --upgrade --auto-upgrade
+        ~/.acme.sh/acme.sh --set-default-ca --server letsencrypt
+        
+        echo -e "${GREEN}✅ acme.sh 安装成功！${NC}"
+        echo ""
+        echo -e "${CYAN}使用方法示例:${NC}"
+        echo -e "${YELLOW}1. HTTP验证:${NC} ~/.acme.sh/acme.sh --issue -d example.com -w /var/www/html"
+        echo -e "${YELLOW}2. DNS验证:${NC} ~/.acme.sh/acme.sh --issue -d example.com --dns dns_cf"
+        echo ""
+        echo -e "${CYAN}证书位置:${NC}"
+        echo -e "${YELLOW}  ~/.acme.sh/example.com/${NC}"
+    else
+        echo -e "${RED}❌ acme.sh 安装失败！${NC}"
+        echo -e "${YELLOW}可能的原因:${NC}"
+        echo -e "  - 网络连接问题"
+        echo -e "  - 权限问题"
+        echo -e "  - 系统兼容性问题"
+    fi
+    
+    read -p "按回车键继续..."
 }
 
 # -------------------------------
