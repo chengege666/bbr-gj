@@ -235,10 +235,10 @@ bbr_management() {
                 bbr_test_menu
                 ;;
             2)
-                run_bbr_switch      # ✅ 修复: 调用正确的 BBR 切换函数
+                install_bbr_kernel
                 ;;
             3)
-                system_info         # ✅ 修复: 调用完整的系统信息函数
+                show_bbr_status
                 ;;
             4)
                 manage_speedtest_cli  # <<< 调用新增的 speedtest-cli 管理函数
@@ -339,6 +339,22 @@ run_bbr_switch() {
     if [ $? -ne 0 ]; then
         echo -e "${RED}❌❌ 下载或运行脚本失败，请检查网络连接${RESET}"
     fi
+    read -n1 -p "按任意键返回菜单..."
+}
+
+# -------------------------------
+# 功能 3: 系统信息 (增强版，包含BBR类型和GLIBC版本)
+# -------------------------------
+show_sys_info() {
+    echo -e "${CYAN}=== 系统详细信息 ===${RESET}"
+        
+    # BBR信息
+    CURRENT_BBR=$(sysctl net.ipv4.tcp_congestion_control 2>/dev/null | awk '{print $3}')
+    CURRENT_QDISC=$(sysctl net.core.default_qdisc 2>/dev/null | awk '{print $3}')
+    echo -e "${GREEN}当前拥塞控制算法:${RESET} $CURRENT_BBR"
+    echo -e "${GREEN}当前队列规则:${RESET} $CURRENT_QDISC"
+        
+    echo ""
     read -n1 -p "按任意键返回菜单..."
 }
 
@@ -1641,6 +1657,5 @@ while true; do
             echo -e "${RED}无效的选项，请重新输入！${NC}"
             sleep 1
             ;;
-    </case>
+    esac
 done
-
