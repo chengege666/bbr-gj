@@ -1961,7 +1961,7 @@ EOF
 }
 
 # -------------------------------
-# 卸载acme.sh证书工具
+# 卸载acme.sh证书工具（选择性删除）
 # -------------------------------
 uninstall_acme_sh() {
     clear
@@ -1977,6 +1977,144 @@ uninstall_acme_sh() {
         return
     fi
     
+    # 获取已申请的证书列表
+    cert_list=()
+    if [ -d ~/.acme.sh ]; then
+        for domain_dir in ~/.acme.sh/*/; do
+            if [ -d "$domain_dir" ] && [ -f "${domain_dir}${domain_dir##*/}.cer" ]; then
+                domain_name=$(basename "$domain_dir")
+                cert_list+=("$domain_name")
+            fi
+        done
+    fi
+    
+    echo -e "${YELLOW}请选择要执行的操作：${NC}"
+    echo ""
+    echo "1. 选择性删除证书（保留acme.sh工具）"
+    echo "2. 完全卸载acme.sh（删除所有证书和工具）"
+    echo "3. 仅清理配置（保留证书文件）"
+    echo "0. 取消操作"
+    echo ""
+    
+    read -p "请输入选项编号: " uninstall_choice
+    
+    case $uninstall_choice in
+        1)
+            selective_delete_certificates
+            ;;
+        2)
+            full_uninstall_acme
+            ;;
+        3)
+            cleanup_config_only
+            ;;
+        0)
+            echo -e "${YELLOW}操作已取消${NC}"
+            read -p "按回车键继续..."
+            return
+            ;;
+        *)
+            echo -e "${RED}无效选项${NC}"
+            read -p "按回车键继续..."
+            return
+            ;;
+    esac
+}
+
+# -------------------------------
+# 选择性删除证书
+# -------------------------------
+selective_delete_certificates() {
+    clear
+    echo -e "${CYAN}=========================================="
+    echo "           选择性删除 SSL 证书         "
+    echo "=========================================="
+    echo -e "${NC}"
+    
+    if [ ${#cert_list[@]} -eq 0 ]; then
+        echo -e "${YELLOW}没有找到已申请的证书${NC}"
+        read -p "按回车键继续..."
+        return
+    fi
+    
+    echo -e "${GREEN}找到以下证书：${NC}"
+    echo "=========================================="
+    
+    for i in "${!cert_list[@]}"; do
+        domain="${cert_list[$i]}"
+        cert_file="$HOME/.acme.sh/$domain/$domain.cer"
+        
+        if [ -f "$cert_file" ]; then
+            expiry_date=$(openssl x509 -in "$cert_file" -noout -enddate 2>/dev/null | cut -d= -f2)
+            if [ $? -eq 0 ]; then
+                expiry_seconds=$(date -d "$expiry_date" +%s 2>/dev/null || date -j -f "%b %d %T %Y %Z" "$expiry_date" +%s 2>/dev/null || echo "未知")
+                if [[ "$expiry_seconds" =~ ^[0-9]+$ ]]; then
+                    current_seconds=$(date +%s)
+                    days_left=$(( (expiry_seconds - current_seconds) / 86400 ))
+                    echo -e "$((i+1)). ${YELLOW}$domain${NC} (剩余 ${days_left} 天)"
+                else
+                    echo -e "$((i+1)). ${YELLOW}$domain${NC} (过期时间: $expiry_date)"
+                fi
+            else
+                echo -e "$((i+1)). ${YELLOW}$domain${NC}"
+            fi
+        else
+            echo -e "$((i+1)). ${YELLOW}$domain${NC}"
+        fi
+    done
+    
+    echo -e "$(( ${#cert_list[@]} + 1 )). ${RED}删除所有证书${NC}"
+    echo -e "0. ${GREEN}返回上级菜单${NC}"
+    echo "=========================================="
+    
+    read -p "请选择要删除的证书编号: " cert_choice
+    
+    if [ "$cert_choice" -eq 0 ]; then
+        return
+    elif [ "$cert_choice" -eq $((${#cert_list[@]} + 1)) ]; then
+        # 删除所有证书
+        echo -e "${RED}⚠️ 确定要删除所有证书吗？此操作不可逆！${NC}"
+        read -p "输入 'YES' 确认删除: " confirm
+        if [ "$confirm" = "YES" ]; then
+            for domain in "${cert_list[@]}"; do
+                echo -e "${YELLOW}删除证书: $domain${NC}"
+                ~/.acme.sh/acme.sh --remove -d "$domain" 2>/dev/null
+                rm -rf "$HOME/.acme.sh/$domain"
+            done
+            echo -e "${GREEN}✅ 所有证书已删除！${NC}"
+        else
+            echo -e "${YELLOW}操作已取消${NC}"
+        fi
+    elif [ "$cert_choice" -ge 1 ] && [ "$cert_choice" -le ${#cert_list[@]} ]; then
+        # 删除单个证书
+        selected_domain="${cert_list[$((cert_choice-1))]}"
+        echo -e "${YELLOW}选择的证书: $selected_domain${NC}"
+        echo -e "${RED}⚠️ 确定要删除此证书吗？此操作不可逆！${NC}"
+        read -p "输入 'YES' 确认删除: " confirm
+        if [ "$confirm" = "YES" ]; then
+            ~/.acme.sh/acme.sh --remove -d "$selected_domain" 2>/dev/null
+            rm -rf "$HOME/.acme.sh/$selected_domain"
+            echo -e "${GREEN}✅ 证书 $selected_domain 已删除！${NC}"
+        else
+            echo -e "${YELLOW}操作已取消${NC}"
+        fi
+    else
+        echo -e "${RED}无效选择${NC}"
+    fi
+    
+    read -p "按回车键继续..."
+}
+
+# -------------------------------
+# 完全卸载acme.sh（保留原功能）
+# -------------------------------
+full_uninstall_acme() {
+    clear
+    echo -e "${CYAN}=========================================="
+    echo "           完全卸载 acme.sh 工具         "
+    echo "=========================================="
+    echo -e "${NC}"
+    
     echo -e "${RED}⚠️ 警告：此操作将完全卸载 acme.sh 及相关证书文件！${NC}"
     echo ""
     echo -e "${YELLOW}将删除以下内容：${NC}"
@@ -1985,17 +2123,17 @@ uninstall_acme_sh() {
     echo "• acme.sh 配置和脚本"
     echo ""
     
-    read -p "确定要卸载 acme.sh 吗？(y/N): " confirm
+    read -p "确定要完全卸载 acme.sh 吗？(y/N): " confirm
     if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
         echo -e "${YELLOW}卸载操作已取消${NC}"
         read -p "按回车键继续..."
         return
     fi
     
-    # 获取acme.sh版本信息（用于显示）
+    # 获取acme.sh版本信息
     ACME_VERSION=$(~/.acme.sh/acme.sh --version 2>/dev/null | head -1)
     
-    echo -e "${YELLOW}开始卸载 acme.sh (${ACME_VERSION})...${NC}"
+    echo -e "${YELLOW}开始完全卸载 acme.sh (${ACME_VERSION})...${NC}"
     echo ""
     
     # 步骤1: 使用acme.sh自带的卸载命令
@@ -2011,7 +2149,6 @@ uninstall_acme_sh() {
     # 步骤2: 手动删除残留文件
     echo -e "${BLUE}[步骤2/3] 清理残留文件...${NC}"
     
-    # 删除acme.sh主目录
     if [ -d ~/.acme.sh ]; then
         rm -rf ~/.acme.sh
         echo -e "${GREEN}✅ 已删除 ~/.acme.sh 目录${NC}"
@@ -2019,15 +2156,13 @@ uninstall_acme_sh() {
         echo -e "${YELLOW}⚠️ ~/.acme.sh 目录不存在${NC}"
     fi
     
-    # 删除可能的环境变量配置（检查shell配置文件）
+    # 步骤3: 清理环境配置
     echo -e "${BLUE}[步骤3/3] 清理环境配置...${NC}"
     
-    # 检查并移除shell配置文件中的acme.sh相关行
     SHELL_FILES=("$HOME/.bashrc" "$HOME/.bash_profile" "$HOME/.zshrc" "$HOME/.profile")
     
     for shell_file in "${SHELL_FILES[@]}"; do
         if [ -f "$shell_file" ]; then
-            # 移除acme.sh相关的alias和PATH设置
             if grep -q "acme.sh" "$shell_file" 2>/dev/null; then
                 sed -i.bak '/acme.sh/d' "$shell_file"
                 echo -e "${GREEN}✅ 已清理 $shell_file 中的acme.sh配置${NC}"
@@ -2035,16 +2170,69 @@ uninstall_acme_sh() {
         fi
     done
     
-    # 从当前会话中移除可能的alias
     unalias acme.sh 2>/dev/null
     
     echo ""
-    echo -e "${GREEN}✅ acme.sh 卸载完成！${NC}"
+    echo -e "${GREEN}✅ acme.sh 完全卸载完成！${NC}"
+    read -p "按回车键继续..."
+}
+
+# -------------------------------
+# 仅清理配置（保留证书文件）
+# -------------------------------
+cleanup_config_only() {
+    clear
+    echo -e "${CYAN}=========================================="
+    echo "           仅清理配置（保留证书）         "
+    echo "=========================================="
+    echo -e "${NC}"
+    
+    echo -e "${YELLOW}此操作将：${NC}"
+    echo "• 移除acme.sh的环境配置"
+    echo "• 保留所有证书文件在 ~/.acme.sh/ 目录中"
+    echo "• 您可以稍后重新安装acme.sh并继续使用现有证书"
     echo ""
-    echo -e "${YELLOW}注意事项：${NC}"
-    echo "• 如果证书已安装到Web服务器，证书文件不会被删除"
-    echo "• 如需完全清理，请手动删除Web服务器中的证书文件"
-    echo "• 环境变量更改需要重新登录或执行: source ~/.bashrc"
+    
+    read -p "确定要继续吗？(y/N): " confirm
+    if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
+        echo -e "${YELLOW}操作已取消${NC}"
+        read -p "按回车键继续..."
+        return
+    fi
+    
+    echo -e "${YELLOW}开始清理配置...${NC}"
+    
+    # 备份证书目录（可选）
+    backup_dir="$HOME/acme_cert_backup_$(date +%Y%m%d_%H%M%S)"
+    echo -e "${BLUE}[步骤1/3] 备份证书文件...${NC}"
+    if [ -d ~/.acme.sh ]; then
+        cp -r ~/.acme.sh "$backup_dir"
+        echo -e "${GREEN}✅ 证书已备份到: $backup_dir${NC}"
+    fi
+    
+    # 清理环境配置
+    echo -e "${BLUE}[步骤2/3] 清理环境配置...${NC}"
+    
+    SHELL_FILES=("$HOME/.bashrc" "$HOME/.bash_profile" "$HOME/.zshrc" "$HOME/.profile")
+    
+    for shell_file in "${SHELL_FILES[@]}"; do
+        if [ -f "$shell_file" ]; then
+            if grep -q "acme.sh" "$shell_file" 2>/dev/null; then
+                sed -i.bak '/acme.sh/d' "$shell_file"
+                echo -e "${GREEN}✅ 已清理 $shell_file 中的acme.sh配置${NC}"
+            fi
+        fi
+    done
+    
+    # 移除alias
+    echo -e "${BLUE}[步骤3/3] 移除别名...${NC}"
+    unalias acme.sh 2>/dev/null
+    echo -e "${GREEN}✅ 别名已移除${NC}"
+    
+    echo ""
+    echo -e "${GREEN}✅ 配置清理完成！${NC}"
+    echo -e "${YELLOW}证书文件仍保留在 ~/.acme.sh/ 目录中${NC}"
+    echo -e "${YELLOW}如需重新使用，请重新安装acme.sh${NC}"
     
     read -p "按回车键继续..."
 }
