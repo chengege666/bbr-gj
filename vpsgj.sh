@@ -1420,6 +1420,543 @@ EOF
 }
 
 # -------------------------------
+# SSL证书申请管理
+# -------------------------------
+ssl_certificate_management() {
+    while true; do
+        clear
+        echo -e "${CYAN}=========================================="
+        echo "            SSL证书申请管理             "
+        echo "=========================================="
+        echo -e "${NC}"
+        
+        # 检查是否安装acme.sh
+        if [ -f ~/.acme.sh/acme.sh ]; then
+            ACME_STATUS="${GREEN}✅ 已安装 (版本: $(~/.acme.sh/acme.sh --version 2>/dev/null | head -1))${NC}"
+        else
+            ACME_STATUS="${RED}❌❌ 未安装${NC}"
+        fi
+        
+        echo -e "${BLUE}acme.sh 状态: $ACME_STATUS${NC}"
+        echo ""
+        echo "1. 安装/更新 acme.sh 证书工具"
+        echo "2. 申请 SSL 证书 (HTTP验证)"
+        echo "3. 申请 SSL 证书 (DNS验证)"
+        echo "4. 查看已申请的证书"
+        echo "5. 续期 SSL 证书"
+        echo "6. 撤销/删除 SSL 证书"
+        echo "7. 安装证书到 Nginx/Apache"
+        echo "0. 返回上级菜单"
+        echo "=========================================="
+        
+        read -p "请输入选项编号: " ssl_choice
+
+        case $ssl_choice in
+            1)
+                install_acme_sh
+                ;;
+            2)
+                ssl_cert_http_verification
+                ;;
+            3)
+                ssl_cert_dns_verification
+                ;;
+            4)
+                list_ssl_certificates
+                ;;
+            5)
+                renew_ssl_certificates
+                ;;
+            6)
+                revoke_ssl_certificate
+                ;;
+            7)
+                install_cert_to_webserver
+                ;;
+            0)
+                return
+                ;;
+            *)
+                echo -e "${RED}无效选项，请重新输入${NC}"
+                sleep 1
+                ;;
+        esac
+    done
+}
+
+# -------------------------------
+# 安装/更新 acme.sh
+# -------------------------------
+install_acme_sh() {
+    clear
+    echo -e "${CYAN}=========================================="
+    echo "           安装/更新 acme.sh 工具         "
+    echo "=========================================="
+    echo -e "${NC}"
+    
+    echo -e "${YELLOW}正在安装 acme.sh SSL证书工具...${NC}"
+    
+    # 安装依赖
+    echo -e "${BLUE}[步骤1/4] 安装必要依赖...${NC}"
+    if command -v apt >/dev/null 2>&1; then
+        apt update -y
+        apt install -y curl socat openssl
+    elif command -v yum >/dev/null 2>&1; then
+        yum install -y curl socat openssl
+    elif command -v dnf >/dev/null 2>&1; then
+        dnf install -y curl socat openssl
+    else
+        echo -e "${YELLOW}⚠️ 无法自动安装依赖，请手动安装: curl, socat, openssl${NC}"
+    fi
+    
+    # 安装acme.sh
+    echo -e "${BLUE}[步骤2/4] 下载安装 acme.sh...${NC}"
+    curl https://get.acme.sh | sh -s email=admin@$(hostname).local
+    
+    if [ $? -eq 0 ] && [ -f ~/.acme.sh/acme.sh ]; then
+        echo -e "${BLUE}[步骤3/4] 设置自动升级...${NC}"
+        ~/.acme.sh/acme.sh --upgrade --auto-upgrade
+        
+        echo -e "${BLUE}[步骤4/4] 设置默认CA...${NC}"
+        ~/.acme.sh/acme.sh --set-default-ca --server letsencrypt
+        
+        echo -e "${GREEN}✅ acme.sh 安装成功！${NC}"
+        echo -e "${YELLOW}使用方法:${NC}"
+        echo -e "${CYAN}  ~/.acme.sh/acme.sh --issue -d 域名 -w 网站根目录${NC}"
+        echo -e "${CYAN}  ~/.acme.sh/acme.sh --issue -d 域名 --dns dns服务商${NC}"
+    else
+        echo -e "${RED}❌❌ acme.sh 安装失败！${NC}"
+    fi
+    
+    read -p "按回车键继续..."
+}
+
+# -------------------------------
+# HTTP验证方式申请证书
+# -------------------------------
+ssl_cert_http_verification() {
+    clear
+    echo -e "${CYAN}=========================================="
+    echo "          HTTP验证方式申请SSL证书         "
+    echo "=========================================="
+    echo -e "${NC}"
+    
+    if [ ! -f ~/.acme.sh/acme.sh ]; then
+        echo -e "${RED}请先安装 acme.sh 工具！${NC}"
+        read -p "按回车键继续..."
+        return
+    fi
+    
+    read -p "请输入要申请证书的域名 (如: example.com): " domain_name
+    if [ -z "$domain_name" ]; then
+        echo -e "${YELLOW}操作已取消${NC}"
+        read -p "按回车键继续..."
+        return
+    fi
+    
+    # 验证域名解析
+    echo -e "${YELLOW}正在验证域名解析...${NC}"
+    domain_ip=$(dig +short $domain_name | head -1)
+    server_ip=$(curl -s4 ifconfig.me)
+    
+    if [ "$domain_ip" != "$server_ip" ]; then
+        echo -e "${RED}⚠️ 警告: 域名解析IP ($domain_ip) 与服务器IP ($server_ip) 不匹配！${NC}"
+        read -p "是否继续？(y/N): " confirm
+        if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
+            echo -e "${YELLOW}操作已取消${NC}"
+            read -p "按回车键继续..."
+            return
+        fi
+    fi
+    
+    read -p "请输入网站根目录 (默认: /var/www/html): " web_root
+    web_root=${web_root:-/var/www/html}
+    
+    # 创建网站目录
+    mkdir -p $web_root
+    
+    # 申请证书
+    echo -e "${YELLOW}正在申请SSL证书...${NC}"
+    ~/.acme.sh/acme.sh --issue -d $domain_name -w $web_root --debug
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✅ SSL证书申请成功！${NC}"
+        echo -e "${CYAN}证书位置:${NC}"
+        echo -e "${YELLOW}  证书文件: ~/.acme.sh/${domain_name}/${domain_name}.cer${NC}"
+        echo -e "${YELLOW}  密钥文件: ~/.acme.sh/${domain_name}/${domain_name}.key${NC}"
+        echo -e "${YELLOW}  完整链: ~/.acme.sh/${domain_name}/fullchain.cer${NC}"
+    else
+        echo -e "${RED}❌❌ SSL证书申请失败！${NC}"
+        echo -e "${YELLOW}可能的原因:${NC}"
+        echo -e "  - 域名解析不正确"
+        echo -e "  - 80端口被占用"
+        echo -e "  - 网络连接问题"
+    fi
+    
+    read -p "按回车键继续..."
+}
+
+# -------------------------------
+# DNS验证方式申请证书
+# -------------------------------
+ssl_cert_dns_verification() {
+    clear
+    echo -e "${CYAN}=========================================="
+    echo "          DNS验证方式申请SSL证书         "
+    echo "=========================================="
+    echo -e "${NC}"
+    
+    if [ ! -f ~/.acme.sh/acme.sh ]; then
+        echo -e "${RED}请先安装 acme.sh 工具！${NC}"
+        read -p "按回车键继续..."
+        return
+    fi
+    
+    read -p "请输入要申请证书的域名 (如: example.com): " domain_name
+    if [ -z "$domain_name" ]; then
+        echo -e "${YELLOW}操作已取消${NC}"
+        read -p "按回车键继续..."
+        return
+    fi
+    
+    echo "请选择DNS服务商:"
+    echo "1. Cloudflare"
+    echo "2. 阿里云 (AliDNS)"
+    echo "3. DNSPod"
+    echo "4. 手动设置DNS记录"
+    echo "0. 取消"
+    
+    read -p "请输入选项: " dns_provider
+    
+    case $dns_provider in
+        1)
+            read -p "请输入Cloudflare API Key: " cf_key
+            read -p "请输入Cloudflare Email: " cf_email
+            export CF_Key="$cf_key"
+            export CF_Email="$cf_email"
+            dns_type="dns_cf"
+            ;;
+        2)
+            read -p "请输入阿里云 AccessKey ID: " ali_key
+            read -p "请输入阿里云 AccessKey Secret: " ali_secret
+            export Ali_Key="$ali_key"
+            export Ali_Secret="$ali_secret"
+            dns_type="dns_ali"
+            ;;
+        3)
+            read -p "请输入DNSPod API ID: " dp_id
+            read -p "请输入DNSPod API Token: " dp_token
+            export DP_Id="$dp_id"
+            export DP_Key="$dp_token"
+            dns_type="dns_dp"
+            ;;
+        4)
+            echo -e "${YELLOW}请手动在DNS服务商处添加TXT记录:${NC}"
+            echo -e "${CYAN}  名称: _acme-challenge.${domain_name}${NC}"
+            echo -e "${CYAN}  类型: TXT${NC}"
+            echo -e "${CYAN}  值: (将在下一步显示)${NC}"
+            dns_type="dns_manual"
+            ;;
+        0)
+            echo -e "${YELLOW}操作已取消${NC}"
+            return
+            ;;
+        *)
+            echo -e "${RED}无效选项${NC}"
+            return
+            ;;
+    esac
+    
+    echo -e "${YELLOW}正在申请SSL证书...${NC}"
+    
+    if [ "$dns_type" = "dns_manual" ]; then
+        ~/.acme.sh/acme.sh --issue -d $domain_name --dns $dns_type --yes-I-know-dns-manual-mode-enough-go-ahead-please
+    else
+        ~/.acme.sh/acme.sh --issue -d $domain_name --dns $dns_type
+    fi
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✅ SSL证书申请成功！${NC}"
+    else
+        echo -e "${RED}❌❌ SSL证书申请失败！${NC}"
+    fi
+    
+    read -p "按回车键继续..."
+}
+
+# -------------------------------
+# 查看已申请的证书
+# -------------------------------
+list_ssl_certificates() {
+    clear
+    echo -e "${CYAN}=========================================="
+    echo "           已申请的SSL证书列表           "
+    echo "=========================================="
+    echo -e "${NC}"
+    
+    if [ ! -f ~/.acme.sh/acme.sh ]; then
+        echo -e "${RED}acme.sh 未安装！${NC}"
+        read -p "按回车键继续..."
+        return
+    fi
+    
+    cert_dir=~/.acme.sh/
+    if [ ! -d "$cert_dir" ] || [ -z "$(ls -A $cert_dir)" ]; then
+        echo -e "${YELLOW}暂无已申请的证书${NC}"
+    else
+        echo -e "${GREEN}已申请的证书列表:${NC}"
+        echo "=========================================="
+        
+        for domain_dir in $cert_dir*/; do
+            if [ -f "${domain_dir}${domain_dir##*/}.cer" ]; then
+                domain_name=$(basename $domain_dir)
+                cert_file="${domain_dir}${domain_name}.cer"
+                
+                if [ -f "$cert_file" ]; then
+                    expiry_date=$(openssl x509 -in "$cert_file" -noout -enddate | cut -d= -f2)
+                    issue_date=$(openssl x509 -in "$cert_file" -noout -startdate | cut -d= -f2)
+                    
+                    echo -e "${CYAN}域名: ${YELLOW}$domain_name${NC}"
+                    echo -e "  颁发时间: $issue_date"
+                    echo -e "  过期时间: $expiry_date"
+                    
+                    # 检查是否即将过期
+                    expiry_seconds=$(date -d "$expiry_date" +%s)
+                    current_seconds=$(date +%s)
+                    days_left=$(( (expiry_seconds - current_seconds) / 86400 ))
+                    
+                    if [ $days_left -lt 30 ]; then
+                        echo -e "  状态: ${RED}⚠️ 即将过期 (剩余 ${days_left} 天)${NC}"
+                    else
+                        echo -e "  状态: ${GREEN}✅ 有效 (剩余 ${days_left} 天)${NC}"
+                    fi
+                    echo "------------------------------------------"
+                fi
+            fi
+        done
+    fi
+    
+    read -p "按回车键继续..."
+}
+
+# -------------------------------
+# 续期SSL证书
+# -------------------------------
+renew_ssl_certificates() {
+    clear
+    echo -e "${CYAN}=========================================="
+    echo "             SSL证书续期            "
+    echo "=========================================="
+    echo -e "${NC}"
+    
+    if [ ! -f ~/.acme.sh/acme.sh ]; then
+        echo -e "${RED}acme.sh 未安装！${NC}"
+        read -p "按回车键继续..."
+        return
+    fi
+    
+    echo "请选择续期方式:"
+    echo "1. 续期所有证书"
+    echo "2. 续期指定域名证书"
+    echo "0. 取消"
+    
+    read -p "请输入选项: " renew_choice
+    
+    case $renew_choice in
+        1)
+            echo -e "${YELLOW}正在续期所有证书...${NC}"
+            ~/.acme.sh/acme.sh --renew-all --force
+            ;;
+        2)
+            read -p "请输入要续期的域名: " renew_domain
+            if [ -z "$renew_domain" ]; then
+                echo -e "${YELLOW}操作已取消${NC}"
+                return
+            fi
+            echo -e "${YELLOW}正在续期域名: $renew_domain${NC}"
+            ~/.acme.sh/acme.sh --renew -d $renew_domain --force
+            ;;
+        0)
+            echo -e "${YELLOW}操作已取消${NC}"
+            return
+            ;;
+        *)
+            echo -e "${RED}无效选项${NC}"
+            return
+            ;;
+    esac
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✅ 证书续期成功！${NC}"
+    else
+        echo -e "${RED}❌❌ 证书续期失败！${NC}"
+    fi
+    
+    read -p "按回车键继续..."
+}
+
+# -------------------------------
+# 撤销/删除SSL证书
+# -------------------------------
+revoke_ssl_certificate() {
+    clear
+    echo -e "${CYAN}=========================================="
+    echo "           撤销/删除SSL证书           "
+    echo "=========================================="
+    echo -e "${NC}"
+    
+    if [ ! -f ~/.acme.sh/acme.sh ]; then
+        echo -e "${RED}acme.sh 未安装！${NC}"
+        read -p "按回车键继续..."
+        return
+    fi
+    
+    read -p "请输入要撤销的域名: " revoke_domain
+    if [ -z "$revoke_domain" ]; then
+        echo -e "${YELLOW}操作已取消${NC}"
+        read -p "按回车键继续..."
+        return
+    fi
+    
+    echo "请选择操作:"
+    echo "1. 仅撤销证书 (证书将失效)"
+    echo "2. 删除证书文件"
+    echo "3. 撤销并删除"
+    echo "0. 取消"
+    
+    read -p "请输入选项: " revoke_choice
+    
+    case $revoke_choice in
+        1)
+            echo -e "${YELLOW}正在撤销证书...${NC}"
+            ~/.acme.sh/acme.sh --revoke -d $revoke_domain
+            ;;
+        2)
+            echo -e "${YELLOW}正在删除证书文件...${NC}"
+            ~/.acme.sh/acme.sh --remove -d $revoke_domain
+            ;;
+        3)
+            echo -e "${YELLOW}正在撤销并删除证书...${NC}"
+            ~/.acme.sh/acme.sh --revoke -d $revoke_domain
+            ~/.acme.sh/acme.sh --remove -d $revoke_domain
+            ;;
+        0)
+            echo -e "${YELLOW}操作已取消${NC}"
+            return
+            ;;
+        *)
+            echo -e "${RED}无效选项${NC}"
+            return
+            ;;
+    esac
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✅ 操作成功！${NC}"
+    else
+        echo -e "${RED}❌❌ 操作失败！${NC}"
+    fi
+    
+    read -p "按回车键继续..."
+}
+
+# -------------------------------
+# 安装证书到Web服务器
+# -------------------------------
+install_cert_to_webserver() {
+    clear
+    echo -e "${CYAN}=========================================="
+    echo "         安装证书到Web服务器         "
+    echo "=========================================="
+    echo -e "${NC}"
+    
+    if [ ! -f ~/.acme.sh/acme.sh ]; then
+        echo -e "${RED}acme.sh 未安装！${NC}"
+        read -p "按回车键继续..."
+        return
+    fi
+    
+    read -p "请输入域名: " install_domain
+    if [ -z "$install_domain" ]; then
+        echo -e "${YELLOW}操作已取消${NC}"
+        read -p "按回车键继续..."
+        return
+    fi
+    
+    echo "请选择Web服务器:"
+    echo "1. Nginx"
+    echo "2. Apache"
+    echo "3. 自定义路径"
+    echo "0. 取消"
+    
+    read -p "请输入选项: " server_choice
+    
+    case $server_choice in
+        1)
+            cert_path="/etc/nginx/ssl"
+            ;;
+        2)
+            cert_path="/etc/apache2/ssl"
+            ;;
+        3)
+            read -p "请输入证书存放路径: " cert_path
+            ;;
+        0)
+            echo -e "${YELLOW}操作已取消${NC}"
+            return
+            ;;
+        *)
+            echo -e "${RED}无效选项${NC}"
+            return
+            ;;
+    esac
+    
+    # 创建证书目录
+    mkdir -p $cert_path
+    
+    # 安装证书
+    echo -e "${YELLOW}正在安装证书...${NC}"
+    ~/.acme.sh/acme.sh --install-cert -d $install_domain \
+        --key-file $cert_path/$install_domain.key \
+        --fullchain-file $cert_path/$install_domain.crt \
+        --reloadcmd "systemctl reload nginx"
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✅ 证书安装成功！${NC}"
+        echo -e "${CYAN}证书位置:${NC}"
+        echo -e "${YELLOW}  密钥文件: $cert_path/$install_domain.key${NC}"
+        echo -e "${YELLOW}  证书文件: $cert_path/$install_domain.crt${NC}"
+        
+        # 生成Nginx配置示例
+        if [ "$server_choice" = "1" ]; then
+            echo -e "${CYAN}Nginx配置示例:${NC}"
+            cat << EOF
+server {
+    listen 443 ssl http2;
+    server_name $install_domain;
+    
+    ssl_certificate $cert_path/$install_domain.crt;
+    ssl_certificate_key $cert_path/$install_domain.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512;
+    
+    # 其他配置...
+}
+
+server {
+    listen 80;
+    server_name $install_domain;
+    return 301 https://\$server_name\$request_uri;
+}
+EOF
+        fi
+    else
+        echo -e "${RED}❌❌ 证书安装失败！${NC}"
+    fi
+    
+    read -p "按回车键继续..."
+}
+
+# -------------------------------
 # 系统工具主菜单 (更新，调用实际函数)
 # -------------------------------
 system_tools_menu() {
@@ -1442,6 +1979,7 @@ system_tools_menu() {
         echo "10. Nginx Proxy Manager 管理"
         echo "11. 查看端口占用状态"
         echo "12. 修改 DNS 服务器"
+        echo "13. SSL证书申请管理"
         echo "0. 返回主菜单"
         echo "=========================================="
 
@@ -1460,6 +1998,7 @@ system_tools_menu() {
             10) nginx_proxy_manager_menu ;;
             11) check_port_usage ;;
             12) change_dns_servers ;;
+            13) ssl_certificate_management ;;
             0) return ;;
             *) echo -e "${RED}无效的选项，请重新输入！${NC}"; sleep 1 ;;
         esac
