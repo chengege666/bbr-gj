@@ -882,69 +882,135 @@ change_ssh_port() {
 }
 
 # -------------------------------
-# 4. 切换优先 IPV4/IPV6
+# 4. 切换优先 IPV4/IPV6 (增强版，添加IPv6开关功能)
 # -------------------------------
 toggle_ipv_priority() {
-    clear
-    echo -e "${CYAN}=========================================="
-    echo "            切换 IPV4/IPV6 优先           "
-    echo "=========================================="
-    echo -e "${NC}"
-    
-    GAI_CONF="/etc/gai.conf"
-    
-    echo "请选择优先使用的网络协议："
-    echo "1. 优先使用 IPv4"
-    echo "2. 优先使用 IPv6"
-    echo "0. 取消操作"
-    read -p "请输入选项编号: " choice
-    
-    case $choice in
-        1)
-            # 优先 IPv4 (取消对 ::ffff:0:0/96 的优先，并设置 ::/0 的优先级低于 IPv4)
-            echo -e "${YELLOW}正在配置优先使用 IPv4...${NC}"
-            
-            # 备份原始文件
-            [ -f "$GAI_CONF" ] && cp "$GAI_CONF" "$GAI_CONF.bak"
-            
-            # 移除或注释掉所有 priority 行
-            sed -i '/^#\s*precedence/!s/^\s*precedence/# precedence/g' "$GAI_CONF" 2>/dev/null
-            touch "$GAI_CONF" # 如果文件不存在则创建
-            sed -i '/^precedence\s*::ffff:0:0\/96/d' "$GAI_CONF"
-
-            # 写入优先 IPv4 的配置
-            echo "precedence ::ffff:0:0/96  100" >> "$GAI_CONF"
-            
-            echo -e "${GREEN}✅ 配置完成。系统将优先使用 IPv4。${NC}"
-            ;;
-        2)
-            # 优先 IPv6 (确保默认优先级，同时不给 IPv4 专门的优先权)
-            echo -e "${YELLOW}正在配置优先使用 IPv6 (恢复默认)...${NC}"
-            
-            # 备份原始文件
-            [ -f "$GAI_CONF" ] && cp "$GAI_CONF" "$GAI_CONF.bak"
-
-            # 移除或注释掉所有 priority 行
-            sed -i '/^#\s*precedence/!s/^\s*precedence/# precedence/g' "$GAI_CONF" 2>/dev/null
-            touch "$GAI_CONF" # 如果文件不存在则创建
-            sed -i '/^precedence\s*::ffff:0:0\/96/d' "$GAI_CONF"
-
-            echo -e "${GREEN}✅ 配置完成。系统将按默认配置优先解析 IPv6。${NC}"
-            ;;
-        0)
-            echo -e "${YELLOW}操作已取消。${NC}"
+    while true; do
+        clear
+        echo -e "${CYAN}=========================================="
+        echo "            IPv4/IPv6 协议管理           "
+        echo "=========================================="
+        echo -e "${NC}"
+        
+        # 检查当前IPv6状态
+        IPV6_STATUS=$(sysctl net.ipv6.conf.all.disable_ipv6 2>/dev/null | awk '{print $3}')
+        if [ "$IPV6_STATUS" = "1" ]; then
+            IPV6_STATUS_TEXT="${RED}已禁用${NC}"
+        else
+            IPV6_STATUS_TEXT="${GREEN}已启用${NC}"
+        fi
+        
+        # 检查当前优先级设置
+        GAI_CONF="/etc/gai.conf"
+        if grep -q "^precedence ::ffff:0:0/96" "$GAI_CONF" 2>/dev/null; then
+            PRIORITY_STATUS="${GREEN}IPv4优先${NC}"
+        else
+            PRIORITY_STATUS="${BLUE}IPv6优先${NC}"
+        fi
+        
+        echo -e "${BLUE}当前IPv6状态: ${IPV6_STATUS_TEXT}${NC}"
+        echo -e "${BLUE}当前连接优先级: ${PRIORITY_STATUS}${NC}"
+        echo ""
+        echo "请选择操作："
+        echo "1. 优先使用 IPv4 (修改gai.conf)"
+        echo "2. 优先使用 IPv6 (恢复默认)"
+        echo "3. 完全禁用 IPv6"
+        echo "4. 启用 IPv6"
+        echo "5. 查看当前网络配置"
+        echo "0. 返回上级菜单"
+        echo "=========================================="
+        
+        read -p "请输入选项编号: " choice
+        
+        case $choice in
+            1)
+                # 优先 IPv4
+                echo -e "${YELLOW}正在配置优先使用 IPv4...${NC}"
+                [ -f "$GAI_CONF" ] && cp "$GAI_CONF" "$GAI_CONF.bak"
+                sed -i '/^#\s*precedence/!s/^\s*precedence/# precedence/g' "$GAI_CONF" 2>/dev/null
+                touch "$GAI_CONF"
+                sed -i '/^precedence\s*::ffff:0:0\/96/d' "$GAI_CONF"
+                echo "precedence ::ffff:0:0/96  100" >> "$GAI_CONF"
+                echo -e "${GREEN}✅ 配置完成。系统将优先使用 IPv4。${NC}"
+                ;;
+            2)
+                # 优先 IPv6 (恢复默认)
+                echo -e "${YELLOW}正在配置优先使用 IPv6 (恢复默认)...${NC}"
+                [ -f "$GAI_CONF" ] && cp "$GAI_CONF" "$GAI_CONF.bak"
+                sed -i '/^#\s*precedence/!s/^\s*precedence/# precedence/g' "$GAI_CONF" 2>/dev/null
+                touch "$GAI_CONF"
+                sed -i '/^precedence\s*::ffff:0:0\/96/d' "$GAI_CONF"
+                echo -e "${GREEN}✅ 配置完成。系统将按默认配置优先解析 IPv6。${NC}"
+                ;;
+            3)
+                # 禁用 IPv6
+                echo -e "${YELLOW}正在禁用 IPv6...${NC}"
+                echo -e "${RED}⚠️ 警告：禁用IPv6可能会影响网络连接，请谨慎操作！${NC}"
+                read -p "确定要禁用IPv6吗？(y/N): " confirm
+                if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then
+                    # 临时禁用
+                    sysctl -w net.ipv6.conf.all.disable_ipv6=1 >/dev/null 2>&1
+                    sysctl -w net.ipv6.conf.default.disable_ipv6=1 >/dev/null 2>&1
+                    
+                    # 永久禁用（写入sysctl.conf）
+                    if grep -q "net.ipv6.conf.all.disable_ipv6" /etc/sysctl.conf 2>/dev/null; then
+                        sed -i 's/^.*net.ipv6.conf.all.disable_ipv6.*$/net.ipv6.conf.all.disable_ipv6 = 1/' /etc/sysctl.conf
+                    else
+                        echo "net.ipv6.conf.all.disable_ipv6 = 1" >> /etc/sysctl.conf
+                    fi
+                    
+                    if grep -q "net.ipv6.conf.default.disable_ipv6" /etc/sysctl.conf 2>/dev/null; then
+                        sed -i 's/^.*net.ipv6.conf.default.disable_ipv6.*$/net.ipv6.conf.default.disable_ipv6 = 1/' /etc/sysctl.conf
+                    else
+                        echo "net.ipv6.conf.default.disable_ipv6 = 1" >> /etc/sysctl.conf
+                    fi
+                    
+                    echo -e "${GREEN}✅ IPv6 已禁用。部分设置需要重启生效。${NC}"
+                else
+                    echo -e "${YELLOW}操作已取消。${NC}"
+                fi
+                ;;
+            4)
+                # 启用 IPv6
+                echo -e "${YELLOW}正在启用 IPv6...${NC}"
+                # 临时启用
+                sysctl -w net.ipv6.conf.all.disable_ipv6=0 >/dev/null 2>&1
+                sysctl -w net.ipv6.conf.default.disable_ipv6=0 >/dev/null 2>&1
+                
+                # 从sysctl.conf中移除禁用设置
+                sed -i '/net.ipv6.conf.all.disable_ipv6/d' /etc/sysctl.conf 2>/dev/null
+                sed -i '/net.ipv6.conf.default.disable_ipv6/d' /etc/sysctl.conf 2>/dev/null
+                
+                echo -e "${GREEN}✅ IPv6 已启用。${NC}"
+                ;;
+            5)
+                # 查看当前网络配置
+                echo -e "${CYAN}=== 当前网络配置信息 ===${NC}"
+                echo -e "${BLUE}IPv6 状态:${NC}"
+                sysctl net.ipv6.conf.all.disable_ipv6 2>/dev/null || echo "无法获取IPv6状态"
+                echo ""
+                echo -e "${BLUE}IP地址信息:${NC}"
+                ip addr show | grep -E "inet6? " | grep -v "127.0.0.1" | head -10
+                echo ""
+                echo -e "${BLUE}路由信息:${NC}"
+                ip route | head -5
+                echo ""
+                echo -e "${BLUE}DNS配置:${NC}"
+                cat /etc/resolv.conf 2>/dev/null | grep -v "^#" | head -5
+                ;;
+            0)
+                return
+                ;;
+            *)
+                echo -e "${RED}无效的选项。${NC}"
+                ;;
+        esac
+        
+        if [ "$choice" != "0" ]; then
+            echo ""
             read -p "按回车键继续..."
-            return
-            ;;
-        *)
-            echo -e "${RED}无效的选项。${NC}"
-            read -p "按回车键继续..."
-            return
-            ;;
-    esac
-    
-    echo -e "${YELLOW}配置更改已应用。${NC}"
-    read -p "按回车键继续..."
+        fi
+    done
 }
 
 # -------------------------------
