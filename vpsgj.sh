@@ -348,12 +348,11 @@ run_bbr_switch() {
 show_sys_info() {
     echo -e "${CYAN}=== 系统详细信息 ===${RESET}"
     
-    # GLIBC信息
-    GLIBC_VERSION=$(ldd --version 2>/dev/null | head -n1 | awk '{print $NF}')
-    if [ -z "$GLIBC_VERSION" ]; then
-        GLIBC_VERSION="未知"
-    fi
-    echo -e "${GREEN}GLIBC版本:${RESET} $GLIBC_VERSION"
+    # BBR信息
+    CURRENT_BBR=$(sysctl net.ipv4.tcp_congestion_control 2>/dev/null | awk '{print $3}')
+    CURRENT_QDISC=$(sysctl net.core.default_qdisc 2>/dev/null | awk '{print $3}')
+    echo -e "${GREEN}当前拥塞控制算法:${RESET} $CURRENT_BBR"
+    echo -e "${GREEN}当前队列规则:${RESET} $CURRENT_QDISC"
     
     echo ""
     read -n1 -p "按任意键返回菜单..."
