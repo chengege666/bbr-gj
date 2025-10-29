@@ -1446,10 +1446,11 @@ ssl_certificate_management() {
         echo "5. 续期 SSL 证书"
         echo "6. 撤销/删除 SSL 证书"
         echo "7. 安装证书到 Nginx/Apache"
+        echo "8. 卸载 acme.sh 证书工具"
         echo "0. 返回上级菜单"
         echo "=========================================="
         
-        read -p "请输入选项编号: " ssl_choice
+         read -p "请输入选项编号: " ssl_choice
 
         case $ssl_choice in
             1)
@@ -1472,6 +1473,9 @@ ssl_certificate_management() {
                 ;;
             7)
                 install_cert_to_webserver
+                ;;
+            8)
+                uninstall_acme_sh
                 ;;
             0)
                 return
@@ -1952,6 +1956,95 @@ EOF
     else
         echo -e "${RED}❌❌ 证书安装失败！${NC}"
     fi
+    
+    read -p "按回车键继续..."
+}
+
+# -------------------------------
+# 卸载acme.sh证书工具
+# -------------------------------
+uninstall_acme_sh() {
+    clear
+    echo -e "${CYAN}=========================================="
+    echo "           卸载 acme.sh 证书工具         "
+    echo "=========================================="
+    echo -e "${NC}"
+    
+    # 检查是否已安装
+    if [ ! -f ~/.acme.sh/acme.sh ]; then
+        echo -e "${YELLOW}acme.sh 未安装，无需卸载${NC}"
+        read -p "按回车键继续..."
+        return
+    fi
+    
+    echo -e "${RED}⚠️ 警告：此操作将完全卸载 acme.sh 及相关证书文件！${NC}"
+    echo ""
+    echo -e "${YELLOW}将删除以下内容：${NC}"
+    echo "• ~/.acme.sh/ 目录及其所有内容"
+    echo "• 所有已申请的SSL证书文件"
+    echo "• acme.sh 配置和脚本"
+    echo ""
+    
+    read -p "确定要卸载 acme.sh 吗？(y/N): " confirm
+    if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
+        echo -e "${YELLOW}卸载操作已取消${NC}"
+        read -p "按回车键继续..."
+        return
+    fi
+    
+    # 获取acme.sh版本信息（用于显示）
+    ACME_VERSION=$(~/.acme.sh/acme.sh --version 2>/dev/null | head -1)
+    
+    echo -e "${YELLOW}开始卸载 acme.sh (${ACME_VERSION})...${NC}"
+    echo ""
+    
+    # 步骤1: 使用acme.sh自带的卸载命令
+    echo -e "${BLUE}[步骤1/3] 执行acme.sh官方卸载...${NC}"
+    ~/.acme.sh/acme.sh --uninstall
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✅ 官方卸载完成${NC}"
+    else
+        echo -e "${YELLOW}⚠️ 官方卸载失败，尝试手动清理${NC}"
+    fi
+    
+    # 步骤2: 手动删除残留文件
+    echo -e "${BLUE}[步骤2/3] 清理残留文件...${NC}"
+    
+    # 删除acme.sh主目录
+    if [ -d ~/.acme.sh ]; then
+        rm -rf ~/.acme.sh
+        echo -e "${GREEN}✅ 已删除 ~/.acme.sh 目录${NC}"
+    else
+        echo -e "${YELLOW}⚠️ ~/.acme.sh 目录不存在${NC}"
+    fi
+    
+    # 删除可能的环境变量配置（检查shell配置文件）
+    echo -e "${BLUE}[步骤3/3] 清理环境配置...${NC}"
+    
+    # 检查并移除shell配置文件中的acme.sh相关行
+    SHELL_FILES=("$HOME/.bashrc" "$HOME/.bash_profile" "$HOME/.zshrc" "$HOME/.profile")
+    
+    for shell_file in "${SHELL_FILES[@]}"; do
+        if [ -f "$shell_file" ]; then
+            # 移除acme.sh相关的alias和PATH设置
+            if grep -q "acme.sh" "$shell_file" 2>/dev/null; then
+                sed -i.bak '/acme.sh/d' "$shell_file"
+                echo -e "${GREEN}✅ 已清理 $shell_file 中的acme.sh配置${NC}"
+            fi
+        fi
+    done
+    
+    # 从当前会话中移除可能的alias
+    unalias acme.sh 2>/dev/null
+    
+    echo ""
+    echo -e "${GREEN}✅ acme.sh 卸载完成！${NC}"
+    echo ""
+    echo -e "${YELLOW}注意事项：${NC}"
+    echo "• 如果证书已安装到Web服务器，证书文件不会被删除"
+    echo "• 如需完全清理，请手动删除Web服务器中的证书文件"
+    echo "• 环境变量更改需要重新登录或执行: source ~/.bashrc"
     
     read -p "按回车键继续..."
 }
