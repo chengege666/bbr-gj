@@ -25,6 +25,40 @@ check_root() {
 }
 
 # -------------------------------
+# 修复 /tmp 目录和检查空间 (新增)
+# -------------------------------
+fix_tmp_and_check_space() {
+    # 检查并修复 /tmp 目录权限
+    if [ ! -d "/tmp" ]; then
+        echo -e "${YELLOW}创建 /tmp 目录...${NC}"
+        mkdir /tmp
+    fi
+    
+    current_perms=$(stat -c "%a" /tmp)
+    if [ "$current_perms" != "1777" ]; then
+        echo -e "${YELLOW}⚠️ /tmp 目录权限不正确 (当前: $current_perms)，正在尝试修复...${NC}"
+        chmod 1777 /tmp
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}✅ /tmp 目录权限已修复为 1777。${NC}"
+        else
+            echo -e "${RED}❌ 修复 /tmp 目录权限失败。请手动执行 'sudo chmod 1777 /tmp'。${NC}"
+        fi
+    fi
+
+    # 检查 /tmp 目录的可用空间
+    # 使用 POSIX compliant `df -P` to avoid issues with long lines on some systems
+    TMP_AVAIL_KB=$(df -Pk /tmp | awk 'NR==2 {print $4}')
+    # 需要至少 100MB 空间
+    REQUIRED_KB=102400 
+    if [ "$TMP_AVAIL_KB" -lt "$REQUIRED_KB" ]; then
+        echo -e "${RED}❌ /tmp 目录可用空间不足 (可用: ${TMP_AVAIL_KB}KB)，请清理磁盘空间。${NC}"
+        read -n1 -p "按任意键继续..."
+        return 1
+    fi
+    return 0
+}
+
+# -------------------------------
 # 依赖安装
 # -------------------------------
 install_deps() {
@@ -518,6 +552,9 @@ manage_speedtest_cli() {
     case $choice in
         1) # 安装/更新
             echo -e "${YELLOW}正在尝试安装 speedtest-cli...${NC}"
+            if ! fix_tmp_and_check_space; then
+                return
+            fi
             if [ -f /etc/debian_version ]; then
                 apt update -y
                 apt install -y speedtest-cli
@@ -2111,9 +2148,9 @@ port_scanner_tool() {
     if ! command -v nmap >/dev/null 2>&1; then
         echo -e "${YELLOW}正在安装nmap...${NC}"
         if command -v apt >/dev/null 2>&1; then
-            apt update && apt install -y nmap
+            apt update -y && apt install -y net-tools
         elif command -v yum >/dev/null 2>&1; then
-            yum install -y nmap
+            yum install -y net-tools
         fi
     fi
     
@@ -2188,7 +2225,8 @@ ssl_cert_manager() {
             ;;
         2)
             if command -v apt >/dev/null 2>&1; then
-                apt update && apt install -y certbot
+                apt update -y
+                apt install -y certbot
             elif command -v yum >/dev/null 2>&1; then
                 yum install -y certbot
             fi
@@ -2670,8 +2708,8 @@ network_health_check() {
     # 运行网络质量体检
     echo -e "${GREEN}✅ 开始网络质量体检...${NC}"
     echo -e "${YELLOW}正在进行全面网络诊断，请稍候...${NC}"
-    echo -e "${BLUE}执行命令: bash <(curl -Ls https://Check.Place) -N${NC}"
-    bash <(curl -Ls https://Check.Place) -N
+    echo -e "${BLUE}执行命令: bash <(curl -Ls https://raw.githubusercontent.com/sjlleo/nexttrace/main/nt_install.sh)${NC}"
+    bash <(curl -Ls https://raw.githubusercontent.com/sjlleo/nexttrace/main/nt_install.sh)
     
     echo -e "${CYAN}"
     echo "=========================================="
@@ -2680,52 +2718,3 @@ network_health_check() {
     echo -e "${YELLOW}请参考上面的报告了解网络状况${NC}"
     read -p "按回车键返回..."
 }
-
-# ====================================================================
-# +++ 主执行逻辑更新 +++
-# ====================================================================
-
-# 脚本启动时，首先检查root权限和依赖
-check_root
-check_deps
-
-# 无限循环，直到用户选择退出
-while true; do
-    show_menu
-    read -p "请输入你的选择 (0-8): " main_choice
-
-    case $main_choice in
-        1)
-            system_info
-            ;;
-        2)
-            system_update
-            ;;
-        3)
-            system_clean
-            ;;
-        4)
-            basic_tools
-            ;;
-        5)
-            bbr_management
-            ;;
-        6)
-            docker_management_menu
-            ;;
-        7)
-            system_tools_menu
-            ;;
-        8)
-            vps_network_test_menu
-            ;;
-        0)
-            echo -e "${GREEN}感谢使用，正在退出脚本...${NC}"
-            exit 0  # 改为 exit 0 确保完全退出
-            ;;
-        *)
-            echo -e "${RED}无效的选项，请重新输入！${NC}"
-            sleep 1
-            ;;
-    esac
-done
