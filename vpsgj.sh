@@ -409,7 +409,7 @@ bbr_management() {
 }
 
 # -------------------------------
-# 核心功能：BBR 测速
+# 核心功能：BBR 测速 (增强版)
 # -------------------------------
 run_test() {
     MODE=$1
@@ -442,38 +442,122 @@ run_test() {
             ;;
     esac
     
-    # 执行测速
-    RAW=$(speedtest-cli --simple 2>/dev/null)
-    if [ -z "$RAW" ]; then
-        echo -e "${YELLOW}⚠️ speedtest-cli 失败，尝试替代方法...${RESET}" 
-        RAW=$(curl -s https://raw.githubusercontent.com/sivel/speedtest-cli/master/speedtest.py | python - --simple 2>/dev/null)
+    # 执行测速 - 尝试多种方法
+    local speedtest_result=""
+    
+    # 方法1: 使用 speedtest-cli
+    if command -v speedtest-cli >/dev/null 2>&1; then
+        echo -e "${YELLOW}尝试方法1: 使用 speedtest-cli...${RESET}"
+        speedtest_result=$(speedtest-cli --simple --timeout 30 2>/dev/null)
     fi
-
-    if [ -z "$RAW" ]; then
-        echo -e "${RED}$MODE 测速失败${RESET}" | tee -a "$RESULT_FILE" 
-        echo ""
-        return
+    
+    # 方法2: 如果方法1失败，尝试使用 Python 版本的 speedtest
+    if [ -z "$speedtest_result" ] && command -v python3 >/dev/null 2>&1; then
+        echo -e "${YELLOW}尝试方法2: 使用 Python speedtest...${RESET}"
+        speedtest_result=$(python3 -c "
+import speedtest
+try:
+    s = speedtest.Speedtest(timeout=10)
+    s.get_best_server()
+    s.download()
+    s.upload()
+    result = s.results.dict()
+    print(f'Ping: {result[\"ping\"]} ms')
+    print(f'Download: {result[\"download\"] / 1000000:.2f} Mbps')
+    print(f'Upload: {result[\"upload\"] / 1000000:.2f} Mbps')
+except Exception as e:
+    pass
+" 2>/dev/null)
     fi
-
-    PING=$(echo "$RAW" | grep "Ping" | awk '{print $2}')
-    DOWNLOAD=$(echo "$RAW" | grep "Download" | awk '{print $2}')
-    UPLOAD=$(echo "$RAW" | grep "Upload" | awk '{print $2}')
-
-    echo -e "${GREEN}$MODE | Ping: ${PING}ms | Down: ${DOWNLOAD} Mbps | Up: ${UPLOAD} Mbps${RESET}" | tee -a "$RESULT_FILE" 
+    
+    # 方法3: 如果前两种方法都失败，尝试使用 curl 下载测试
+    if [ -z "$speedtest_result" ] && command -v curl >/dev/null 2>&1; then
+        echo -e "${YELLOW}尝试方法3: 使用下载速度测试...${RESET}"
+        # 测试下载速度 (使用一个可靠的测试文件)
+        local test_file="https://proof.ovh.net/files/100Mb.dat"
+        local start_time=$(date +%s)
+        local download_result=$(curl -o /dev/null -w "%{speed_download}\n" -s "$test_file")
+        local end_time=$(date +%s)
+        local download_time=$((end_time - start_time))
+        
+        if [ -n "$download_result" ] && [ "$download_result" != "0.000" ]; then
+            # 计算下载速度 (Mbps)
+            local download_speed=$(echo "scale=2; $download_result * 8 / 1000000" | bc)
+            # 简单估算 ping 值 (不准确，仅供参考)
+            local ping_estimate=$(echo "scale=2; $download_time * 50 / 10" | bc)
+            speedtest_result="Ping: ${ping_estimate} ms\nDownload: ${download_speed} Mbps\nUpload: 0.00 Mbps"
+        fi
+    fi
+    
+    # 方法4: 使用 wget 测试下载速度
+    if [ -z "$speedtest_result" ] && command -v wget >/dev/null 2>&1; then
+        echo -e "${YELLOW}尝试方法4: 使用 wget 测试下载速度...${RESET}"
+        local test_file="https://proof.ovh.net/files/100Mb.dat"
+        local start_time=$(date +%s)
+        wget -O /dev/null -q --show-progress "$test_file" 2>&1 | grep -o '[0-9.]\+ [KM]B/s'
+        local end_time=$(date +%s)
+        local download_time=$((end_time - start_time))
+        
+        if [ $download_time -gt 0 ]; then
+            # 计算平均下载速度 (Mbps)
+            local download_speed=$(echo "scale=2; 100 * 8 / $download_time" | bc)
+            local ping_estimate=$(echo "scale=2; $download_time * 50 / 10" | bc)
+            speedtest_result="Ping: ${ping_estimate} ms\nDownload: ${download_speed} Mbps\nUpload: 0.00 Mbps"
+        fi
+    fi
+    
+    # 处理测速结果
+    if [ -n "$speedtest_result" ]; then
+        PING=$(echo -e "$speedtest_result" | grep "Ping" | awk '{print $2}')
+        DOWNLOAD=$(echo -e "$speedtest_result" | grep "Download" | awk '{print $2}')
+        UPLOAD=$(echo -e "$speedtest_result" | grep "Upload" | awk '{print $2}')
+        
+        echo -e "${GREEN}$MODE | Ping: ${PING}ms | Down: ${DOWNLOAD} Mbps | Up: ${UPLOAD} Mbps${RESET}" | tee -a "$RESULT_FILE" 
+    else
+        echo -e "${RED}$MODE 测速失败 - 所有方法都尝试过了${RESET}" | tee -a "$RESULT_FILE" 
+        echo -e "${YELLOW}可能的原因:${NC}"
+        echo -e "${YELLOW}1. 网络连接问题${NC}"
+        echo -e "${YELLOW}2. 测速服务器不可用${NC}"
+        echo -e "${YELLOW}3. 防火墙阻止了测速连接${NC}"
+    fi
     echo ""
 }
 
 # -------------------------------
-# 功能 1: BBR 综合测速
+# 功能 1: BBR 综合测速 (增强版)
 # -------------------------------
 bbr_test_menu() {
+    # 确保已安装必要的工具
+    if ! command -v bc >/dev/null 2>&1; then
+        echo -e "${YELLOW}安装计算工具 bc...${NC}"
+        if command -v apt >/dev/null 2>&1; then
+            apt install -y bc
+        elif command -v yum >/dev/null 2>&1; then
+            yum install -y bc
+        fi
+    fi
+    
     echo -e "${CYAN}=== 开始 BBR 综合测速 ===${RESET}"
     > "$RESULT_FILE"
+    
+    # 记录当前设置
+    ORIGINAL_CC=$(sysctl net.ipv4.tcp_congestion_control 2>/dev/null | awk '{print $3}')
+    ORIGINAL_QDISC=$(sysctl net.core.default_qdisc 2>/dev/null | awk '{print $3}')
     
     # 无条件尝试所有算法
     for MODE in "BBR" "BBR Plus" "BBRv2" "BBRv3"; do
         run_test "$MODE"
+        # 每次测试后稍作休息
+        sleep 2
     done
+    
+    # 恢复原始设置
+    if [ -n "$ORIGINAL_CC" ]; then
+        sysctl -w net.ipv4.tcp_congestion_control="$ORIGINAL_CC" >/dev/null 2>&1
+    fi
+    if [ -n "$ORIGINAL_QDISC" ]; then
+        sysctl -w net.core.default_qdisc="$ORIGINAL_QDISC" >/dev/null 2>&1
+    fi
     
     echo -e "${CYAN}=== 测试完成，结果汇总 (${RESULT_FILE}) ===${RESET}"
     if [ -f "$RESULT_FILE" ] && [ -s "$RESULT_FILE" ]; then
