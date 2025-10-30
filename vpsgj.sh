@@ -409,10 +409,10 @@ bbr_management() {
 }
 
 # -------------------------------
-# 核心功能：BBR 测速 (修复版 v4 - 解决TSV解析错误，改用JSON)
+# 核心功能：BBR 测速 (修复版 v5 - 解决 AWK 兼容性问题，改用 BC)
 # -------------------------------
 
-# 辅助函数：检查并安装 Ookla speedtest (健壮版 - 保持不变)
+# 辅助函数：检查并安装 Ookla speedtest (健壮版)
 check_and_install_speedtest() {
     if command -v speedtest >/dev/null 2>&1; then
         return 0 # 已安装
@@ -422,9 +422,10 @@ check_and_install_speedtest() {
     
     # --- 方法 1: 尝试使用包管理器 (APT / YUM / DNF) ---
     if [ -f /etc/debian_version ]; then
-        echo -e "${BLUE}[1/3] 正在安装依赖 (curl, gnupg)...${NC}"
+        # ⚠️ 修复点：安装依赖时增加 bc
+        echo -e "${BLUE}[1/3] 正在安装依赖 (curl, gnupg, bc)...${NC}" 
         apt-get update -y
-        apt-get install -y curl gnupg1 apt-transport-https dirmngr
+        apt-get install -y curl gnupg1 apt-transport-https dirmngr bc
         
         echo -e "${BLUE}[2/3] 正在添加 Ookla 软件源...${NC}"
         curl -s https://install.speedtest.net/app/cli/install.deb.sh | bash
@@ -446,9 +447,11 @@ check_and_install_speedtest() {
         
         echo -e "${BLUE}[2/2] 正在安装 'speedtest' 包...${NC}"
         if command -v dnf >/dev/null 2>&1; then
-            dnf install -y speedtest
+            # ⚠️ 修复点：安装依赖时增加 bc
+            dnf install -y speedtest bc 
         else
-            yum install -y speedtest
+            # ⚠️ 修复点：安装依赖时增加 bc
+            yum install -y speedtest bc 
         fi
         
         if command -v speedtest >/dev/null 2>&1; then
@@ -481,6 +484,7 @@ check_and_install_speedtest() {
     elif command -v wget >/dev/null 2>&1; then
         wget -qO /tmp/speedtest.tgz "$SPEEDTEST_URL"
     else
+        # 在后备安装中，如果缺少 curl/wget，也无法安装 bc，因此必须退出
         echo -e "${RED}❌ 缺少 curl 和 wget，无法下载。${NC}"
         return 1
     fi
@@ -490,10 +494,24 @@ check_and_install_speedtest() {
         return 1
     fi
     
-    # 解压到 /tmp/
-    tar -zxf /tmp/speedtest.tgz -C /tmp/
+    # ... (二进制安装逻辑保持不变)
     
-    # 将解压出的 'speedtest' 文件移动到 bin 目录
+    # 必须确保 bc 在这里也被安装，否则 run_test 会失败
+    if ! command -v bc >/dev/null 2>&1; then
+        echo -e "${YELLOW}后备安装模式下，正在安装 bc 以进行计算...${NC}"
+        if [ -f /etc/debian_version ]; then
+            apt-get update -y && apt-get install -y bc
+        elif [ -f /etc/redhat-release ]; then
+            if command -v dnf >/dev/null 2>&1; then
+                dnf install -y bc
+            else
+                yum install -y bc
+            fi
+        fi
+    fi
+
+    # ... (二进制安装逻辑继续)
+    tar -zxf /tmp/speedtest.tgz -C /tmp/
     if [ -f /tmp/speedtest ]; then
         mv /tmp/speedtest /usr/local/bin/speedtest
         chmod +x /usr/local/bin/speedtest
@@ -502,12 +520,8 @@ check_and_install_speedtest() {
         rm -f /tmp/speedtest.tgz
         return 1
     fi
-    
-    # 清理
     rm -f /tmp/speedtest.tgz
-    rm -f /tmp/ookla-speedtest* # 清理 md5 和 readme
-    
-    if command -v speedtest >/dev/null 2>&1; then
+    rm -f /tmp/ookla-speedtest* if command -v speedtest >/dev/null 2>&1; then
         echo -e "${GREEN}✅ Ookla speedtest (二进制版) 安装成功！${NC}"
         speedtest --accept-license >/dev/null 2>&1
         return 0
@@ -529,7 +543,7 @@ run_test() {
         return
     fi
     
-    # 切换算法
+    # 切换算法 (保持不变)
     case $MODE in
         "BBR") 
             modprobe tcp_bbr >/dev/null 2>&1
@@ -559,7 +573,6 @@ run_test() {
     # 执行测速 (使用 Ookla speedtest 和 JSON 格式)
     echo -e "${YELLOW}正在执行 $MODE 测速 (使用 Ookla - JSON 模式)，请稍候...${NC}"
     
-    # 使用 JSON 格式输出，然后使用 grep + PCRE 提取字段
     RAW_JSON=$(speedtest --accept-license -f json 2>/dev/null)
 
     if [ -z "$RAW_JSON" ]; then
@@ -568,18 +581,12 @@ run_test() {
         return
     fi
     
-    # 提取 JSON 字段 (使用 grep -oP 提取)
-    # Ping (ms)
+    # 提取 JSON 字段 (保持不变)
     PING=$(echo "$RAW_JSON" | grep -oP '"latency":\s*\K[^,]+' | head -n1)
-    
-    # Download (bps)
     DOWNLOAD_BPS=$(echo "$RAW_JSON" | grep -oP '"download":\s*\K[^,]+' | head -n1)
-    
-    # Upload (bps)
     UPLOAD_BPS=$(echo "$RAW_JSON" | grep -oP '"upload":\s*\K[^,]+' | head -n1)
 
-
-    # 检查是否获取到数字
+    # 检查是否获取到数字 (保持不变)
     if [ -z "$PING" ] || [ -z "$DOWNLOAD_BPS" ] || [ -z "$UPLOAD_BPS" ]; then
         echo -e "${RED}$MODE 测速失败 (JSON解析失败或字段缺失)${RESET}" | tee -a "$RESULT_FILE"
         echo "DEBUG (RAW): $RAW_JSON"
@@ -587,17 +594,17 @@ run_test() {
         return
     fi
     
-    # 转换单位: Ookla JSON 输出是 bps (bits/second)，转换为 Mbps (Megabits/second)
-    # Mbps = bps / 1000 / 1000 (注意：这里已移除错误的 * 8 因子)
-    DOWNLOAD_MBPS=$(awk "BEGIN {printf \"%.2f\", $DOWNLOAD_BPS / 1000 / 1000}")
-    UPLOAD_MBPS=$(awk "BEGIN {printf \"%.2f\", $UPLOAD_BPS / 1000 / 1000}")
+    # ⚠️ 修复点：使用 bc 进行浮点运算
+    # Mbps = bps / 1,000,000
+    DOWNLOAD_MBPS=$(echo "scale=2; $DOWNLOAD_BPS / 1000000" | bc)
+    UPLOAD_MBPS=$(echo "scale=2; $UPLOAD_BPS / 1000000" | bc)
 
     echo -e "${GREEN}$MODE | Ping: ${PING}ms | Down: ${DOWNLOAD_MBPS} Mbps | Up: ${UPLOAD_MBPS} Mbps${RESET}" | tee -a "$RESULT_FILE" 
     echo ""
 }
 
 # -------------------------------
-# 功能 1: BBR 综合测速
+# 功能 1: BBR 综合测速 (保持不变)
 # -------------------------------
 bbr_test_menu() {
     echo -e "${CYAN}=== 开始 BBR 综合测速 ===${RESET}"
