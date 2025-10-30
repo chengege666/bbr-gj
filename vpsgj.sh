@@ -409,37 +409,111 @@ bbr_management() {
 }
 
 # -------------------------------
-# 核心功能：BBR 测速 (修复版 - 使用 Ookla Speedtest)
+# 核心功能：BBR 测速 (修复版 v2 - 使用 Ookla Speedtest + 回退)
 # -------------------------------
 
-# 辅助函数：检查并安装 Ookla speedtest
+# 辅助函数：检查并安装 Ookla speedtest (健壮版)
 check_and_install_speedtest() {
     if command -v speedtest >/dev/null 2>&1; then
         return 0 # 已安装
     fi
     
     echo -e "${YELLOW}⚠️ 未检测到 Ookla speedtest，正在尝试自动安装...${NC}"
+    
+    # --- 方法 1: 尝试使用包管理器 (APT / YUM / DNF) ---
     if [ -f /etc/debian_version ]; then
-        apt update >/dev/null 2>&1
-        apt install -y curl gnupg1 apt-transport-https dirmngr >/dev/null 2>&1
-        curl -s https://install.speedtest.net/app/cli/install.deb.sh | bash >/dev/null 2>&1
-        apt-get update >/dev/null 2>&1
+        echo -e "${BLUE}[1/3] 正在安装依赖 (curl, gnupg)...${NC}"
+        apt-get update -y
+        apt-get install -y curl gnupg1 apt-transport-https dirmngr
+        
+        echo -e "${BLUE}[2/3] 正在添加 Ookla 软件源...${NC}"
+        # 不再隐藏输出，以便调试
+        curl -s https://install.speedtest.net/app/cli/install.deb.sh | bash
+        
+        echo -e "${BLUE}[3/3] 正在更新列表并安装 'speedtest' 包...${NC}"
+        apt-get update -y
         apt-get install -y speedtest
+        
+        if command -v speedtest >/dev/null 2>&1; then
+            echo -e "${GREEN}✅ Ookla speedtest (APT版) 安装成功！${NC}"
+            speedtest --accept-license >/dev/null 2>&1
+            return 0
+        fi
+        echo -e "${YELLOW}⚠️ APT 方法安装失败，尝试后备方法...${NC}"
+
     elif [ -f /etc/redhat-release ]; then
-        curl -s https://install.speedtest.net/app/cli/install.rpm.sh | bash >/dev/null 2>&1
-        yum install -y speedtest
+        echo -e "${BLUE}[1/2] 正在添加 Ookla 软件源...${NC}"
+        curl -s https://install.speedtest.net/app/cli/install.rpm.sh | bash
+        
+        echo -e "${BLUE}[2/2] 正在安装 'speedtest' 包...${NC}"
+        if command -v dnf >/dev/null 2>&1; then
+            dnf install -y speedtest
+        else
+            yum install -y speedtest
+        fi
+        
+        if command -v speedtest >/dev/null 2>&1; then
+            echo -e "${GREEN}✅ Ookla speedtest (YUM/DNF版) 安装成功！${NC}"
+            speedtest --accept-license >/dev/null 2>&1
+            return 0
+        fi
+        echo -e "${YELLOW}⚠️ YUM/DNF 方法安装失败，尝试后备方法...${NC}"
+    fi
+
+    # --- 方法 2: 后备 - 手动下载二进制文件 (适用于所有架构) ---
+    echo -e "${BLUE}>>> 正在尝试后备方法：手动下载二进制文件...${NC}"
+    ARCH=$(uname -m)
+    SPEEDTEST_URL=""
+    
+    if [ "$ARCH" = "x86_64" ]; then
+        SPEEDTEST_URL="https://install.speedtest.net/app/cli/ookla-speedtest-1.2.0-linux-x86_64.tgz"
+    elif [ "$ARCH" = "aarch64" ]; then
+        SPEEDTEST_URL="https://install.speedtest.net/app/cli/ookla-speedtest-1.2.0-linux-aarch64.tgz"
+    elif [ "$ARCH" = "armv7l" ] || [ "$ARCH" = "armv6l" ] || [ "$ARCH" = "armhf" ]; then
+        SPEEDTEST_URL="https://install.speedtest.net/app/cli/ookla-speedtest-1.2.0-linux-armhf.tgz"
     else
-        echo -e "${RED}❌ 自动安装失败。请从菜单 [5] -> [4] 手动安装 speedtest。${NC}"
+        echo -e "${RED}❌ 不支持的系统架构: $ARCH (后备方法失败)${NC}"
         return 1
     fi
     
+    echo -e "${YELLOW}正在从 $SPEEDTEST_URL 下载...${NC}"
+    if command -v curl >/dev/null 2>&1; then
+        curl -sLo /tmp/speedtest.tgz "$SPEEDTEST_URL"
+    elif command -v wget >/dev/null 2>&1; then
+        wget -qO /tmp/speedtest.tgz "$SPEEDTEST_URL"
+    else
+        echo -e "${RED}❌ 缺少 curl 和 wget，无法下载。${NC}"
+        return 1
+    fi
+    
+    if [ ! -f /tmp/speedtest.tgz ]; then
+        echo -e "${RED}❌ 下载失败！${NC}"
+        return 1
+    fi
+    
+    # 解压到 /tmp/
+    tar -zxf /tmp/speedtest.tgz -C /tmp/
+    
+    # 将解压出的 'speedtest' 文件移动到 bin 目录
+    if [ -f /tmp/speedtest ]; then
+        mv /tmp/speedtest /usr/local/bin/speedtest
+        chmod +x /usr/local/bin/speedtest
+    else
+        echo -e "${RED}❌ 解压失败或未找到 'speedtest' 文件。${NC}"
+        rm -f /tmp/speedtest.tgz
+        return 1
+    fi
+    
+    # 清理
+    rm -f /tmp/speedtest.tgz
+    rm -f /tmp/ookla-speedtest* # 清理 md5 和 readme
+    
     if command -v speedtest >/dev/null 2>&1; then
-        echo -e "${GREEN}✅ Ookla speedtest 安装成功！${NC}"
-        echo -e "${YELLOW}正在自动接受 EULA 许可...${NC}"
+        echo -e "${GREEN}✅ Ookla speedtest (二进制版) 安装成功！${NC}"
         speedtest --accept-license >/dev/null 2>&1
         return 0
     else
-        echo -e "${RED}❌ 安装失败。${NC}"
+        echo -e "${RED}❌ 所有安装方法均失败！${NC}"
         return 1
     fi
 }
@@ -477,7 +551,7 @@ run_test() {
             sysctl -w net.core.default_qdisc=fq >/dev/null 2>&1
             sysctl -w net.ipv4.tcp_congestion_control=bbrv3 >/dev/null 2>&1
             ;;
-        *) # 增加一个默认情况以防意外输入，虽然测速模式通常是固定的
+        *) 
             echo -e "${YELLOW}未知 BBR 模式: $MODE${RESET}"
             ;;
     esac
@@ -499,7 +573,7 @@ run_test() {
     # 解析 TSV
     PING=$(echo "$RAW_TSV" | awk -F'\t' '{printf "%.2f", $1}')
     DOWNLOAD_BPS=$(echo "$RAW_TSV" | awk -F'\t' '{print $2}')
-    UPLOAD_BPS=$(echo "$RAW_TSV" | awk -F'\t' '{print $3}')
+    UPLOAD_BPS=$(echo "$RAW_T"S V" | awk -F'\t' '{print $3}')
 
     # 检查是否获取到数字
     if ! [[ "$PING" =~ ^[0-9.-]+$ ]] || ! [[ "$DOWNLOAD_BPS" =~ ^[0-9]+$ ]] || ! [[ "$UPLOAD_BPS" =~ ^[0-9]+$ ]]; then
@@ -515,6 +589,28 @@ run_test() {
 
     echo -e "${GREEN}$MODE | Ping: ${PING}ms | Down: ${DOWNLOAD_MBPS} Mbps | Up: ${UPLOAD_MBPS} Mbps${RESET}" | tee -a "$RESULT_FILE" 
     echo ""
+}
+
+# -------------------------------
+# 功能 1: BBR 综合测速
+# -------------------------------
+bbr_test_menu() {
+    echo -e "${CYAN}=== 开始 BBR 综合测速 ===${RESET}"
+    > "$RESULT_FILE"
+    
+    # 无条件尝试所有算法
+    for MODE in "BBR" "BBR Plus" "BBRv2" "BBRv3"; do
+        run_test "$MODE"
+    done
+    
+    echo -e "${CYAN}=== 测试完成，结果汇总 (${RESULT_FILE}) ===${RESET}"
+    if [ -f "$RESULT_FILE" ] && [ -s "$RESULT_FILE" ]; then
+        cat "$RESULT_FILE"
+    else
+        echo -e "${YELLOW}无测速结果${RESET}"
+    fi
+    echo ""
+    read -n1 -p "按任意键返回菜单..."
 }
 
 # -------------------------------
@@ -593,7 +689,7 @@ manage_speedtest_cli() {
 
     case $choice in
         1) # 安装/更新
-            # 调用 BBR 测速中的安装函数
+            # 调用健壮的安装函数
             check_and_install_speedtest
             ;;
         2) # 卸载
@@ -602,9 +698,16 @@ manage_speedtest_cli() {
                 apt-get purge -y speedtest
                 apt-get autoremove -y
             elif [ -f /etc/redhat-release ]; then
-                yum remove -y speedtest
-            else
-                echo -e "${RED}不支持的系统或找不到包管理器，请手动卸载。${NC}"
+                if command -v dnf >/dev/null 2>&1; then
+                    dnf remove -y speedtest
+                else
+                    yum remove -y speedtest
+                fi
+            fi
+            # 额外检查手动安装的二进制文件
+            if [ -f /usr/local/bin/speedtest ]; then
+                rm -f /usr/local/bin/speedtest
+                echo -e "${GREEN}✅ 已移除手动安装的 speedtest。${NC}"
             fi
             ;;
         0)
@@ -615,38 +718,6 @@ manage_speedtest_cli() {
             ;;
     esac
     read -n1 -p "按任意键返回菜单..."
-}
-
-
-# 新增：修复APT软件源函数
-fix_apt_sources() {
-    echo -e "${YELLOW}正在修复APT软件源配置...${NC}"
-    
-    # 备份当前源列表
-    cp /etc/apt/sources.list /etc/apt/sources.list.backup.$(date +%Y%m%d_%H%M%S)
-    
-    # 使用Debian官方源
-    cat > /etc/apt/sources.list << 'EOF'
-# Debian 12 Bookworm 官方源
-deb http://deb.debian.org/debian bookworm main contrib non-free
-deb http://deb.debian.org/debian bookworm-updates main contrib non-free
-deb http://security.debian.org/debian-security bookworm-security main contrib non-free
-
-# 如果需要非自由软件，取消注释下面行
-# deb http://deb.debian.org/debian bookworm non-free
-EOF
-
-    # 更新GPG密钥
-    echo -e "${YELLOW}更新GPG密钥...${NC}"
-    apt-get update -o Acquire::AllowInsecureRepositories=true
-    apt-get install -y debian-archive-keyring
-    apt-key update
-    
-    # 清理并更新
-    apt-get clean
-    apt-get update
-    
-    echo -e "${GREEN}✅ 软件源修复完成！${NC}"
 }
 
 # 新增：替代安装方法
