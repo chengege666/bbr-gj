@@ -2723,6 +2723,7 @@ done
 # 27. 安装 1Panel
 # -------------------------------
 install_1panel() {
+    set -x # Enable shell debugging
     clear
     echo -e "${CYAN}=========================================="
     echo "             安装 1Panel 面板             "
@@ -2744,15 +2745,20 @@ install_1panel() {
         else
             echo -e "${RED}无法安装curl，请手动安装后重试${NC}"
             read -p "按回车键返回..."
+            set +x # Disable shell debugging
             return
         fi
     fi
 
     # 执行 1Panel 安装命令
-    curl -sSL https://resource.fit2cloud.com/1panel/binary/stable/install.sh | bash
+    echo -e "${GREEN}正在下载并执行 1Panel 安装脚本...${NC}"
+    if ! curl -sSL https://resource.fit2cloud.com/1panel/binary/stable/install.sh | bash; then
+        echo -e "${RED}1Panel 安装脚本执行失败！请检查网络连接或手动尝试安装。${NC}"
+    fi
     
     echo -e "${GREEN}1Panel 安装命令已执行。${NC}"
     echo -e "${YELLOW}请根据安装脚本的提示完成后续配置。${NC}"
     echo -e "${YELLOW}通常，安装完成后会显示访问地址和初始用户名密码。${NC}"
     read -p "按回车键返回..."
+    set +x # Disable shell debugging
 }
