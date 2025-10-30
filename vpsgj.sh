@@ -409,7 +409,7 @@ bbr_management() {
 }
 
 # -------------------------------
-# 核心功能：BBR 测速 (修复版 v2 - 使用 Ookla Speedtest + 回退)
+# 核心功能：BBR 测速 (修复版 v3 - 修正拼写错误)
 # -------------------------------
 
 # 辅助函数：检查并安装 Ookla speedtest (健壮版)
@@ -573,7 +573,12 @@ run_test() {
     # 解析 TSV
     PING=$(echo "$RAW_TSV" | awk -F'\t' '{printf "%.2f", $1}')
     DOWNLOAD_BPS=$(echo "$RAW_TSV" | awk -F'\t' '{print $2}')
-    UPLOAD_BPS=$(echo "$RAW_T"S V" | awk -F'\t' '{print $3}')
+    
+    # ====================
+    # ⚠️ 修正点 ⚠️
+    # 修正了 "$RAW_T"S V" 为 "$RAW_TSV"
+    UPLOAD_BPS=$(echo "$RAW_TSV" | awk -F'\t' '{print $3}')
+    # ====================
 
     # 检查是否获取到数字
     if ! [[ "$PING" =~ ^[0-9.-]+$ ]] || ! [[ "$DOWNLOAD_BPS" =~ ^[0-9]+$ ]] || ! [[ "$UPLOAD_BPS" =~ ^[0-9]+$ ]]; then
