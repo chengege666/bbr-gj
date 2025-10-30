@@ -409,7 +409,7 @@ bbr_management() {
 }
 
 # -------------------------------
-# 核心功能：BBR 测速 (修复版 v5 - 解决 AWK 兼容性问题，改用 BC)
+# 核心功能：BBR 测速 (修复版 V6 - 修正语法错误，确保 BC 兼容性)
 # -------------------------------
 
 # 辅助函数：检查并安装 Ookla speedtest (健壮版)
@@ -422,7 +422,7 @@ check_and_install_speedtest() {
     
     # --- 方法 1: 尝试使用包管理器 (APT / YUM / DNF) ---
     if [ -f /etc/debian_version ]; then
-        # ⚠️ 修复点：安装依赖时增加 bc
+        # 修复点：安装依赖时增加 bc
         echo -e "${BLUE}[1/3] 正在安装依赖 (curl, gnupg, bc)...${NC}" 
         apt-get update -y
         apt-get install -y curl gnupg1 apt-transport-https dirmngr bc
@@ -447,10 +447,10 @@ check_and_install_speedtest() {
         
         echo -e "${BLUE}[2/2] 正在安装 'speedtest' 包...${NC}"
         if command -v dnf >/dev/null 2>&1; then
-            # ⚠️ 修复点：安装依赖时增加 bc
+            # 修复点：安装依赖时增加 bc
             dnf install -y speedtest bc 
         else
-            # ⚠️ 修复点：安装依赖时增加 bc
+            # 修复点：安装依赖时增加 bc
             yum install -y speedtest bc 
         fi
         
@@ -462,7 +462,7 @@ check_and_install_speedtest() {
         echo -e "${YELLOW}⚠️ YUM/DNF 方法安装失败，尝试后备方法...${NC}"
     fi
 
-    # --- 方法 2: 后备 - 手动下载二进制文件 (保持不变) ---
+    # --- 方法 2: 后备 - 手动下载二进制文件 (修复了 if 语法) ---
     echo -e "${BLUE}>>> 正在尝试后备方法：手动下载二进制文件...${NC}"
     ARCH=$(uname -m)
     SPEEDTEST_URL=""
@@ -484,7 +484,6 @@ check_and_install_speedtest() {
     elif command -v wget >/dev/null 2>&1; then
         wget -qO /tmp/speedtest.tgz "$SPEEDTEST_URL"
     else
-        # 在后备安装中，如果缺少 curl/wget，也无法安装 bc，因此必须退出
         echo -e "${RED}❌ 缺少 curl 和 wget，无法下载。${NC}"
         return 1
     fi
@@ -494,9 +493,7 @@ check_and_install_speedtest() {
         return 1
     fi
     
-    # ... (二进制安装逻辑保持不变)
-    
-    # 必须确保 bc 在这里也被安装，否则 run_test 会失败
+    # 必须确保 bc 在这里也被安装
     if ! command -v bc >/dev/null 2>&1; then
         echo -e "${YELLOW}后备安装模式下，正在安装 bc 以进行计算...${NC}"
         if [ -f /etc/debian_version ]; then
@@ -510,8 +507,10 @@ check_and_install_speedtest() {
         fi
     fi
 
-    # ... (二进制安装逻辑继续)
+    # 解压到 /tmp/
     tar -zxf /tmp/speedtest.tgz -C /tmp/
+    
+    # 将解压出的 'speedtest' 文件移动到 bin 目录
     if [ -f /tmp/speedtest ]; then
         mv /tmp/speedtest /usr/local/bin/speedtest
         chmod +x /usr/local/bin/speedtest
@@ -520,8 +519,13 @@ check_and_install_speedtest() {
         rm -f /tmp/speedtest.tgz
         return 1
     fi
+    
+    # 清理
     rm -f /tmp/speedtest.tgz
-    rm -f /tmp/ookla-speedtest* if command -v speedtest >/dev/null 2>&1; then
+    rm -f /tmp/ookla-speedtest* # 清理 md5 和 readme
+    
+    # ⚠️ 修复点：将 'if' 语句独立成行
+    if command -v speedtest >/dev/null 2>&1; then
         echo -e "${GREEN}✅ Ookla speedtest (二进制版) 安装成功！${NC}"
         speedtest --accept-license >/dev/null 2>&1
         return 0
@@ -594,7 +598,7 @@ run_test() {
         return
     fi
     
-    # ⚠️ 修复点：使用 bc 进行浮点运算
+    # 使用 bc 进行浮点运算
     # Mbps = bps / 1,000,000
     DOWNLOAD_MBPS=$(echo "scale=2; $DOWNLOAD_BPS / 1000000" | bc)
     UPLOAD_MBPS=$(echo "scale=2; $UPLOAD_BPS / 1000000" | bc)
@@ -605,28 +609,6 @@ run_test() {
 
 # -------------------------------
 # 功能 1: BBR 综合测速 (保持不变)
-# -------------------------------
-bbr_test_menu() {
-    echo -e "${CYAN}=== 开始 BBR 综合测速 ===${RESET}"
-    > "$RESULT_FILE"
-    
-    # 无条件尝试所有算法
-    for MODE in "BBR" "BBR Plus" "BBRv2" "BBRv3"; do
-        run_test "$MODE"
-    done
-    
-    echo -e "${CYAN}=== 测试完成，结果汇总 (${RESULT_FILE}) ===${RESET}"
-    if [ -f "$RESULT_FILE" ] && [ -s "$RESULT_FILE" ]; then
-        cat "$RESULT_FILE"
-    else
-        echo -e "${YELLOW}无测速结果${RESET}"
-    fi
-    echo ""
-    read -n1 -p "按任意键返回菜单..."
-}
-
-# -------------------------------
-# 功能 1: BBR 综合测速
 # -------------------------------
 bbr_test_menu() {
     echo -e "${CYAN}=== 开始 BBR 综合测速 ===${RESET}"
