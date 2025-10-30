@@ -2527,6 +2527,7 @@ system_tools_menu() {
 
         read -p "请输入选项编号: " tools_choice
 
+        set -x # Enable shell debugging for case statement
         case $tools_choice in
             1) advanced_firewall_menu ;;
             2) change_login_password ;;
@@ -2558,6 +2559,7 @@ system_tools_menu() {
             0) return ;;
             *) echo -e "${RED}无效的选项，请重新输入！${NC}"; sleep 1 ;;
         esac
+        set +x # Disable shell debugging for case statement
     done
 }
 
