@@ -2508,7 +2508,6 @@ system_tools_menu() {
         printf "${GREEN}%-40s %-105s${NC}\n" "11. Nginx Proxy Manager 管理" "24. 磁盘性能测试 (fio/iozone)"
         printf "${GREEN}%-40s %-105s${NC}\n" "12. 查看端口占用状态" "25. 系统安全扫描 (Lynis)"
         printf "${GREEN}%-40s %-105s${NC}\n" "13. 修改DNS 服务器" "26. 文件完整性检查 (AIDE)"
-        printf "${GREEN}%-40s %-105s${NC}\n" "27. 安装 1Panel" ""
         echo -e "${GREEN}0. 返回主菜单${NC}"
         echo "=========================================="
 
@@ -2541,7 +2540,6 @@ system_tools_menu() {
             24) disk_performance_test ;;
             25) system_security_scan ;;
             26) file_integrity_check ;;
-            27) install_1panel ;;
             0) return ;;
             *) echo -e "${RED}无效的选项，请重新输入！${NC}"; sleep 1 ;;
         esac
@@ -2718,47 +2716,3 @@ while true; do
             ;;
     esac
 done
-
-# -------------------------------
-# 27. 安装 1Panel
-# -------------------------------
-install_1panel() {
-    set -x # Enable shell debugging
-    clear
-    echo -e "${CYAN}=========================================="
-    echo "             安装 1Panel 面板             "
-    echo "=========================================="
-    echo -e "${NC}"
-    echo -e "${YELLOW}1Panel 是一个现代化、易用的 Linux 服务器运维管理面板。${NC}"
-    echo -e "${YELLOW}它支持一键部署网站、数据库、Docker 等应用。${NC}"
-    echo -e "${GREEN}开始安装 1Panel...${NC}"
-    
-    # 检查是否安装curl
-    if ! command -v curl > /dev/null 2>&1; then
-        echo -e "${YELLOW}未检测到curl，正在尝试安装...${NC}"
-        if command -v apt > /dev/null 2>&1; then
-            apt update -y && apt install -y curl
-        elif command -v yum > /dev/null 2>&1; then
-            yum install -y curl
-        elif command -v dnf > /dev/null 2>&1; then
-            dnf install -y curl
-        else
-            echo -e "${RED}无法安装curl，请手动安装后重试${NC}"
-            read -p "按回车键返回..."
-            set +x # Disable shell debugging
-            return
-        fi
-    fi
-
-    # 执行 1Panel 安装命令
-    echo -e "${GREEN}正在下载并执行 1Panel 安装脚本...${NC}"
-    if ! curl -sSL https://resource.fit2cloud.com/1panel/binary/stable/install.sh | bash; then
-        echo -e "${RED}1Panel 安装脚本执行失败！请检查网络连接或手动尝试安装。${NC}"
-    fi
-    
-    echo -e "${GREEN}1Panel 安装命令已执行。${NC}"
-    echo -e "${YELLOW}请根据安装脚本的提示完成后续配置。${NC}"
-    echo -e "${YELLOW}通常，安装完成后会显示访问地址和初始用户名密码。${NC}"
-    read -p "按回车键返回..."
-    set +x # Disable shell debugging
-}
