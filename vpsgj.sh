@@ -247,6 +247,13 @@ system_clean() {
         echo -e "${BLUE}检测到 CentOS/RHEL 系统${NC}"
         echo -e "${YELLOW}开始深度清理系统...${NC}"
         echo ""
+
+# -------------------------------
+# 实用工具箱菜单
+# -------------------------------
+utility_toolbox_menu() {
+    system_tools_menu
+}
         
         # 1. 清理YUM/DNF缓存
         echo -e "${BLUE}[步骤1/8] 清理YUM/DNF缓存...${NC}"
@@ -1760,49 +1767,7 @@ accelerate_memory_clean() {
 # -------------------------------
 # 实用工具箱函数 (新增)
 # -------------------------------
-utility_tools_menu() {
-    while true; do
-        clear
-        echo -e "${CYAN}"
-        echo "=========================================="
-        echo "               实用工具箱                 "
-        echo "=========================================="
-        echo -e "${NC}"
-        echo "1. 服务器性能全面测试 (Bench.sh)"
-        echo "2. 流媒体解锁检测 (RegionRestrictionCheck)"
-        echo "3. 回程路由测试 (BestTrace)"
-        echo "4. 炫酷系统信息显示 (neofetch)"
-        echo "5. 实时系统监控仪表板 (gtop/bpytop)"
-        echo "6. 网速多节点测试 (Speedtest-X)"
-        echo "7. 端口扫描工具 (nmap)"
-        echo "8. 证书管理工具 (acme.sh)"
-        echo "9. 服务器延迟测试 (Ping测试)"
-        echo "10. 磁盘性能测试 (fio/iozone)"
-        echo "11. 系统安全扫描 (Lynis)"
-        echo "12. 文件完整性检查 (AIDE)"
-        echo "0. 返回上级菜单"
-        echo "=========================================="
-        
-        read -p "请输入选项编号: " utility_choice
-        
-        case $utility_choice in
-            1) server_benchmark ;;
-            2) streaming_unlock_test ;;
-            3) routing_test ;;
-            4) cool_system_info ;;
-            5) system_monitor_dashboard ;;
-            6) multi_speedtest ;;
-            7) port_scanner_tool ;;
-            8) ssl_cert_manager ;;
-            9) server_latency_test ;;
-            10) disk_performance_test ;;
-            11) system_security_scan ;;
-            12) file_integrity_check ;;
-            0) return ;;
-            *) echo -e "${RED}无效选项!${NC}"; sleep 1 ;;
-        esac
-    done
-}
+
 
 # -------------------------------
 # 1. 服务器性能全面测试
@@ -2544,7 +2509,18 @@ system_tools_menu() {
         echo "12. 查看端口占用状态"
         echo "13. 修改 DNS 服务器"
         echo "14. 磁盘空间分析"
-        echo "15. 实用工具箱"
+        echo "15. 服务器性能全面测试 (Bench.sh)"
+        echo "16. 流媒体解锁检测 (RegionRestrictionCheck)"
+        echo "17. 回程路由测试 (BestTrace)"
+        echo "18. 炫酷系统信息显示 (neofetch)"
+        echo "19. 实时系统监控仪表板 (gtop/bpytop)"
+        echo "20. 网速多节点测试 (Speedtest-X)"
+        echo "21. 端口扫描工具 (nmap)"
+        echo "22. 证书管理工具 (acme.sh)"
+        echo "23. 服务器延迟测试 (Ping测试)"
+        echo "24. 磁盘性能测试 (fio/iozone)"
+        echo "25. 系统安全扫描 (Lynis)"
+        echo "26. 文件完整性检查 (AIDE)"
         echo "0. 返回主菜单"
         echo "=========================================="
 
@@ -2565,7 +2541,18 @@ system_tools_menu() {
             12) check_port_usage ;;
             13) change_dns_servers ;;
             14) analyze_disk_usage ;;
-            15) utility_tools_menu ;;
+            15) server_benchmark ;;
+            16) streaming_unlock_test ;;
+            17) routing_test ;;
+            18) cool_system_info ;;
+            19) system_monitor_dashboard ;;
+            20) multi_speedtest ;;
+            21) port_scanner_tool ;;
+            22) ssl_cert_manager ;;
+            23) server_latency_test ;;
+            24) disk_performance_test ;;
+            25) system_security_scan ;;
+            26) file_integrity_check ;;
             0) return ;;
             *) echo -e "${RED}无效的选项，请重新输入！${NC}"; sleep 1 ;;
         esac
