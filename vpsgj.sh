@@ -2742,6 +2742,7 @@ vps_network_test_menu() {
 # 1. 网络速度测速 (原有功能)
 # -------------------------------
 vps_speed_test() {
+    set -x # Enable shell debugging
     clear
     echo -e "${CYAN}=========================================="
     echo "         网络速度测速（NodeQuality）           "
@@ -2762,6 +2763,7 @@ vps_speed_test() {
         else
             echo -e "${RED}无法安装curl，请手动安装后重试${NC}"
             read -p "按回车键返回..."
+            set +x # Disable shell debugging
             return
         fi
     fi
@@ -2775,6 +2777,7 @@ vps_speed_test() {
     echo "=========================================="
     echo -e "${NC}"
     read -p "测速完成，按回车键返回..."
+    set +x # Disable shell debugging
 }
 
 # -------------------------------
