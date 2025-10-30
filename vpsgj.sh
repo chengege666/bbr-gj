@@ -604,28 +604,52 @@ manage_speedtest_cli() {
 }
 
 # -------------------------------
-# 使用pip安装speedtest-cli (辅助函数)
+# 使用pip安装speedtest-cli (修复版)
 # -------------------------------
 install_speedtest_via_pip() {
     echo -e "${YELLOW}正在使用pip安装speedtest-cli...${NC}"
     
-    # 检查并安装pip
+    # 检查并安装pip (使用替代方法)
     if ! command -v pip3 >/dev/null 2>&1 && ! command -v pip >/dev/null 2>&1; then
-        echo -e "${YELLOW}未找到pip，正在安装pip...${NC}"
+        echo -e "${YELLOW}未找到pip，正在尝试安装pip...${NC}"
+        
+        # 创建替代临时目录
+        ALT_TMPDIR="/var/tmp/pip_install"
+        mkdir -p "$ALT_TMPDIR"
+        export TMPDIR="$ALT_TMPDIR"
+        
+        # 尝试使用系统包管理器安装pip
         if [ -f /etc/debian_version ]; then
-            apt update -y && apt install -y python3-pip
+            # 对于Debian/Ubuntu，尝试修复apt问题
+            echo -e "${YELLOW}尝试修复APT临时文件问题...${NC}"
+            rm -rf /var/lib/apt/lists/*
+            mkdir -p /tmp/apt
+            chmod 1777 /tmp/apt
+            
+            # 尝试使用不同的方法安装pip
+            if apt-get update -o Dir::Cache::Archives="$ALT_TMPDIR" -o Dir::State::Lists="$ALT_TMPDIR/lists"; then
+                apt-get install -y python3-pip
+            else
+                echo -e "${YELLOW}APT仍然有问题，尝试直接下载get-pip.py...${NC}"
+                curl -sS https://bootstrap.pypa.io/get-pip.py -o "$ALT_TMPDIR/get-pip.py"
+                python3 "$ALT_TMPDIR/get-pip.py" || python "$ALT_TMPDIR/get-pip.py"
+            fi
         elif [ -f /etc/redhat-release ]; then
+            # 对于CentOS/RHEL
             if command -v dnf >/dev/null 2>&1; then
                 dnf install -y python3-pip
             else
                 yum install -y python3-pip
             fi
         else
-            # 通用pip安装
-            curl -s https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-            python3 get-pip.py || python get-pip.py
-            rm -f get-pip.py
+            # 通用方法
+            echo -e "${YELLOW}使用通用方法安装pip...${NC}"
+            curl -sS https://bootstrap.pypa.io/get-pip.py -o "$ALT_TMPDIR/get-pip.py"
+            python3 "$ALT_TMPDIR/get-pip.py" || python "$ALT_TMPDIR/get-pip.py"
         fi
+        
+        # 清理临时目录
+        rm -rf "$ALT_TMPDIR"
     fi
     
     # 使用pip安装speedtest-cli
@@ -634,14 +658,29 @@ install_speedtest_via_pip() {
     elif command -v pip >/dev/null 2>&1; then
         pip install speedtest-cli
     else
-        echo -e "${RED}❌❌ pip安装失败，无法继续${NC}"
-        return 1
+        echo -e "${RED}❌❌ pip安装失败，尝试替代方法...${NC}"
+        
+        # 替代方法：直接下载speedtest-cli脚本
+        echo -e "${YELLOW}尝试直接下载speedtest-cli脚本...${NC}"
+        wget -O /usr/local/bin/speedtest-cli https://raw.githubusercontent.com/sivel/speedtest-cli/master/speedtest.py
+        chmod +x /usr/local/bin/speedtest-cli
+        
+        if [ -f /usr/local/bin/speedtest-cli ]; then
+            echo -e "${GREEN}✅ 通过直接下载安装speedtest-cli成功！${NC}"
+            echo -e "${YELLOW}使用方法: speedtest-cli --simple${NC}"
+        else
+            echo -e "${RED}❌❌ 所有安装方法都失败了${NC}"
+            echo -e "${YELLOW}您可以手动安装:${NC}"
+            echo -e "1. curl -s https://bootstrap.pypa.io/get-pip.py | python3"
+            echo -e "2. pip3 install speedtest-cli"
+            return 1
+        fi
     fi
     
-    if command -v speedtest-cli >/dev/null 2>&1; then
-        echo -e "${GREEN}✅ 通过pip安装speedtest-cli成功！${NC}"
+    if command -v speedtest-cli >/dev/null 2>&1 || [ -f /usr/local/bin/speedtest-cli ]; then
+        echo -e "${GREEN}✅ speedtest-cli 安装成功！${NC}"
     else
-        echo -e "${RED}❌❌ pip安装失败${NC}"
+        echo -e "${RED}❌❌ 安装失败${NC}"
     fi
 }
 
