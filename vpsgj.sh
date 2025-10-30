@@ -527,41 +527,47 @@ manage_speedtest_cli() {
     if command -v speedtest-cli >/dev/null 2>&1; then
         STATUS="${GREEN}✅ 已安装 ${YELLOW}$(speedtest-cli --version 2>/dev/null | head -n 1)${NC}"
     else
-        STATUS="${RED}❌ 未安装${NC}"
+        STATUS="${RED}❌❌ 未安装${NC}"
     fi
     echo -e "${BLUE}当前状态: $STATUS${NC}"
     
     echo "请选择操作："
     echo "1. 安装/更新 speedtest-cli"
     echo "2. 卸载 speedtest-cli"
+    echo "3. 修复软件源问题"
     echo "0. 返回上级菜单"
     read -p "请输入选项编号: " choice
 
     case $choice in
         1) # 安装/更新
+            # 先尝试修复软件源
+            echo -e "${YELLOW}正在检查并修复软件源问题...${NC}"
+            fix_apt_sources
+            
             echo -e "${YELLOW}正在尝试安装 speedtest-cli...${NC}"
             if [ -f /etc/debian_version ]; then
-                apt update -y
-                apt install -y speedtest-cli
+                # 先更新软件源列表
+                apt-get update
+                # 尝试安装
+                if apt-get install -y speedtest-cli; then
+                    echo -e "${GREEN}✅ speedtest-cli 安装成功！${NC}"
+                else
+                    # 如果官方源失败，尝试替代安装方法
+                    install_speedtest_alternative
+                fi
             elif [ -f /etc/redhat-release ]; then
-                # RHEL/CentOS 需要 EPEL 源
-                yum install -y epel-release; yum install -y speedtest-cli
+                yum install -y speedtest-cli
             elif command -v dnf >/dev/null 2>&1; then
                 dnf install -y speedtest-cli
             else
-                echo -e "${RED}不支持的系统或找不到包管理器，请手动安装。${NC}"
-            fi
-            
-            if command -v speedtest-cli >/dev/null 2>&1; then
-                echo -e "${GREEN}✅ speedtest-cli 安装/更新成功！${NC}"
-            else
-                echo -e "${RED}❌ speedtest-cli 安装失败，请检查系统源。${NC}"
+                install_speedtest_alternative
             fi
             ;;
         2) # 卸载
             echo -e "${YELLOW}正在尝试卸载 speedtest-cli...${NC}"
             if [ -f /etc/debian_version ]; then
-                apt purge -y speedtest-cli; apt autoremove -y
+                apt-get purge -y speedtest-cli
+                apt-get autoremove -y
             elif [ -f /etc/redhat-release ]; then
                 yum remove -y speedtest-cli
             elif command -v dnf >/dev/null 2>&1; then
@@ -569,15 +575,11 @@ manage_speedtest_cli() {
             else
                 echo -e "${RED}不支持的系统或找不到包管理器，请手动卸载。${NC}"
             fi
-
-            if ! command -v speedtest-cli >/dev/null 2>&1; then
-                echo -e "${GREEN}✅ speedtest-cli 卸载成功！${NC}"
-            else
-                echo -e "${RED}❌ speedtest-cli 卸载失败，请检查系统日志。${NC}"
-            fi
+            ;;
+        3) # 修复软件源
+            fix_apt_sources
             ;;
         0)
-            echo -e "${YELLOW}返回上级菜单...${NC}"
             return
             ;;
         *)
@@ -585,6 +587,74 @@ manage_speedtest_cli() {
             ;;
     esac
     read -n1 -p "按任意键返回菜单..."
+}
+
+# 新增：修复APT软件源函数
+fix_apt_sources() {
+    echo -e "${YELLOW}正在修复APT软件源配置...${NC}"
+    
+    # 备份当前源列表
+    cp /etc/apt/sources.list /etc/apt/sources.list.backup.$(date +%Y%m%d_%H%M%S)
+    
+    # 使用Debian官方源
+    cat > /etc/apt/sources.list << 'EOF'
+# Debian 12 Bookworm 官方源
+deb http://deb.debian.org/debian bookworm main contrib non-free
+deb http://deb.debian.org/debian bookworm-updates main contrib non-free
+deb http://security.debian.org/debian-security bookworm-security main contrib non-free
+
+# 如果需要非自由软件，取消注释下面行
+# deb http://deb.debian.org/debian bookworm non-free
+EOF
+
+    # 更新GPG密钥
+    echo -e "${YELLOW}更新GPG密钥...${NC}"
+    apt-get update -o Acquire::AllowInsecureRepositories=true
+    apt-get install -y debian-archive-keyring
+    apt-key update
+    
+    # 清理并更新
+    apt-get clean
+    apt-get update
+    
+    echo -e "${GREEN}✅ 软件源修复完成！${NC}"
+}
+
+# 新增：替代安装方法
+install_speedtest_alternative() {
+    echo -e "${YELLOW}尝试使用替代方法安装 speedtest-cli...${NC}"
+    
+    # 方法1: 使用pip安装
+    if command -v python3 >/dev/null 2>&1; then
+        echo -e "${YELLOW}尝试使用pip安装...${NC}"
+        if command -v pip3 >/dev/null 2>&1 || apt-get install -y python3-pip; then
+            pip3 install speedtest-cli
+            if [ $? -eq 0 ]; then
+                echo -e "${GREEN}✅ 使用pip安装成功！${NC}"
+                return 0
+            fi
+        fi
+    fi
+    
+    # 方法2: 直接下载二进制文件
+    echo -e "${YELLOW}尝试下载二进制文件...${NC}"
+    if command -v wget >/dev/null 2>&1; then
+        wget -O /usr/local/bin/speedtest-cli https://raw.githubusercontent.com/sivel/speedtest-cli/master/speedtest.py
+        chmod +x /usr/local/bin/speedtest-cli
+        echo -e "${GREEN}✅ 二进制文件安装成功！${NC}"
+        return 0
+    fi
+    
+    # 方法3: 使用curl下载
+    if command -v curl >/dev/null 2>&1; then
+        curl -s https://raw.githubusercontent.com/sivel/speedtest-cli/master/speedtest.py -o /usr/local/bin/speedtest-cli
+        chmod +x /usr/local/bin/speedtest-cli
+        echo -e "${GREEN}✅ 使用curl安装成功！${NC}"
+        return 0
+    fi
+    
+    echo -e "${RED}❌ 所有安装方法都失败了！${NC}"
+    return 1
 }
 
 # Docker 相关函数 (修复版)
