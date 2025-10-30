@@ -2725,194 +2725,39 @@ show_menu() {
 check_root
 check_deps
 
-# ====================================================================
-# +++ 新增主菜单函数 +++
-# ====================================================================
-
-# 主菜单显示函数
-show_main_menu() {
-    clear
-    echo -e "${CYAN}"
-    echo "============================================"
-    echo "         CGG-VPS 脚本管理菜单 v3.3          "
-    echo "============================================"
-    echo -e "${NC}"
-    echo "1. 🚀 系统信息与管理"
-    echo "2. 🌐 网络工具"
-    echo "3. 🐳 Docker管理"
-    echo "4. 🔒 系统安全与维护"
-    echo "5. 🛠️ 实用工具箱"
-    echo "0. ❌ 退出脚本"
-    echo "============================================"
-}
-
-# 系统信息与管理子菜单
-system_info_management_menu() {
-    while true; do
-        clear
-        echo -e "${CYAN}"
-        echo "============================================"
-        echo "         系统信息与管理子菜单             "
-        echo "============================================"
-        echo -e "${NC}"
-        echo "1. 📊 系统信息查询"
-        echo "2. 🔄 系统更新"
-        echo "3. 🧹 系统清理"
-        echo "4. 🔑 修改登录密码"
-        echo "5. 🚪 修改 SSH 连接端口"
-        echo "6. 🌐 切换优先 IPV4/IPV6"
-        echo "7. 🖥️ 修改主机名"
-        echo "8. ⏰ 系统时区调整"
-        echo "9. 💾 修改虚拟内存大小 (Swap)"
-        echo "10. 🚀 内存加速清理"
-        echo "11. ♻️ 重启服务器"
-        echo "12. 🗑️ 卸载本脚本"
-        echo "0. 🔙 返回主菜单"
-        echo "============================================"
-
-        read -p "请输入选项编号: " choice
-        case $choice in
-            1) system_info ;;
-            2) system_update ;;
-            3) system_clean ;;
-            4) change_login_password ;;
-            5) change_ssh_port ;;
-            6) toggle_ipv_priority ;;
-            7) change_hostname ;;
-            8) change_system_timezone ;;
-            9) manage_swap ;;
-            10) accelerate_memory_clean ;;
-            11) reboot_server ;;
-            12) uninstall_script ;;
-            0) return ;;
-            *) echo -e "${RED}无效的选项，请重新输入！${NC}"; sleep 1 ;;
-        esac
-    done
-}
-
-# 网络工具子菜单
-network_tools_menu() {
-    while true; do
-        clear
-        echo -e "${CYAN}"
-        echo "============================================"
-        echo "             网络工具子菜单               "
-        echo "============================================"
-        echo -e "${NC}"
-        echo "1. 📡 VPS测试IP网络"
-        echo "2. 🔍 查看端口占用状态"
-        echo "3. ⚙️ 修改 DNS 服务器"
-        echo "0. 🔙 返回主菜单"
-        echo "============================================"
-
-        read -p "请输入选项编号: " choice
-        case $choice in
-            1) vps_network_test_menu ;;
-            2) check_port_usage ;;
-            3) change_dns_servers ;;
-            0) return ;;
-            *) echo -e "${RED}无效的选项，请重新输入！${NC}"; sleep 1 ;;
-        esac
-    done
-}
-
-# Docker管理主菜单 (避免与现有docker_management_menu冲突)
-docker_management_main_menu() {
-    docker_management_menu # 调用原有的Docker管理菜单
-}
-
-# 系统安全与维护子菜单
-system_security_maintenance_menu() {
-    while true; do
-        clear
-        echo -e "${CYAN}"
-        echo "============================================"
-        echo "         系统安全与维护子菜单             "
-        echo "============================================"
-        echo -e "${NC}"
-        echo "1. 🛡️ 高级防火墙管理"
-        echo "2. 扫描 恶意软件"
-        echo "3. 完整性检查"
-        echo "0. 🔙 返回主菜单"
-        echo "============================================"
-
-        read -p "请输入选项编号: " choice
-        case $choice in
-            1) advanced_firewall_menu ;;
-            2) system_security_scan ;;
-            3) file_integrity_check ;;
-            0) return ;;
-            *) echo -e "${RED}无效的选项，请重新输入！${NC}"; sleep 1 ;;
-        esac
-    done
-}
-
-# 实用工具箱子菜单
-utility_toolbox_menu() {
-    while true; do
-        clear
-        echo -e "${CYAN}"
-        echo "============================================"
-        echo "             实用工具箱子菜单             "
-        echo "============================================"
-        echo -e "${NC}"
-        echo "1. 🚀 服务器性能测试"
-        echo "2. 📺 流媒体解锁检测"
-        echo "3. 🗺️ 路由测试"
-        echo "4. ℹ️ 系统信息显示"
-        echo "5. 📈 实时系统监控仪表板"
-        echo "6. ⚡ 网速多节点测试"
-        echo "7. 🔍 端口扫描工具"
-        echo "8. 🔐 SSL证书管理工具"
-        echo "9. ⏱️ 服务器延迟测试"
-        echo "10. 📊 磁盘性能测试"
-        echo "11. 📦 Nginx Proxy Manager 管理"
-        echo "0. 🔙 返回主菜单"
-        echo "============================================"
-
-        read -p "请输入选项编号: " choice
-        case $choice in
-            1) server_benchmark ;;
-            2) streaming_unlock_test ;;
-            3) routing_test ;;
-            4) cool_system_info ;;
-            5) system_monitor_dashboard ;;
-            6) multi_speedtest ;;
-            7) port_scanner_tool ;;
-            8) ssl_cert_manager ;;
-            9) server_latency_test ;;
-            10) disk_performance_test ;;
-            11) nginx_proxy_manager_menu ;;
-            0) return ;;
-            *) echo -e "${RED}无效的选项，请重新输入！${NC}"; sleep 1 ;;
-        esac
-    done
-}
-
 # 无限循环，直到用户选择退出
 while true; do
-    show_main_menu
-    read -p "请输入你的选择 (0-5): " main_choice
+    show_menu
+    read -p "请输入你的选择 (0-8): " main_choice
 
     case $main_choice in
         1)
-            system_info_management_menu
+            system_info
             ;;
         2)
-            network_tools_menu
+            system_update
             ;;
         3)
-            docker_management_main_menu
+            system_clean
             ;;
         4)
-            system_security_maintenance_menu
+            basic_tools
             ;;
         5)
-            utility_toolbox_menu
+            bbr_management
+            ;;
+        6)
+            docker_management_menu
+            ;;
+        7)
+            system_tools_menu
+            ;;
+        8)
+            vps_network_test_menu
             ;;
         0)
             echo -e "${GREEN}感谢使用，正在退出脚本...${NC}"
-            exit 0
+            exit 0  # 改为 exit 0 确保完全退出
             ;;
         *)
             echo -e "${RED}无效的选项，请重新输入！${NC}"
