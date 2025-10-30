@@ -580,6 +580,30 @@ manage_speedtest_cli() {
             if command -v pip >/dev/null 2>&1; then
                 pip uninstall -y speedtest-cli 2>/dev/null
             fi
+
+            # 删除直接下载的可执行文件
+            if [ -f /usr/local/bin/speedtest-cli ]; then
+                echo -e "${YELLOW}正在删除 /usr/local/bin/speedtest-cli...${NC}"
+                rm -f /usr/local/bin/speedtest-cli
+            fi
+            if [ -f /usr/bin/speedtest ]; then
+                echo -e "${YELLOW}正在删除 /usr/bin/speedtest...${NC}"
+                rm -f /usr/bin/speedtest
+            fi
+            if [ -f /usr/bin/speedtest-cli ]; then
+                echo -e "${YELLOW}正在删除 /usr/bin/speedtest-cli...${NC}"
+                rm -f /usr/bin/speedtest-cli
+            fi
+
+            # 删除可能的配置文件或缓存目录
+            if [ -d "$HOME/.config/speedtest-cli" ]; then
+                echo -e "${YELLOW}正在删除 $HOME/.config/speedtest-cli 目录...${NC}"
+                rm -rf "$HOME/.config/speedtest-cli"
+            fi
+            if [ -f /etc/speedtest-cli.conf ]; then
+                echo -e "${YELLOW}正在删除 /etc/speedtest-cli.conf...${NC}"
+                rm -f /etc/speedtest-cli.conf
+            fi
             
             if ! command -v speedtest >/dev/null 2>&1 && ! command -v speedtest-cli >/dev/null 2>&1; then
                 echo -e "${GREEN}✅ speedtest-cli 卸载成功！${NC}"
