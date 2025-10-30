@@ -409,10 +409,10 @@ bbr_management() {
 }
 
 # -------------------------------
-# 核心功能：BBR 测速 (修复版 V6 - 修正语法错误，确保 BC 兼容性)
+# 核心功能：BBR 测速 (修复版 V7 - 最终修正：精确 JSON 解析)
 # -------------------------------
 
-# 辅助函数：检查并安装 Ookla speedtest (健壮版)
+# 辅助函数：检查并安装 Ookla speedtest (健壮版 - 保持 V6 逻辑不变)
 check_and_install_speedtest() {
     if command -v speedtest >/dev/null 2>&1; then
         return 0 # 已安装
@@ -422,7 +422,7 @@ check_and_install_speedtest() {
     
     # --- 方法 1: 尝试使用包管理器 (APT / YUM / DNF) ---
     if [ -f /etc/debian_version ]; then
-        # 修复点：安装依赖时增加 bc
+        # 安装依赖时增加 bc
         echo -e "${BLUE}[1/3] 正在安装依赖 (curl, gnupg, bc)...${NC}" 
         apt-get update -y
         apt-get install -y curl gnupg1 apt-transport-https dirmngr bc
@@ -447,10 +447,10 @@ check_and_install_speedtest() {
         
         echo -e "${BLUE}[2/2] 正在安装 'speedtest' 包...${NC}"
         if command -v dnf >/dev/null 2>&1; then
-            # 修复点：安装依赖时增加 bc
+            # 安装依赖时增加 bc
             dnf install -y speedtest bc 
         else
-            # 修复点：安装依赖时增加 bc
+            # 安装依赖时增加 bc
             yum install -y speedtest bc 
         fi
         
@@ -462,7 +462,7 @@ check_and_install_speedtest() {
         echo -e "${YELLOW}⚠️ YUM/DNF 方法安装失败，尝试后备方法...${NC}"
     fi
 
-    # --- 方法 2: 后备 - 手动下载二进制文件 (修复了 if 语法) ---
+    # --- 方法 2: 后备 - 手动下载二进制文件 ---
     echo -e "${BLUE}>>> 正在尝试后备方法：手动下载二进制文件...${NC}"
     ARCH=$(uname -m)
     SPEEDTEST_URL=""
@@ -524,7 +524,6 @@ check_and_install_speedtest() {
     rm -f /tmp/speedtest.tgz
     rm -f /tmp/ookla-speedtest* # 清理 md5 和 readme
     
-    # ⚠️ 修复点：将 'if' 语句独立成行
     if command -v speedtest >/dev/null 2>&1; then
         echo -e "${GREEN}✅ Ookla speedtest (二进制版) 安装成功！${NC}"
         speedtest --accept-license >/dev/null 2>&1
@@ -585,10 +584,15 @@ run_test() {
         return
     fi
     
-    # 提取 JSON 字段 (保持不变)
-    PING=$(echo "$RAW_JSON" | grep -oP '"latency":\s*\K[^,]+' | head -n1)
-    DOWNLOAD_BPS=$(echo "$RAW_JSON" | grep -oP '"download":\s*\K[^,]+' | head -n1)
-    UPLOAD_BPS=$(echo "$RAW_JSON" | grep -oP '"upload":\s*\K[^,]+' | head -n1)
+    # ⚠️ 修复点：使用更精确的 PCRE 匹配来提取嵌套的 bandwidth 值，并用 tr 清除空白
+    # Ping (ms) - 提取 latency
+    PING=$(echo "$RAW_JSON" | grep -oP '"latency":\s*\K\d+\.?\d*' | head -n1 | tr -d ' \n\r')
+    
+    # Download Bandwidth (bps) - 提取 download 对象中的 bandwidth 字段
+    DOWNLOAD_BPS=$(echo "$RAW_JSON" | grep -oP '"download".*?"bandwidth":\s*\K\d+' | head -n1 | tr -d ' \n\r')
+    
+    # Upload Bandwidth (bps) - 提取 upload 对象中的 bandwidth 字段
+    UPLOAD_BPS=$(echo "$RAW_JSON" | grep -oP '"upload".*?"bandwidth":\s*\K\d+' | head -n1 | tr -d ' \n\r')
 
     # 检查是否获取到数字 (保持不变)
     if [ -z "$PING" ] || [ -z "$DOWNLOAD_BPS" ] || [ -z "$UPLOAD_BPS" ]; then
