@@ -2521,13 +2521,11 @@ system_tools_menu() {
         printf "${GREEN}%-40s${NC}\n" "24. 磁盘性能测试 (fio/iozone)"
         printf "${GREEN}%-40s${NC}\n" "25. 系统安全扫描 (Lynis)"
         printf "${GREEN}%-40s${NC}\n" "26. 文件完整性检查 (AIDE)"
-        printf "${GREEN}%-40s${NC}\n" "27. 安装 1Panel"
         echo -e "${GREEN}0. 返回主菜单${NC}"
         echo "=========================================="
 
         read -p "请输入选项编号: " tools_choice
 
-        set -x # Enable shell debugging for case statement
         case $tools_choice in
             1) advanced_firewall_menu ;;
             2) change_login_password ;;
@@ -2555,11 +2553,9 @@ system_tools_menu() {
             24) disk_performance_test ;;
             25) system_security_scan ;;
             26) file_integrity_check ;;
-            27) install_1panel_new ;;
             0) return ;;
             *) echo -e "${RED}无效的选项，请重新输入！${NC}"; sleep 1 ;;
         esac
-        set +x # Disable shell debugging for case statement
     done
 }
 
@@ -2733,45 +2729,3 @@ while true; do
             ;;
     esac
 done
-
-# -------------------------------
-# 27. 安装 1Panel (新)
-# -------------------------------
-install_1panel_new() {
-    set -x # Enable shell debugging
-    clear
-    echo -e "${CYAN}=========================================="
-    echo "             安装 1Panel 面板             "
-    echo "=========================================="
-    echo -e "${NC}"
-    echo -e "${YELLOW}1Panel 是一个现代化、易用的 Linux 服务器运维管理面板。${NC}"
-    echo -e "${YELLOW}它支持一键部署网站、数据库、Docker 等应用。${NC}"
-    echo -e "${GREEN}开始安装 1Panel...${NC}"
-    
-    # 检查是否安装curl
-    if ! command -v curl > /dev/null 2>&1; then
-        echo -e "${YELLOW}未检测到curl，正在尝试安装...${NC}"
-        if command -v apt > /dev/null 2>&1; then
-            apt update -y && apt install -y curl
-        elif command -v yum > /dev/null 2>&1; then
-            yum install -y curl
-        elif command -v dnf > /dev/null 2>&1; then
-            dnf install -y curl
-        else
-            echo -e "${RED}无法安装curl，请手动安装后重试${NC}"
-            read -p "按回车键返回..."
-            set +x # Disable shell debugging
-            return
-        fi
-    fi
-
-    # 执行 1Panel 安装命令
-    echo -e "${GREEN}正在下载并执行 1Panel 安装脚本...${NC}"
-    bash -c "$(curl -sSL https://resource.fit2cloud.com/1panel/package/v2/quick_start.sh)"
-    
-    echo -e "${GREEN}1Panel 安装命令已执行。${NC}"
-    echo -e "${YELLOW}请根据安装脚本的提示完成后续配置。${NC}"
-    echo -e "${YELLOW}通常，安装完成后会显示访问地址和初始用户名密码。${NC}"
-    read -p "按回车键返回..."
-    set +x # Disable shell debugging
-}
