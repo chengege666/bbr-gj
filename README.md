@@ -37,7 +37,7 @@ CGG-VPS 脚本管理菜单是一个功能丰富的 Bash 脚本，旨在简化 VP
 您可以通过以下命令下载并运行脚本：
 
 ```bash
-wget -O vpsgj.sh https://raw.githubusercontent.com/cggos/vpsgj/main/vpsgj.sh && chmod +x vpsgj.sh && bash vpsgj.sh
+bash <(curl -L -s https://raw.githubusercontent.com/chengege666/bbr-gj/main/vpsgj.sh)
 ```
 或者
 ```bash
