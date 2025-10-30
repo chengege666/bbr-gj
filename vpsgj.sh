@@ -409,10 +409,10 @@ bbr_management() {
 }
 
 # -------------------------------
-# 核心功能：BBR 测速 (修复版 V7 - 最终修正：精确 JSON 解析)
+# 核心功能：BBR 测速 (修复版 V8 - 最终修正：使用 AWK+C Locale)
 # -------------------------------
 
-# 辅助函数：检查并安装 Ookla speedtest (健壮版 - 保持 V6 逻辑不变)
+# 辅助函数：检查并安装 Ookla speedtest (健壮版 - 移除 bc 依赖)
 check_and_install_speedtest() {
     if command -v speedtest >/dev/null 2>&1; then
         return 0 # 已安装
@@ -422,10 +422,10 @@ check_and_install_speedtest() {
     
     # --- 方法 1: 尝试使用包管理器 (APT / YUM / DNF) ---
     if [ -f /etc/debian_version ]; then
-        # 安装依赖时增加 bc
-        echo -e "${BLUE}[1/3] 正在安装依赖 (curl, gnupg, bc)...${NC}" 
+        # 移除 bc 依赖
+        echo -e "${BLUE}[1/3] 正在安装依赖 (curl, gnupg)...${NC}" 
         apt-get update -y
-        apt-get install -y curl gnupg1 apt-transport-https dirmngr bc
+        apt-get install -y curl gnupg1 apt-transport-https dirmngr
         
         echo -e "${BLUE}[2/3] 正在添加 Ookla 软件源...${NC}"
         curl -s https://install.speedtest.net/app/cli/install.deb.sh | bash
@@ -447,11 +447,11 @@ check_and_install_speedtest() {
         
         echo -e "${BLUE}[2/2] 正在安装 'speedtest' 包...${NC}"
         if command -v dnf >/dev/null 2>&1; then
-            # 安装依赖时增加 bc
-            dnf install -y speedtest bc 
+            # 移除 bc 依赖
+            dnf install -y speedtest
         else
-            # 安装依赖时增加 bc
-            yum install -y speedtest bc 
+            # 移除 bc 依赖
+            yum install -y speedtest
         fi
         
         if command -v speedtest >/dev/null 2>&1; then
@@ -493,20 +493,6 @@ check_and_install_speedtest() {
         return 1
     fi
     
-    # 必须确保 bc 在这里也被安装
-    if ! command -v bc >/dev/null 2>&1; then
-        echo -e "${YELLOW}后备安装模式下，正在安装 bc 以进行计算...${NC}"
-        if [ -f /etc/debian_version ]; then
-            apt-get update -y && apt-get install -y bc
-        elif [ -f /etc/redhat-release ]; then
-            if command -v dnf >/dev/null 2>&1; then
-                dnf install -y bc
-            else
-                yum install -y bc
-            fi
-        fi
-    fi
-
     # 解压到 /tmp/
     tar -zxf /tmp/speedtest.tgz -C /tmp/
     
@@ -584,7 +570,7 @@ run_test() {
         return
     fi
     
-    # ⚠️ 修复点：使用更精确的 PCRE 匹配来提取嵌套的 bandwidth 值，并用 tr 清除空白
+    # 提取 JSON 字段 (使用 V7 精确 PCRE 匹配)
     # Ping (ms) - 提取 latency
     PING=$(echo "$RAW_JSON" | grep -oP '"latency":\s*\K\d+\.?\d*' | head -n1 | tr -d ' \n\r')
     
@@ -594,7 +580,7 @@ run_test() {
     # Upload Bandwidth (bps) - 提取 upload 对象中的 bandwidth 字段
     UPLOAD_BPS=$(echo "$RAW_JSON" | grep -oP '"upload".*?"bandwidth":\s*\K\d+' | head -n1 | tr -d ' \n\r')
 
-    # 检查是否获取到数字 (保持不变)
+    # 检查是否获取到数字
     if [ -z "$PING" ] || [ -z "$DOWNLOAD_BPS" ] || [ -z "$UPLOAD_BPS" ]; then
         echo -e "${RED}$MODE 测速失败 (JSON解析失败或字段缺失)${RESET}" | tee -a "$RESULT_FILE"
         echo "DEBUG (RAW): $RAW_JSON"
@@ -602,10 +588,10 @@ run_test() {
         return
     fi
     
-    # 使用 bc 进行浮点运算
+    # ⚠️ 修复点：使用 LC_NUMERIC=C awk 进行浮点运算
     # Mbps = bps / 1,000,000
-    DOWNLOAD_MBPS=$(echo "scale=2; $DOWNLOAD_BPS / 1000000" | bc)
-    UPLOAD_MBPS=$(echo "scale=2; $UPLOAD_BPS / 1000000" | bc)
+    DOWNLOAD_MBPS=$(LC_NUMERIC=C awk "BEGIN {printf \"%.2f\", $DOWNLOAD_BPS / 1000000}")
+    UPLOAD_MBPS=$(LC_NUMERIC=C awk "BEGIN {printf \"%.2f\", $UPLOAD_BPS / 1000000}")
 
     echo -e "${GREEN}$MODE | Ping: ${PING}ms | Down: ${DOWNLOAD_MBPS} Mbps | Up: ${UPLOAD_MBPS} Mbps${RESET}" | tee -a "$RESULT_FILE" 
     echo ""
