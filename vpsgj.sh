@@ -409,11 +409,51 @@ bbr_management() {
 }
 
 # -------------------------------
-# 核心功能：BBR 测速
+# 核心功能：BBR 测速 (修复版 - 使用 Ookla Speedtest)
 # -------------------------------
+
+# 辅助函数：检查并安装 Ookla speedtest
+check_and_install_speedtest() {
+    if command -v speedtest >/dev/null 2>&1; then
+        return 0 # 已安装
+    fi
+    
+    echo -e "${YELLOW}⚠️ 未检测到 Ookla speedtest，正在尝试自动安装...${NC}"
+    if [ -f /etc/debian_version ]; then
+        apt update >/dev/null 2>&1
+        apt install -y curl gnupg1 apt-transport-https dirmngr >/dev/null 2>&1
+        curl -s https://install.speedtest.net/app/cli/install.deb.sh | bash >/dev/null 2>&1
+        apt-get update >/dev/null 2>&1
+        apt-get install -y speedtest
+    elif [ -f /etc/redhat-release ]; then
+        curl -s https://install.speedtest.net/app/cli/install.rpm.sh | bash >/dev/null 2>&1
+        yum install -y speedtest
+    else
+        echo -e "${RED}❌ 自动安装失败。请从菜单 [5] -> [4] 手动安装 speedtest。${NC}"
+        return 1
+    fi
+    
+    if command -v speedtest >/dev/null 2>&1; then
+        echo -e "${GREEN}✅ Ookla speedtest 安装成功！${NC}"
+        echo -e "${YELLOW}正在自动接受 EULA 许可...${NC}"
+        speedtest --accept-license >/dev/null 2>&1
+        return 0
+    else
+        echo -e "${RED}❌ 安装失败。${NC}"
+        return 1
+    fi
+}
+
 run_test() {
     MODE=$1
     echo -e "${CYAN}>>> 切换到 $MODE 并测速...${RESET}" 
+    
+    # 检查 speedtest 工具
+    if ! check_and_install_speedtest; then
+        echo -e "${RED}$MODE 测速失败：缺少 speedtest 工具${RESET}" | tee -a "$RESULT_FILE" 
+        echo ""
+        return
+    fi
     
     # 切换算法
     case $MODE in
@@ -442,24 +482,38 @@ run_test() {
             ;;
     esac
     
-    # 执行测速
-    RAW=$(speedtest-cli --simple 2>/dev/null)
-    if [ -z "$RAW" ]; then
-        echo -e "${YELLOW}⚠️ speedtest-cli 失败，尝试替代方法...${RESET}" 
-        RAW=$(curl -s https://raw.githubusercontent.com/sivel/speedtest-cli/master/speedtest.py | python - --simple 2>/dev/null)
-    fi
+    # 执行测速 (使用 Ookla speedtest 和 tsv 格式)
+    echo -e "${YELLOW}正在执行 $MODE 测速 (使用 Ookla)，请稍候...${NC}"
+    
+    # 使用 tsv 格式，字段：ping_latency\tdownload_bandwidth\tupload_bandwidth
+    # 带宽单位是 Bytes/s，需要转换为 Mbps (* 8 / 1000 / 1000)
+    
+    RAW_TSV=$(speedtest --accept-license -f tsv 2>/dev/null)
 
-    if [ -z "$RAW" ]; then
-        echo -e "${RED}$MODE 测速失败${RESET}" | tee -a "$RESULT_FILE" 
+    if [ -z "$RAW_TSV" ]; then
+        echo -e "${RED}$MODE 测速失败 (Ookla speedtest 执行错误)${RESET}" | tee -a "$RESULT_FILE" 
         echo ""
         return
     fi
 
-    PING=$(echo "$RAW" | grep "Ping" | awk '{print $2}')
-    DOWNLOAD=$(echo "$RAW" | grep "Download" | awk '{print $2}')
-    UPLOAD=$(echo "$RAW" | grep "Upload" | awk '{print $2}')
+    # 解析 TSV
+    PING=$(echo "$RAW_TSV" | awk -F'\t' '{printf "%.2f", $1}')
+    DOWNLOAD_BPS=$(echo "$RAW_TSV" | awk -F'\t' '{print $2}')
+    UPLOAD_BPS=$(echo "$RAW_TSV" | awk -F'\t' '{print $3}')
 
-    echo -e "${GREEN}$MODE | Ping: ${PING}ms | Down: ${DOWNLOAD} Mbps | Up: ${UPLOAD} Mbps${RESET}" | tee -a "$RESULT_FILE" 
+    # 检查是否获取到数字
+    if ! [[ "$PING" =~ ^[0-9.-]+$ ]] || ! [[ "$DOWNLOAD_BPS" =~ ^[0-9]+$ ]] || ! [[ "$UPLOAD_BPS" =~ ^[0-9]+$ ]]; then
+        echo -e "${RED}$MODE 测速失败 (解析TSV输出失败)${RESET}" | tee -a "$RESULT_FILE"
+        echo "DEBUG (RAW): $RAW_TSV"
+        echo ""
+        return
+    fi
+    
+    # 转换单位 (使用 awk 进行浮点运算)
+    DOWNLOAD_MBPS=$(awk "BEGIN {printf \"%.2f\", $DOWNLOAD_BPS * 8 / 1000 / 1000}")
+    UPLOAD_MBPS=$(awk "BEGIN {printf \"%.2f\", $UPLOAD_BPS * 8 / 1000 / 1000}")
+
+    echo -e "${GREEN}$MODE | Ping: ${PING}ms | Down: ${DOWNLOAD_MBPS} Mbps | Up: ${UPLOAD_MBPS} Mbps${RESET}" | tee -a "$RESULT_FILE" 
     echo ""
 }
 
@@ -514,70 +568,44 @@ show_sys_info() {
 }
 
 # -------------------------------
-# speedtest-cli 管理函数 (新增)
+# Ookla speedtest 管理函数 (替换原 speedtest-cli)
 # -------------------------------
 manage_speedtest_cli() {
     clear
     echo -e "${CYAN}=========================================="
-    echo "           speedtest-cli 管理             "
+    echo "         Ookla speedtest 管理 (官方版)    "
     echo "=========================================="
     echo -e "${NC}"
     
-    # 检查当前状态
-    if command -v speedtest-cli >/dev/null 2>&1; then
-        STATUS="${GREEN}✅ 已安装 ${YELLOW}$(speedtest-cli --version 2>/dev/null | head -n 1)${NC}"
+    # 检查当前状态 (命令是 speedtest)
+    if command -v speedtest >/dev/null 2>&1; then
+        STATUS="${GREEN}✅ 已安装 ${YELLOW}(Ookla 官方版本)${NC}"
     else
         STATUS="${RED}❌❌ 未安装${NC}"
     fi
     echo -e "${BLUE}当前状态: $STATUS${NC}"
     
     echo "请选择操作："
-    echo "1. 安装/更新 speedtest-cli"
-    echo "2. 卸载 speedtest-cli"
-    echo "3. 修复软件源问题"
+    echo "1. 安装/更新 Ookla speedtest"
+    echo "2. 卸载 Ookla speedtest"
     echo "0. 返回上级菜单"
     read -p "请输入选项编号: " choice
 
     case $choice in
         1) # 安装/更新
-            # 先尝试修复软件源
-            echo -e "${YELLOW}正在检查并修复软件源问题...${NC}"
-            fix_apt_sources
-            
-            echo -e "${YELLOW}正在尝试安装 speedtest-cli...${NC}"
-            if [ -f /etc/debian_version ]; then
-                # 先更新软件源列表
-                apt-get update
-                # 尝试安装
-                if apt-get install -y speedtest-cli; then
-                    echo -e "${GREEN}✅ speedtest-cli 安装成功！${NC}"
-                else
-                    # 如果官方源失败，尝试替代安装方法
-                    install_speedtest_alternative
-                fi
-            elif [ -f /etc/redhat-release ]; then
-                yum install -y speedtest-cli
-            elif command -v dnf >/dev/null 2>&1; then
-                dnf install -y speedtest-cli
-            else
-                install_speedtest_alternative
-            fi
+            # 调用 BBR 测速中的安装函数
+            check_and_install_speedtest
             ;;
         2) # 卸载
-            echo -e "${YELLOW}正在尝试卸载 speedtest-cli...${NC}"
+            echo -e "${YELLOW}正在尝试卸载 Ookla speedtest...${NC}"
             if [ -f /etc/debian_version ]; then
-                apt-get purge -y speedtest-cli
+                apt-get purge -y speedtest
                 apt-get autoremove -y
             elif [ -f /etc/redhat-release ]; then
-                yum remove -y speedtest-cli
-            elif command -v dnf >/dev/null 2>&1; then
-                dnf remove -y speedtest-cli
+                yum remove -y speedtest
             else
                 echo -e "${RED}不支持的系统或找不到包管理器，请手动卸载。${NC}"
             fi
-            ;;
-        3) # 修复软件源
-            fix_apt_sources
             ;;
         0)
             return
@@ -588,6 +616,7 @@ manage_speedtest_cli() {
     esac
     read -n1 -p "按任意键返回菜单..."
 }
+
 
 # 新增：修复APT软件源函数
 fix_apt_sources() {
