@@ -492,7 +492,7 @@ show_sys_info() {
 }
 
 # -------------------------------
-# speedtest-cli 管理函数 (新增)
+# speedtest-cli 管理函数 (修复版)
 # -------------------------------
 manage_speedtest_cli() {
     clear
@@ -502,58 +502,96 @@ manage_speedtest_cli() {
     echo -e "${NC}"
     
     # 检查当前状态
-    if command -v speedtest-cli >/dev/null 2>&1; then
+    if command -v speedtest >/dev/null 2>&1; then
+        STATUS="${GREEN}✅ 已安装 ${YELLOW}$(speedtest --version 2>/dev/null | head -n 1)${NC}"
+    elif command -v speedtest-cli >/dev/null 2>&1; then
         STATUS="${GREEN}✅ 已安装 ${YELLOW}$(speedtest-cli --version 2>/dev/null | head -n 1)${NC}"
     else
-        STATUS="${RED}❌ 未安装${NC}"
+        STATUS="${RED}❌❌ 未安装${NC}"
     fi
     echo -e "${BLUE}当前状态: $STATUS${NC}"
     
     echo "请选择操作："
     echo "1. 安装/更新 speedtest-cli"
     echo "2. 卸载 speedtest-cli"
+    echo "3. 使用pip安装 (推荐方法)"
     echo "0. 返回上级菜单"
     read -p "请输入选项编号: " choice
 
     case $choice in
-        1) # 安装/更新
-            echo -e "${YELLOW}正在尝试安装 speedtest-cli...${NC}"
+        1) # 安装/更新 - 系统包管理器
+            echo -e "${YELLOW}正在尝试通过系统包管理器安装 speedtest-cli...${NC}"
             if [ -f /etc/debian_version ]; then
+                echo -e "${BLUE}检测到 Debian/Ubuntu 系统${NC}"
                 apt update -y
-                apt install -y speedtest-cli
+                # 尝试不同的包名
+                if apt install -y speedtest-cli 2>/dev/null; then
+                    echo -e "${GREEN}✅ 通过 speedtest-cli 包安装成功！${NC}"
+                elif apt install -y speedtest 2>/dev/null; then
+                    echo -e "${GREEN}✅ 通过 speedtest 包安装成功！${NC}"
+                else
+                    echo -e "${YELLOW}⚠️ 系统包安装失败，尝试pip安装...${NC}"
+                    install_speedtest_via_pip
+                fi
             elif [ -f /etc/redhat-release ]; then
-                # RHEL/CentOS 需要 EPEL 源
-                yum install -y epel-release; yum install -y speedtest-cli
-            elif command -v dnf >/dev/null 2>&1; then
-                dnf install -y speedtest-cli
+                echo -e "${BLUE}检测到 CentOS/RHEL 系统${NC}"
+                # 确保EPEL源可用
+                if ! yum repolist | grep -q epel; then
+                    echo -e "${YELLOW}正在安装EPEL源...${NC}"
+                    yum install -y epel-release || dnf install -y epel-release
+                fi
+                # 尝试安装
+                if command -v dnf >/dev/null 2>&1; then
+                    dnf install -y speedtest-cli || dnf install -y python3-speedtest-cli
+                else
+                    yum install -y speedtest-cli || yum install -y python3-speedtest-cli
+                fi
             else
-                echo -e "${RED}不支持的系统或找不到包管理器，请手动安装。${NC}"
+                echo -e "${RED}不支持的系统，尝试pip安装...${NC}"
+                install_speedtest_via_pip
             fi
             
-            if command -v speedtest-cli >/dev/null 2>&1; then
-                echo -e "${GREEN}✅ speedtest-cli 安装/更新成功！${NC}"
+            # 验证安装
+            if command -v speedtest >/dev/null 2>&1 || command -v speedtest-cli >/dev/null 2>&1; then
+                echo -e "${GREEN}✅ speedtest-cli 安装成功！${NC}"
+                echo -e "${YELLOW}使用方法:${NC}"
+                echo -e "  speedtest 或 speedtest-cli"
             else
-                echo -e "${RED}❌ speedtest-cli 安装失败，请检查系统源。${NC}"
+                echo -e "${RED}❌❌ 安装失败，请尝试使用pip安装（选项3）${NC}"
             fi
             ;;
+            
         2) # 卸载
             echo -e "${YELLOW}正在尝试卸载 speedtest-cli...${NC}"
             if [ -f /etc/debian_version ]; then
-                apt purge -y speedtest-cli; apt autoremove -y
+                apt purge -y speedtest-cli speedtest 2>/dev/null
+                apt autoremove -y
             elif [ -f /etc/redhat-release ]; then
-                yum remove -y speedtest-cli
-            elif command -v dnf >/dev/null 2>&1; then
-                dnf remove -y speedtest-cli
-            else
-                echo -e "${RED}不支持的系统或找不到包管理器，请手动卸载。${NC}"
+                if command -v dnf >/dev/null 2>&1; then
+                    dnf remove -y speedtest-cli python3-speedtest-cli
+                else
+                    yum remove -y speedtest-cli python3-speedtest-cli
+                fi
             fi
-
-            if ! command -v speedtest-cli >/dev/null 2>&1; then
+            # 同时尝试pip卸载
+            if command -v pip3 >/dev/null 2>&1; then
+                pip3 uninstall -y speedtest-cli 2>/dev/null
+            fi
+            if command -v pip >/dev/null 2>&1; then
+                pip uninstall -y speedtest-cli 2>/dev/null
+            fi
+            
+            if ! command -v speedtest >/dev/null 2>&1 && ! command -v speedtest-cli >/dev/null 2>&1; then
                 echo -e "${GREEN}✅ speedtest-cli 卸载成功！${NC}"
             else
-                echo -e "${RED}❌ speedtest-cli 卸载失败，请检查系统日志。${NC}"
+                echo -e "${YELLOW}⚠️ 可能有残留文件，请手动检查${NC}"
             fi
             ;;
+            
+        3) # 使用pip安装（推荐）
+            install_speedtest_via_pip
+            ;;
+            
         0)
             echo -e "${YELLOW}返回上级菜单...${NC}"
             return
@@ -563,6 +601,48 @@ manage_speedtest_cli() {
             ;;
     esac
     read -n1 -p "按任意键返回菜单..."
+}
+
+# -------------------------------
+# 使用pip安装speedtest-cli (辅助函数)
+# -------------------------------
+install_speedtest_via_pip() {
+    echo -e "${YELLOW}正在使用pip安装speedtest-cli...${NC}"
+    
+    # 检查并安装pip
+    if ! command -v pip3 >/dev/null 2>&1 && ! command -v pip >/dev/null 2>&1; then
+        echo -e "${YELLOW}未找到pip，正在安装pip...${NC}"
+        if [ -f /etc/debian_version ]; then
+            apt update -y && apt install -y python3-pip
+        elif [ -f /etc/redhat-release ]; then
+            if command -v dnf >/dev/null 2>&1; then
+                dnf install -y python3-pip
+            else
+                yum install -y python3-pip
+            fi
+        else
+            # 通用pip安装
+            curl -s https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+            python3 get-pip.py || python get-pip.py
+            rm -f get-pip.py
+        fi
+    fi
+    
+    # 使用pip安装speedtest-cli
+    if command -v pip3 >/dev/null 2>&1; then
+        pip3 install speedtest-cli
+    elif command -v pip >/dev/null 2>&1; then
+        pip install speedtest-cli
+    else
+        echo -e "${RED}❌❌ pip安装失败，无法继续${NC}"
+        return 1
+    fi
+    
+    if command -v speedtest-cli >/dev/null 2>&1; then
+        echo -e "${GREEN}✅ 通过pip安装speedtest-cli成功！${NC}"
+    else
+        echo -e "${RED}❌❌ pip安装失败${NC}"
+    fi
 }
 
 # Docker 相关函数 (修复版)
