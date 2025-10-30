@@ -19,7 +19,18 @@ CGG-VPS 脚本管理菜单是一个功能丰富的 Bash 脚本，旨在简化 VP
 ### 2.1 准备工作
 
 *   确保您的 VPS 具有 `root` 权限。
-*   确保您的系统已安装 `curl` 或 `wget`。如果未安装，脚本会尝试自动安装。您也可以手动安装，例如对于 Debian/Ubuntu 系统使用 `sudo apt update && sudo apt install -y curl wget`，对于 CentOS/RHEL 系统使用 `sudo yum install -y curl wget` 或 `sudo dnf install -y curl wget`。
+*   确保您的系统已安装 `curl` 或 `wget`。如果未安装，脚本会尝试自动安装。您也可以手动安装：
+
+    *   **Debian/Ubuntu 系统**:
+        ```bash
+        sudo apt update && sudo apt install -y curl wget
+        ```
+    *   **CentOS/RHEL 系统**:
+        ```bash
+        sudo yum install -y curl wget
+        # 或者
+        sudo dnf install -y curl wget
+        ```
 
 ### 2.2 下载并运行脚本
 
