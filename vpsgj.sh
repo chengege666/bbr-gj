@@ -409,10 +409,10 @@ bbr_management() {
 }
 
 # -------------------------------
-# 核心功能：BBR 测速 (修复版 v3 - 修正拼写错误)
+# 核心功能：BBR 测速 (修复版 v4 - 解决TSV解析错误，改用JSON)
 # -------------------------------
 
-# 辅助函数：检查并安装 Ookla speedtest (健壮版)
+# 辅助函数：检查并安装 Ookla speedtest (健壮版 - 保持不变)
 check_and_install_speedtest() {
     if command -v speedtest >/dev/null 2>&1; then
         return 0 # 已安装
@@ -427,7 +427,6 @@ check_and_install_speedtest() {
         apt-get install -y curl gnupg1 apt-transport-https dirmngr
         
         echo -e "${BLUE}[2/3] 正在添加 Ookla 软件源...${NC}"
-        # 不再隐藏输出，以便调试
         curl -s https://install.speedtest.net/app/cli/install.deb.sh | bash
         
         echo -e "${BLUE}[3/3] 正在更新列表并安装 'speedtest' 包...${NC}"
@@ -460,7 +459,7 @@ check_and_install_speedtest() {
         echo -e "${YELLOW}⚠️ YUM/DNF 方法安装失败，尝试后备方法...${NC}"
     fi
 
-    # --- 方法 2: 后备 - 手动下载二进制文件 (适用于所有架构) ---
+    # --- 方法 2: 后备 - 手动下载二进制文件 (保持不变) ---
     echo -e "${BLUE}>>> 正在尝试后备方法：手动下载二进制文件...${NC}"
     ARCH=$(uname -m)
     SPEEDTEST_URL=""
@@ -518,6 +517,7 @@ check_and_install_speedtest() {
     fi
 }
 
+
 run_test() {
     MODE=$1
     echo -e "${CYAN}>>> 切换到 $MODE 并测速...${RESET}" 
@@ -556,41 +556,41 @@ run_test() {
             ;;
     esac
     
-    # 执行测速 (使用 Ookla speedtest 和 tsv 格式)
-    echo -e "${YELLOW}正在执行 $MODE 测速 (使用 Ookla)，请稍候...${NC}"
+    # 执行测速 (使用 Ookla speedtest 和 JSON 格式)
+    echo -e "${YELLOW}正在执行 $MODE 测速 (使用 Ookla - JSON 模式)，请稍候...${NC}"
     
-    # 使用 tsv 格式，字段：ping_latency\tdownload_bandwidth\tupload_bandwidth
-    # 带宽单位是 Bytes/s，需要转换为 Mbps (* 8 / 1000 / 1000)
-    
-    RAW_TSV=$(speedtest --accept-license -f tsv 2>/dev/null)
+    # 使用 JSON 格式输出，然后使用 grep + PCRE 提取字段
+    RAW_JSON=$(speedtest --accept-license -f json 2>/dev/null)
 
-    if [ -z "$RAW_TSV" ]; then
-        echo -e "${RED}$MODE 测速失败 (Ookla speedtest 执行错误)${RESET}" | tee -a "$RESULT_FILE" 
+    if [ -z "$RAW_JSON" ]; then
+        echo -e "${RED}$MODE 测速失败 (Ookla speedtest 执行错误或无输出)${RESET}" | tee -a "$RESULT_FILE" 
         echo ""
         return
     fi
-
-    # 解析 TSV
-    PING=$(echo "$RAW_TSV" | awk -F'\t' '{printf "%.2f", $1}')
-    DOWNLOAD_BPS=$(echo "$RAW_TSV" | awk -F'\t' '{print $2}')
     
-    # ====================
-    # ⚠️ 修正点 ⚠️
-    # 修正了 "$RAW_T"S V" 为 "$RAW_TSV"
-    UPLOAD_BPS=$(echo "$RAW_TSV" | awk -F'\t' '{print $3}')
-    # ====================
+    # 提取 JSON 字段 (使用 grep -oP 提取)
+    # Ping (ms)
+    PING=$(echo "$RAW_JSON" | grep -oP '"latency":\s*\K[^,]+' | head -n1)
+    
+    # Download (bps)
+    DOWNLOAD_BPS=$(echo "$RAW_JSON" | grep -oP '"download":\s*\K[^,]+' | head -n1)
+    
+    # Upload (bps)
+    UPLOAD_BPS=$(echo "$RAW_JSON" | grep -oP '"upload":\s*\K[^,]+' | head -n1)
+
 
     # 检查是否获取到数字
-    if ! [[ "$PING" =~ ^[0-9.-]+$ ]] || ! [[ "$DOWNLOAD_BPS" =~ ^[0-9]+$ ]] || ! [[ "$UPLOAD_BPS" =~ ^[0-9]+$ ]]; then
-        echo -e "${RED}$MODE 测速失败 (解析TSV输出失败)${RESET}" | tee -a "$RESULT_FILE"
-        echo "DEBUG (RAW): $RAW_TSV"
+    if [ -z "$PING" ] || [ -z "$DOWNLOAD_BPS" ] || [ -z "$UPLOAD_BPS" ]; then
+        echo -e "${RED}$MODE 测速失败 (JSON解析失败或字段缺失)${RESET}" | tee -a "$RESULT_FILE"
+        echo "DEBUG (RAW): $RAW_JSON"
         echo ""
         return
     fi
     
-    # 转换单位 (使用 awk 进行浮点运算)
-    DOWNLOAD_MBPS=$(awk "BEGIN {printf \"%.2f\", $DOWNLOAD_BPS * 8 / 1000 / 1000}")
-    UPLOAD_MBPS=$(awk "BEGIN {printf \"%.2f\", $UPLOAD_BPS * 8 / 1000 / 1000}")
+    # 转换单位: Ookla JSON 输出是 bps (bits/second)，转换为 Mbps (Megabits/second)
+    # Mbps = bps / 1000 / 1000 (注意：这里已移除错误的 * 8 因子)
+    DOWNLOAD_MBPS=$(awk "BEGIN {printf \"%.2f\", $DOWNLOAD_BPS / 1000 / 1000}")
+    UPLOAD_MBPS=$(awk "BEGIN {printf \"%.2f\", $UPLOAD_BPS / 1000 / 1000}")
 
     echo -e "${GREEN}$MODE | Ping: ${PING}ms | Down: ${DOWNLOAD_MBPS} Mbps | Up: ${UPLOAD_MBPS} Mbps${RESET}" | tee -a "$RESULT_FILE" 
     echo ""
