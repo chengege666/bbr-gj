@@ -2736,6 +2736,7 @@ done
 # 27. 安装 1Panel (新)
 # -------------------------------
 install_1panel_new() {
+    set -x # Enable shell debugging
     clear
     echo -e "${CYAN}=========================================="
     echo "             安装 1Panel 面板             "
@@ -2757,6 +2758,7 @@ install_1panel_new() {
         else
             echo -e "${RED}无法安装curl，请手动安装后重试${NC}"
             read -p "按回车键返回..."
+            set +x # Disable shell debugging
             return
         fi
     fi
@@ -2769,4 +2771,5 @@ install_1panel_new() {
     echo -e "${YELLOW}请根据安装脚本的提示完成后续配置。${NC}"
     echo -e "${YELLOW}通常，安装完成后会显示访问地址和初始用户名密码。${NC}"
     read -p "按回车键返回..."
+    set +x # Disable shell debugging
 }
