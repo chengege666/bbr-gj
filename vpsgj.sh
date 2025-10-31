@@ -758,25 +758,121 @@ check_docker_status() {
     fi
 }
 
+# -------------------------------
+# Docker 环境安装/更新函数 (修复版)
+# -------------------------------
 install_update_docker() {
     clear
     echo "正在安装/更新Docker环境..."
-    if command -v apt >/dev/null 2>&1; then
-        apt update -y
-        apt install -y curl wget
-    elif command -v yum >/dev/null 2>&1; then
-        yum install -y curl wget
+    
+    # 检查并清理/tmp目录
+    echo "检查/tmp目录状态..."
+    if [ ! -w /tmp ]; then
+        echo "警告: /tmp目录不可写，尝试修复权限..."
+        chmod 1777 /tmp
     fi
-    curl -fsSL https://get.docker.com -o get-docker.sh
-    sh get-docker.sh
-    rm -f get-docker.sh
+    
+    # 检查/tmp空间
+    TMP_SPACE=$(df /tmp | awk 'NR==2 {print $4}')
+    if [ "$TMP_SPACE" -lt 50000 ]; then
+        echo "清理/tmp目录以释放空间..."
+        rm -rf /tmp/*
+        # 如果/tmp是独立分区且空间不足，尝试使用其他目录
+        export TMPDIR=/var/tmp
+        mkdir -p /var/tmp
+        chmod 1777 /var/tmp
+    fi
+    
+    # 检查系统类型并安装必要工具
+    if command -v apt >/dev/null 2>&1; then
+        echo "检测到Debian/Ubuntu系统"
+        
+        # 更新包列表（使用不同的临时目录）
+        TMPDIR=/var/tmp apt update -y
+        
+        # 安装必要工具
+        apt install -y curl wget apt-transport-https ca-certificates gnupg2 software-properties-common
+        
+        # 添加Docker官方GPG密钥（使用备用方法）
+        echo "添加Docker GPG密钥..."
+        mkdir -p /etc/apt/keyrings
+        curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+        
+        # 添加Docker仓库
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+        
+        # 更新包列表
+        TMPDIR=/var/tmp apt update -y
+        
+        # 安装Docker
+        apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+        
+    elif command -v yum >/dev/null 2>&1; then
+        echo "检测到CentOS/RHEL系统"
+        
+        # 安装必要工具
+        yum install -y yum-utils device-mapper-persistent-data lvm2
+        
+        # 添加Docker仓库
+        yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+        
+        # 安装Docker
+        yum install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+        
+    elif command -v dnf >/dev/null 2>&1; then
+        echo "检测到Fedora系统"
+        
+        # 安装必要工具
+        dnf install -y dnf-plugins-core
+        
+        # 添加Docker仓库
+        dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
+        
+        # 安装Docker
+        dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+        
+    else
+        echo "不支持的系统类型，尝试通用安装方法..."
+        # 使用Docker官方安装脚本
+        curl -fsSL https://get.docker.com -o /var/tmp/get-docker.sh
+        sh /var/tmp/get-docker.sh
+        rm -f /var/tmp/get-docker.sh
+    fi
+    
+    # 启动Docker服务
     systemctl start docker
     systemctl enable docker
+    
+    # 检查安装结果
     if systemctl is-active docker >/dev/null 2>&1; then
-        echo -e "${GREEN}Docker安装成功！${NC}"
+        echo "Docker安装成功！"
+        echo "Docker版本: $(docker --version)"
     else
-        echo -e "${RED}Docker安装失败，请检查日志${NC}"
+        echo "Docker安装失败，尝试备用安装方法..."
+        
+        # 备用方法：使用官方安装脚本
+        echo "尝试使用Docker官方安装脚本..."
+        curl -fsSL https://get.docker.com -o /var/tmp/get-docker.sh
+        sh /var/tmp/get-docker.sh
+        rm -f /var/tmp/get-docker.sh
+        
+        # 再次检查
+        if systemctl is-active docker >/dev/null 2>&1; then
+            echo "Docker安装成功！"
+            echo "Docker版本: $(docker --version)"
+        else
+            echo "Docker安装失败，请检查日志"
+            echo "常见问题:"
+            echo "1. /tmp目录空间不足或权限问题"
+            echo "2. 网络连接问题"
+            echo "3. 系统不支持"
+            echo ""
+            echo "可以尝试手动安装:"
+            echo "curl -fsSL https://get.docker.com -o get-docker.sh"
+            echo "sh get-docker.sh"
+        fi
     fi
+    
     read -p "按回车键继续..."
 }
 
