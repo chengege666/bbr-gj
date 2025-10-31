@@ -598,25 +598,254 @@ run_test() {
 }
 
 # -------------------------------
-# 功能 1: BBR 综合测速 (保持不变)
+# 修复版 BBR 综合测速函数
 # -------------------------------
 bbr_test_menu() {
-    echo -e "${CYAN}=== 开始 BBR 综合测速 ===${RESET}"
+    clear
+    echo -e "${CYAN}=========================================="
+    echo "           BBR 综合测速 (修复版)           "
+    echo "=========================================="
+    echo -e "${NC}"
+    
+    # 检查并安装测速工具
+    if ! check_and_install_speedtest; then
+        echo -e "${RED}测速工具安装失败，无法进行测速${NC}"
+        read -p "按回车键返回..."
+        return
+    fi
+    
+    # 创建结果文件
+    RESULT_FILE="/tmp/bbr_test_results_$(date +%Y%m%d_%H%M%S).txt"
     > "$RESULT_FILE"
     
-    # 无条件尝试所有算法
-    for MODE in "BBR" "BBR Plus" "BBRv2" "BBRv3"; do
-        run_test "$MODE"
+    echo -e "${YELLOW}正在检查当前系统拥塞控制算法...${NC}"
+    CURRENT_CC=$(sysctl net.ipv4.tcp_congestion_control 2>/dev/null | awk '{print $3}')
+    CURRENT_QDISC=$(sysctl net.core.default_qdisc 2>/dev/null | awk '{print $3}')
+    echo -e "${GREEN}当前算法: ${CURRENT_CC}, 队列: ${CURRENT_QDISC}${NC}"
+    
+    echo -e "${YELLOW}注意：测速结果受网络环境、服务器负载等因素影响${NC}"
+    echo -e "${YELLOW}建议在不同时间段多次测试取平均值${NC}"
+    echo ""
+    
+    # 测试的算法列表（只测试系统实际支持的算法）
+    ALGORITHMS=()
+    
+    # 检查系统支持的算法
+    if [ -f "/proc/sys/net/ipv4/tcp_congestion_control" ]; then
+        AVAILABLE_ALGOS=$(cat /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null)
+        echo -e "${BLUE}系统支持的算法: ${AVAILABLE_ALGOS}${NC}"
+        
+        # 根据实际支持的算法来测试
+        if echo "$AVAILABLE_ALGOS" | grep -q "bbr"; then
+            ALGORITHMS+=("bbr")
+        fi
+        
+        if echo "$AVAILABLE_ALGOS" | grep -q "cubic"; then
+            ALGORITHMS+=("cubic")  # 作为对比
+        fi
+        
+        if echo "$AVAILABLE_ALGOS" | grep -q "reno"; then
+            ALGORITHMS+=("reno")   # 作为对比
+        fi
+    else
+        echo -e "${RED}无法获取系统支持的拥塞控制算法${NC}"
+        ALGORITHMS=("bbr" "cubic")  # 默认测试这两个
+    fi
+    
+    echo -e "${GREEN}将测试以下算法: ${ALGORITHMS[*]}${NC}"
+    echo ""
+    
+    # 对每个算法进行测速
+    for ALGO in "${ALGORITHMS[@]}"; do
+        run_enhanced_speed_test "$ALGO"
     done
     
-    echo -e "${CYAN}=== 测试完成，结果汇总 (${RESULT_FILE}) ===${RESET}"
+    # 显示汇总结果
+    echo -e "${CYAN}=========================================="
+    echo "              测速结果汇总                "
+    echo "=========================================="
+    echo -e "${NC}"
+    
     if [ -f "$RESULT_FILE" ] && [ -s "$RESULT_FILE" ]; then
         cat "$RESULT_FILE"
+        echo ""
+        echo -e "${YELLOW}完整结果已保存至: $RESULT_FILE${NC}"
     else
-        echo -e "${YELLOW}无测速结果${RESET}"
+        echo -e "${RED}无有效的测速结果${NC}"
     fi
+    
+    # 恢复原始设置
+    if [ -n "$CURRENT_CC" ]; then
+        echo -e "${YELLOW}恢复原始算法设置...${NC}"
+        sysctl -w net.ipv4.tcp_congestion_control="$CURRENT_CC" >/dev/null 2>&1
+    fi
+    
+    read -p "按回车键返回菜单..."
+}
+
+# -------------------------------
+# 增强版测速函数
+# -------------------------------
+run_enhanced_speed_test() {
+    local ALGO=$1
+    local MAX_RETRIES=2
+    local RETRY_COUNT=0
+    
+    echo -e "${CYAN}>>> 测试算法: $ALGO ${NC}"
+    
+    # 设置算法
+    if ! sysctl -w net.ipv4.tcp_congestion_control="$ALGO" >/dev/null 2>&1; then
+        echo -e "${RED}❌ 无法设置算法: $ALGO${NC}" | tee -a "$RESULT_FILE"
+        return 1
+    fi
+    
+    # 等待设置生效
+    sleep 2
+    
+    # 验证算法是否设置成功
+    local CURRENT=$(sysctl net.ipv4.tcp_congestion_control 2>/dev/null | awk '{print $3}')
+    if [ "$CURRENT" != "$ALGO" ]; then
+        echo -e "${RED}❌ 算法设置失败: 期望 $ALGO, 实际 $CURRENT${NC}" | tee -a "$RESULT_FILE"
+        return 1
+    fi
+    
+    # 多次测速取平均值
+    local TOTAL_DOWNLOAD=0
+    local TOTAL_UPLOAD=0
+    local TOTAL_PING=0
+    local SUCCESS_COUNT=0
+    
+    for ((i=1; i<=3; i++)); do
+        echo -e "${YELLOW}第 $i 次测速...${NC}"
+        
+        local RESULT=$(run_single_speedtest "$ALGO")
+        
+        if [ $? -eq 0 ] && [ -n "$RESULT" ]; then
+            local DOWNLOAD=$(echo "$RESULT" | cut -d'|' -f1)
+            local UPLOAD=$(echo "$RESULT" | cut -d'|' -f2)
+            local PING=$(echo "$RESULT" | cut -d'|' -f3)
+            
+            if [ "$DOWNLOAD" != "0" ] && [ "$UPLOAD" != "0" ]; then
+                TOTAL_DOWNLOAD=$(echo "$TOTAL_DOWNLOAD + $DOWNLOAD" | bc)
+                TOTAL_UPLOAD=$(echo "$TOTAL_UPLOAD + $UPLOAD" | bc)
+                TOTAL_PING=$(echo "$TOTAL_PING + $PING" | bc)
+                SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+                
+                echo -e "${GREEN}✓ 下载: ${DOWNLOAD} Mbps, 上传: ${UPLOAD} Mbps, 延迟: ${PING} ms${NC}"
+            else
+                echo -e "${RED}✗ 测速数据异常${NC}"
+            fi
+        else
+            echo -e "${RED}✗ 测速失败${NC}"
+        fi
+        
+        # 每次测速间隔
+        if [ $i -lt 3 ]; then
+            sleep 5
+        fi
+    done
+    
+    # 计算平均值
+    if [ $SUCCESS_COUNT -gt 0 ]; then
+        local AVG_DOWNLOAD=$(echo "scale=2; $TOTAL_DOWNLOAD / $SUCCESS_COUNT" | bc)
+        local AVG_UPLOAD=$(echo "scale=2; $TOTAL_UPLOAD / $SUCCESS_COUNT" | bc)
+        local AVG_PING=$(echo "scale=2; $TOTAL_PING / $SUCCESS_COUNT" | bc)
+        
+        echo -e "${GREEN}✅ $ALGO | 平均下载: ${AVG_DOWNLOAD} Mbps | 平均上传: ${AVG_UPLOAD} Mbps | 平均延迟: ${AVG_PING} ms${NC}" | tee -a "$RESULT_FILE"
+    else
+        echo -e "${RED}❌ $ALGO | 所有测速尝试均失败${NC}" | tee -a "$RESULT_FILE"
+    fi
+    
     echo ""
-    read -n1 -p "按任意键返回菜单..."
+}
+
+# -------------------------------
+# 单次测速函数
+# -------------------------------
+run_single_speedtest() {
+    local ALGO=$1
+    
+    # 使用 speedtest 的 JSON 格式输出
+    local RESULT_JSON=$(speedtest --accept-license --format=json --precision=2 2>/dev/null)
+    
+    if [ $? -ne 0 ] || [ -z "$RESULT_JSON" ]; then
+        # 如果 JSON 格式失败，尝试普通格式
+        RESULT_JSON=$(speedtest --accept-license --simple 2>/dev/null)
+        if [ $? -eq 0 ]; then
+            # 解析简单格式
+            local DOWNLOAD=$(echo "$RESULT_JSON" | grep "Download:" | awk '{print $2}')
+            local UPLOAD=$(echo "$RESULT_JSON" | grep "Upload:" | awk '{print $2}')
+            local PING=$(echo "$RESULT_JSON" | grep "Ping:" | awk '{print $2}')
+            
+            echo "$DOWNLOAD|$UPLOAD|$PING"
+            return 0
+        else
+            return 1
+        fi
+    fi
+    
+    # 解析 JSON 格式
+    local DOWNLOAD=$(echo "$RESULT_JSON" | grep -oP '"download":\s*{\s*"bandwidth":\s*\K\d+')
+    local UPLOAD=$(echo "$RESULT_JSON" | grep -oP '"upload":\s*{\s*"bandwidth":\s*\K\d+')
+    local PING=$(echo "$RESULT_JSON" | grep -oP '"ping":\s*{\s*"latency":\s*\K\d+\.?\d*')
+    
+    # 转换带宽单位 (bps to Mbps)
+    if [ -n "$DOWNLOAD" ] && [ "$DOWNLOAD" -gt 0 ]; then
+        DOWNLOAD=$(echo "scale=2; $DOWNLOAD / 125000" | bc)
+    else
+        DOWNLOAD=0
+    fi
+    
+    if [ -n "$UPLOAD" ] && [ "$UPLOAD" -gt 0 ]; then
+        UPLOAD=$(echo "scale=2; $UPLOAD / 125000" | bc)
+    else
+        UPLOAD=0
+    fi
+    
+    echo "$DOWNLOAD|$UPLOAD|$PING"
+    return 0
+}
+
+# -------------------------------
+# 多工具测速函数（备用）
+# -------------------------------
+run_backup_speedtest() {
+    local ALGO=$1
+    
+    echo -e "${YELLOW}使用备用测速工具...${NC}"
+    
+    # 尝试使用 speedtest-cli（如果存在）
+    if command -v speedtest-cli >/dev/null 2>&1; then
+        local RESULT=$(speedtest-cli --simple 2>/dev/null)
+        if [ $? -eq 0 ]; then
+            local DOWNLOAD=$(echo "$RESULT" | grep "Download:" | awk '{print $2}')
+            local UPLOAD=$(echo "$RESULT" | grep "Upload:" | awk '{print $2}')
+            local PING=$(echo "$RESULT" | grep "Ping:" | awk '{print $2}')
+            echo "$DOWNLOAD|$UPLOAD|$PING"
+            return 0
+        fi
+    fi
+    
+    # 尝试使用 wget 进行简单下载测试（仅作为最后手段）
+    echo -e "${YELLOW}使用基础网络测试...${NC}"
+    
+    # 测试延迟
+    local PING_TIME=$(ping -c 3 8.8.8.8 2>/dev/null | grep "avg" | awk -F'/' '{print $5}')
+    
+    # 简单下载测试（小文件）
+    local START_TIME=$(date +%s)
+    wget -O /dev/null --timeout=10 http://cachefly.cachefly.net/100mb.test 2>&1 | grep -oP '\d+\.\d+ [KM]B/s'
+    local END_TIME=$(date +%s)
+    
+    local DOWNLOAD_TIME=$((END_TIME - START_TIME))
+    local DOWNLOAD_SPEED="0"
+    
+    if [ $DOWNLOAD_TIME -gt 0 ]; then
+        DOWNLOAD_SPEED=$(echo "scale=2; 100 / $DOWNLOAD_TIME" | bc)
+    fi
+    
+    echo "$DOWNLOAD_SPEED|0|$PING_TIME"
+    return 0
 }
 
 # -------------------------------
