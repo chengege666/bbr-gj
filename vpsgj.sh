@@ -759,120 +759,188 @@ check_docker_status() {
 }
 
 # -------------------------------
-# Docker 环境安装/更新函数 (修复版)
+# Docker 环境安装/更新函数 (完全绕过/tmp目录)
 # -------------------------------
 install_update_docker() {
     clear
     echo "正在安装/更新Docker环境..."
     
-    # 检查并清理/tmp目录
-    echo "检查/tmp目录状态..."
-    if [ ! -w /tmp ]; then
-        echo "警告: /tmp目录不可写，尝试修复权限..."
+    # 检查/tmp目录是否存在
+    if [ ! -d /tmp ]; then
+        echo "警告: /tmp目录不存在，创建并设置权限..."
+        mkdir -p /tmp
         chmod 1777 /tmp
     fi
     
-    # 检查/tmp空间
-    TMP_SPACE=$(df /tmp | awk 'NR==2 {print $4}')
-    if [ "$TMP_SPACE" -lt 50000 ]; then
-        echo "清理/tmp目录以释放空间..."
-        rm -rf /tmp/*
-        # 如果/tmp是独立分区且空间不足，尝试使用其他目录
-        export TMPDIR=/var/tmp
-        mkdir -p /var/tmp
-        chmod 1777 /var/tmp
+    # 检查/tmp目录权限
+    if [ ! -w /tmp ]; then
+        echo "修复/tmp目录权限..."
+        chmod 1777 /tmp
     fi
     
-    # 检查系统类型并安装必要工具
-    if command -v apt >/dev/null 2>&1; then
-        echo "检测到Debian/Ubuntu系统"
+    # 设置临时目录环境变量
+    export TMPDIR=/var/tmp
+    export TEMP=/var/tmp
+    export TMP=/var/tmp
+    mkdir -p /var/tmp
+    chmod 1777 /var/tmp
+    
+    # 创建apt配置文件，强制使用/var/tmp作为临时目录
+    mkdir -p /etc/apt/apt.conf.d
+    echo 'Dir::Cache::archives "/var/cache/apt/archives";' > /etc/apt/apt.conf.d/99tempdir
+    echo 'Dir::State::lists "/var/lib/apt/lists";' >> /etc/apt/apt.conf.d/99tempdir
+    echo 'APT::ExtractTemplates::TempDir "/var/tmp";' >> /etc/apt/apt.conf.d/99tempdir
+    
+    # 方法1: 使用Docker官方安装脚本（推荐）
+    echo "方法1: 使用Docker官方安装脚本..."
+    
+    # 下载安装脚本到安全目录
+    SCRIPT_DIR="/opt/docker-install"
+    mkdir -p "$SCRIPT_DIR"
+    
+    if command -v curl >/dev/null 2>&1; then
+        if curl -fsSL https://get.docker.com -o "$SCRIPT_DIR/get-docker.sh"; then
+            echo "下载Docker安装脚本成功"
+        else
+            echo "curl下载失败，尝试wget..."
+            if command -v wget >/dev/null 2>&1; then
+                wget -q https://get.docker.com -O "$SCRIPT_DIR/get-docker.sh"
+            else
+                echo "错误: 需要curl或wget来下载安装脚本"
+                read -p "按回车键继续..."
+                return 1
+            fi
+        fi
+    else
+        if command -v wget >/dev/null 2>&1; then
+            wget -q https://get.docker.com -O "$SCRIPT_DIR/get-docker.sh"
+        else
+            echo "错误: 需要curl或wget来下载安装脚本"
+            read -p "按回车键继续..."
+            return 1
+        fi
+    fi
+    
+    if [ ! -f "$SCRIPT_DIR/get-docker.sh" ]; then
+        echo "下载Docker安装脚本失败"
+        echo "尝试方法2: 手动安装..."
         
-        # 更新包列表（使用不同的临时目录）
-        TMPDIR=/var/tmp apt update -y
+        # 方法2: 手动安装Docker
+        echo "方法2: 手动安装Docker..."
         
-        # 安装必要工具
-        apt install -y curl wget apt-transport-https ca-certificates gnupg2 software-properties-common
+        # 更新包列表（使用/var/tmp作为临时目录）
+        TMPDIR=/var/tmp apt update || apt update
         
-        # 添加Docker官方GPG密钥（使用备用方法）
-        echo "添加Docker GPG密钥..."
-        mkdir -p /etc/apt/keyrings
-        curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+        # 安装必要工具（简化版本）
+        apt install -y curl wget gnupg lsb-release
         
-        # 添加Docker仓库
-        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+        # 手动创建Docker安装目录结构
+        DOCKER_DIR="/opt/docker-manual"
+        mkdir -p "$DOCKER_DIR"
         
-        # 更新包列表
-        TMPDIR=/var/tmp apt update -y
+        # 下载Docker deb包（如果可用）
+        echo "尝试下载Docker安装包..."
+        # 这里可以添加直接下载deb包的逻辑，但比较复杂
         
-        # 安装Docker
-        apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+        # 使用最简安装方法
+        echo "使用最简安装方法..."
+        apt install -y docker.io containerd runc
         
-    elif command -v yum >/dev/null 2>&1; then
-        echo "检测到CentOS/RHEL系统"
-        
-        # 安装必要工具
-        yum install -y yum-utils device-mapper-persistent-data lvm2
-        
-        # 添加Docker仓库
-        yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-        
-        # 安装Docker
-        yum install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-        
-    elif command -v dnf >/dev/null 2>&1; then
-        echo "检测到Fedora系统"
-        
-        # 安装必要工具
-        dnf install -y dnf-plugins-core
-        
-        # 添加Docker仓库
-        dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
-        
-        # 安装Docker
-        dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+        # 启动服务
+        systemctl start docker
+        systemctl enable docker
         
     else
-        echo "不支持的系统类型，尝试通用安装方法..."
-        # 使用Docker官方安装脚本
-        curl -fsSL https://get.docker.com -o /var/tmp/get-docker.sh
-        sh /var/tmp/get-docker.sh
-        rm -f /var/tmp/get-docker.sh
+        # 执行官方安装脚本
+        echo "执行Docker官方安装脚本..."
+        chmod +x "$SCRIPT_DIR/get-docker.sh"
+        TMPDIR=/var/tmp TEMP=/var/tmp TMP=/var/tmp "$SCRIPT_DIR/get-docker.sh"
+        
+        # 清理安装脚本
+        rm -f "$SCRIPT_DIR/get-docker.sh"
     fi
-    
-    # 启动Docker服务
-    systemctl start docker
-    systemctl enable docker
     
     # 检查安装结果
     if systemctl is-active docker >/dev/null 2>&1; then
         echo "Docker安装成功！"
-        echo "Docker版本: $(docker --version)"
+        echo "Docker版本: $(docker --version 2>/dev/null || echo '无法获取版本')"
     else
-        echo "Docker安装失败，尝试备用安装方法..."
-        
-        # 备用方法：使用官方安装脚本
-        echo "尝试使用Docker官方安装脚本..."
-        curl -fsSL https://get.docker.com -o /var/tmp/get-docker.sh
-        sh /var/tmp/get-docker.sh
-        rm -f /var/tmp/get-docker.sh
+        echo "Docker安装可能失败，尝试启动服务..."
+        systemctl start docker
+        systemctl enable docker
         
         # 再次检查
         if systemctl is-active docker >/dev/null 2>&1; then
-            echo "Docker安装成功！"
-            echo "Docker版本: $(docker --version)"
+            echo "Docker启动成功！"
+            echo "Docker版本: $(docker --version 2>/dev/null || echo '无法获取版本')"
         else
-            echo "Docker安装失败，请检查日志"
-            echo "常见问题:"
-            echo "1. /tmp目录空间不足或权限问题"
-            echo "2. 网络连接问题"
-            echo "3. 系统不支持"
-            echo ""
-            echo "可以尝试手动安装:"
-            echo "curl -fsSL https://get.docker.com -o get-docker.sh"
-            echo "sh get-docker.sh"
+            echo "Docker安装失败"
+            echo "请尝试以下手动命令:"
+            echo "1. 检查/tmp目录: ls -la / | grep tmp"
+            echo "2. 手动创建/tmp: mkdir -p /tmp && chmod 1777 /tmp"
+            echo "3. 手动安装: curl -fsSL https://get.docker.com -o get-docker.sh && sh get-docker.sh"
         fi
     fi
     
+    read -p "按回车键继续..."
+}
+
+# -------------------------------
+# 修复系统/tmp目录的函数
+# -------------------------------
+fix_tmp_directory() {
+    clear
+    echo "=========================================="
+    echo "           修复/tmp目录问题              "
+    echo "=========================================="
+    
+    echo "当前/tmp目录状态:"
+    ls -la / | grep tmp || echo "/tmp目录不存在"
+    
+    echo ""
+    echo "尝试修复/tmp目录..."
+    
+    # 备份现有/tmp（如果存在）
+    if [ -d /tmp ] && [ "$(ls -A /tmp 2>/dev/null)" ]; then
+        echo "备份/tmp目录内容到/var/tmp-backup..."
+        mkdir -p /var/tmp-backup
+        cp -r /tmp/* /var/tmp-backup/ 2>/dev/null || true
+    fi
+    
+    # 删除并重建/tmp目录
+    echo "重建/tmp目录..."
+    rm -rf /tmp
+    mkdir -p /tmp
+    chmod 1777 /tmp
+    
+    # 检查是否成功
+    if [ -d /tmp ] && [ -w /tmp ]; then
+        echo "✅ /tmp目录修复成功"
+        echo "权限信息:"
+        ls -ld /tmp
+    else
+        echo "❌ /tmp目录修复失败"
+        echo "尝试使用ramdisk创建/tmp..."
+        mount -t tmpfs -o size=512M tmpfs /tmp
+        chmod 1777 /tmp
+        
+        if [ -d /tmp ] && [ -w /tmp ]; then
+            echo "✅ 使用ramdisk创建/tmp成功"
+        else
+            echo "❌ 所有修复方法都失败"
+            echo "请检查系统文件系统完整性"
+        fi
+    fi
+    
+    # 恢复备份（如果存在）
+    if [ -d /var/tmp-backup ] && [ "$(ls -A /var/tmp-backup 2>/dev/null)" ]; then
+        echo "恢复/tmp目录备份..."
+        cp -r /var/tmp-backup/* /tmp/ 2>/dev/null || true
+        rm -rf /var/tmp-backup
+    fi
+    
+    echo ""
+    echo "修复完成"
     read -p "按回车键继续..."
 }
 
@@ -2791,7 +2859,8 @@ system_tools_menu() {
         echo "24. 磁盘性能测试(fio/iozone)"
         echo "25. 系统安全扫描(Lynis)"
         echo "26. 文件完整性检查(AIDE)"
-         echo "27. 1Panel管理面板"
+        echo "27. 1Panel管理面板"
+        echo "28. 修复/tmp目录问题"
         echo "0. 返回主菜单"
         echo "=========================================="
 
@@ -2825,6 +2894,7 @@ system_tools_menu() {
             25) system_security_scan ;;
             26) file_integrity_check ;;
             27) manage_1panel ;;
+            28) fix_tmp_directory ;;
             0) return ;;
             *) echo "无效的选项，请重新输入！"; sleep 1 ;;
         esac
