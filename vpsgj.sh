@@ -673,12 +673,8 @@ bbr_test_menu() {
     # 如果没有找到任何 BBR 变种
     if [ ${#ALGORITHMS[@]} -eq 0 ]; then
         echo -e "${RED}❌ 未检测到任何 BBR 变种算法${NC}"
-        echo -e "${YELLOW}您可能需要安装支持 BBR Plus/BBRv2/BBRv3 的内核${NC}"
+        echo -e "${YELLOW}您可能需要安装支持 BBR Plus/BBRv2/BBRv3 的内核才能进行相关测速${NC}"
         echo ""
-        read -p "是否查看 BBR 内核安装选项? (y/N): " install_choice
-        if [[ "$install_choice" == "y" || "$install_choice" == "Y" ]]; then
-            run_bbr_switch
-        fi
         read -p "按回车键返回..."
         return
     fi
