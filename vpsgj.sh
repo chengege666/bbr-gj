@@ -366,7 +366,7 @@ basic_tools() {
 }
 
 # -------------------------------
-# BBR 管理函数
+# 修改 BBR 管理菜单，添加变种检测选项
 # -------------------------------
 bbr_management() {
     while true; do
@@ -376,14 +376,15 @@ bbr_management() {
         echo "                BBR 管理菜单              "
         echo "=========================================="
         echo -e "${NC}"
-        echo "1. BBR 综合测速 (BBR, BBR Plus, BBRv2, BBRv3)"
+        echo "1. BBR 综合测速 (所有可用算法)"
         echo "2. 安装/切换 BBR 内核 (使用 ylx2016 脚本)"
         echo "3. 查看系统详细信息 (含BBR状态)"
-        echo "4. speedtest-cli 测速依赖 (安装/卸载)"  # <<< 新增功能
+        echo "4. 检查 BBR 变种支持状态"
+        echo "5. speedtest-cli 测速依赖 (安装/卸载)"
         echo "0. 返回主菜单"
         echo "=========================================="
         
-        read -p "请输入你的选择 (0-4): " bbr_choice
+        read -p "请输入你的选择 (0-5): " bbr_choice
 
         case $bbr_choice in
             1)
@@ -396,7 +397,10 @@ bbr_management() {
                 show_sys_info
                 ;;
             4)
-                manage_speedtest_cli  # <<< 调用新增的 speedtest-cli 管理函数
+                check_bbr_variants
+                ;;
+            5)
+                manage_speedtest_cli
                 ;;
             0)
                 return
@@ -598,12 +602,12 @@ run_test() {
 }
 
 # -------------------------------
-# 修复版 BBR 综合测速函数
+# 增强版 BBR 综合测速函数 (支持所有 BBR 变种)
 # -------------------------------
 bbr_test_menu() {
     clear
     echo -e "${CYAN}=========================================="
-    echo "           BBR 综合测速 (修复版)           "
+    echo "           BBR 综合测速 (增强版)           "
     echo "=========================================="
     echo -e "${NC}"
     
@@ -627,31 +631,59 @@ bbr_test_menu() {
     echo -e "${YELLOW}建议在不同时间段多次测试取平均值${NC}"
     echo ""
     
-    # 测试的算法列表（只测试系统实际支持的算法）
+    # 获取系统支持的所有拥塞控制算法
+    AVAILABLE_ALGOS=$(cat /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null)
+    echo -e "${BLUE}系统支持的算法: ${AVAILABLE_ALGOS}${NC}"
+    
+    # 定义要测试的算法列表（包括所有 BBR 变种）
     ALGORITHMS=()
     
-    # 检查系统支持的算法
-    if [ -f "/proc/sys/net/ipv4/tcp_congestion_control" ]; then
-        AVAILABLE_ALGOS=$(cat /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null)
-        echo -e "${BLUE}系统支持的算法: ${AVAILABLE_ALGOS}${NC}"
-        
-        # 根据实际支持的算法来测试
-        if echo "$AVAILABLE_ALGOS" | grep -q "bbr"; then
-            ALGORITHMS+=("bbr")
-        fi
-        
-        if echo "$AVAILABLE_ALGOS" | grep -q "cubic"; then
-            ALGORITHMS+=("cubic")  # 作为对比
-        fi
-        
-        if echo "$AVAILABLE_ALGOS" | grep -q "reno"; then
-            ALGORITHMS+=("reno")   # 作为对比
-        fi
-    else
-        echo -e "${RED}无法获取系统支持的拥塞控制算法${NC}"
-        ALGORITHMS=("bbr" "cubic")  # 默认测试这两个
+    # 检查并添加所有可用的 BBR 变种
+    if echo "$AVAILABLE_ALGOS" | grep -q "bbr"; then
+        ALGORITHMS+=("bbr")
+        echo -e "${GREEN}✅ 将测试标准 BBR${NC}"
     fi
     
+    if echo "$AVAILABLE_ALGOS" | grep -q "bbrplus"; then
+        ALGORITHMS+=("bbrplus")
+        echo -e "${GREEN}✅ 将测试 BBR Plus${NC}"
+    fi
+    
+    if echo "$AVAILABLE_ALGOS" | grep -q "bbr2"; then
+        ALGORITHMS+=("bbr2")
+        echo -e "${GREEN}✅ 将测试 BBRv2${NC}"
+    fi
+    
+    if echo "$AVAILABLE_ALGOS" | grep -q "bbr3"; then
+        ALGORITHMS+=("bbr3")
+        echo -e "${GREEN}✅ 将测试 BBRv3${NC}"
+    fi
+    
+    # 添加一些标准算法作为对比
+    if echo "$AVAILABLE_ALGOS" | grep -q "cubic"; then
+        ALGORITHMS+=("cubic")
+        echo -e "${GREEN}✅ 将测试 Cubic (对比)${NC}"
+    fi
+    
+    if echo "$AVAILABLE_ALGOS" | grep -q "reno"; then
+        ALGORITHMS+=("reno")
+        echo -e "${GREEN}✅ 将测试 Reno (对比)${NC}"
+    fi
+    
+    # 如果没有找到任何 BBR 变种
+    if [ ${#ALGORITHMS[@]} -eq 0 ]; then
+        echo -e "${RED}❌ 未检测到任何 BBR 变种算法${NC}"
+        echo -e "${YELLOW}您可能需要安装支持 BBR Plus/BBRv2/BBRv3 的内核${NC}"
+        echo ""
+        read -p "是否查看 BBR 内核安装选项? (y/N): " install_choice
+        if [[ "$install_choice" == "y" || "$install_choice" == "Y" ]]; then
+            run_bbr_switch
+        fi
+        read -p "按回车键返回..."
+        return
+    fi
+    
+    echo ""
     echo -e "${GREEN}将测试以下算法: ${ALGORITHMS[*]}${NC}"
     echo ""
     
@@ -680,7 +712,68 @@ bbr_test_menu() {
         sysctl -w net.ipv4.tcp_congestion_control="$CURRENT_CC" >/dev/null 2>&1
     fi
     
+    # 提供 BBR 变种安装建议
+    echo ""
+    if ! echo "$AVAILABLE_ALGOS" | grep -q "bbrplus"; then
+        echo -e "${YELLOW}💡 提示: 系统未检测到 BBR Plus，可使用 BBR 管理菜单安装${NC}"
+    fi
+    
+    if ! echo "$AVAILABLE_ALGOS" | grep -q "bbr2"; then
+        echo -e "${YELLOW}💡 提示: 系统未检测到 BBRv2，可使用 BBR 管理菜单安装${NC}"
+    fi
+    
+    if ! echo "$AVAILABLE_ALGOS" | grep -q "bbr3"; then
+        echo -e "${YELLOW}💡 提示: 系统未检测到 BBRv3，可使用 BBR 管理菜单安装${NC}"
+    fi
+    
     read -p "按回车键返回菜单..."
+}
+
+# -------------------------------
+# 检查 BBR 变种内核是否安装
+# -------------------------------
+check_bbr_variants() {
+    echo -e "${CYAN}=========================================="
+    echo "          BBR 变种内核检测             "
+    echo "=========================================="
+    echo -e "${NC}"
+    
+    # 获取当前内核信息
+    CURRENT_KERNEL=$(uname -r)
+    echo -e "${BLUE}当前内核版本: ${CURRENT_KERNEL}${NC}"
+    
+    # 检查各种 BBR 变种是否可用
+    AVAILABLE_ALGOS=$(cat /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null)
+    
+    echo -e "${YELLOW}BBR 变种支持状态:${NC}"
+    
+    if echo "$AVAILABLE_ALGOS" | grep -q "bbr"; then
+        echo -e "${GREEN}✅ 标准 BBR: 已支持${NC}"
+    else
+        echo -e "${RED}❌ 标准 BBR: 未支持${NC}"
+    fi
+    
+    if echo "$AVAILABLE_ALGOS" | grep -q "bbrplus"; then
+        echo -e "${GREEN}✅ BBR Plus: 已支持${NC}"
+    else
+        echo -e "${YELLOW}⚠️  BBR Plus: 未支持 (需要特定内核)${NC}"
+    fi
+    
+    if echo "$AVAILABLE_ALGOS" | grep -q "bbr2"; then
+        echo -e "${GREEN}✅ BBRv2: 已支持${NC}"
+    else
+        echo -e "${YELLOW}⚠️  BBRv2: 未支持 (需要特定内核)${NC}"
+    fi
+    
+    if echo "$AVAILABLE_ALGOS" | grep -q "bbr3"; then
+        echo -e "${GREEN}✅ BBRv3: 已支持${NC}"
+    else
+        echo -e "${YELLOW}⚠️  BBRv3: 未支持 (需要特定内核)${NC}"
+    fi
+    
+    echo ""
+    echo -e "${YELLOW}要安装 BBR 变种内核，请使用 BBR 管理菜单中的安装选项${NC}"
+    read -p "按回车键返回..."
 }
 
 # -------------------------------
