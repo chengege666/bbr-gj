@@ -2695,6 +2695,7 @@ system_tools_menu() {
         echo "24. 磁盘性能测试(fio/iozone)"
         echo "25. 系统安全扫描(Lynis)"
         echo "26. 文件完整性检查(AIDE)"
+         echo "27. 1Panel管理面板"
         echo "0. 返回主菜单"
         echo "=========================================="
 
@@ -2727,8 +2728,264 @@ system_tools_menu() {
             24) disk_performance_test ;;
             25) system_security_scan ;;
             26) file_integrity_check ;;
+            27) manage_1panel ;;
             0) return ;;
             *) echo "无效的选项，请重新输入！"; sleep 1 ;;
+        esac
+    done
+}
+
+# -------------------------------
+# 系统工具主菜单 (更新为单竖排无颜色，新增1Panel)
+# -------------------------------
+system_tools_menu() {
+    while true; do
+        clear
+        echo "=========================================="
+        echo "              系统工具菜单                "
+        echo "=========================================="
+        echo "1. 高级防火墙管理"
+        echo "2. 修改登录密码"
+        echo "3. 修改SSH连接端口"
+        echo "4. 切换优先IPV4/IPV6"
+        echo "5. 修改主机名"
+        echo "6. 系统时区调整"
+        echo "7. 修改虚拟内存大小(Swap)"
+        echo "8. 内存加速清理"
+        echo "9. 重启服务器"
+        echo "10. 卸载本脚本"
+        echo "11. Nginx Proxy Manager管理"
+        echo "12. 查看端口占用状态"
+        echo "13. 修改DNS服务器"
+        echo "14. 磁盘空间分析"
+        echo "15. 服务器性能全面测试(Bench.sh)"
+        echo "16. 流媒体解锁检测(RegionRestrictionCheck)"
+        echo "17. 回程路由测试(BestTrace)"
+        echo "18. 炫酷系统信息显示(neofetch)"
+        echo "19. 实时系统监控仪表板(gtop/bpytop)"
+        echo "20. 网速多节点测试(Speedtest-X)"
+        echo "21. 端口扫描工具(nmap)"
+        echo "22. 证书管理工具(acme.sh)"
+        echo "23. 服务器延迟测试(Ping测试)"
+        echo "24. 磁盘性能测试(fio/iozone)"
+        echo "25. 系统安全扫描(Lynis)"
+        echo "26. 文件完整性检查(AIDE)"
+        echo "27. 1Panel管理面板"
+        echo "0. 返回主菜单"
+        echo "=========================================="
+
+        read -p "请输入选项编号: " tools_choice
+
+        case $tools_choice in
+            1) advanced_firewall_menu ;;
+            2) change_login_password ;;
+            3) change_ssh_port ;;
+            4) toggle_ipv_priority ;;
+            5) change_hostname ;;
+            6) change_system_timezone ;;
+            7) manage_swap ;;
+            8) accelerate_memory_clean ;;
+            9) reboot_server ;;
+            10) uninstall_script ;;
+            11) nginx_proxy_manager_menu ;;
+            12) check_port_usage ;;
+            13) change_dns_servers ;;
+            14) analyze_disk_usage ;;
+            15) server_benchmark ;;
+            16) streaming_unlock_test ;;
+            17) routing_test ;;
+            18) cool_system_info ;;
+            19) system_monitor_dashboard ;;
+            20) multi_speedtest ;;
+            21) port_scanner_tool ;;
+            22) ssl_cert_manager ;;
+            23) server_latency_test ;;
+            24) disk_performance_test ;;
+            25) system_security_scan ;;
+            26) file_integrity_check ;;
+            27) manage_1panel ;;
+            0) return ;;
+            *) echo "无效的选项，请重新输入！"; sleep 1 ;;
+        esac
+    done
+}
+
+# -------------------------------
+# 27. 1Panel管理面板函数
+# -------------------------------
+manage_1panel() {
+    while true; do
+        clear
+        echo "=========================================="
+        echo "             1Panel管理面板               "
+        echo "=========================================="
+        
+        # 检查1Panel状态
+        if systemctl is-active 1panel >/dev/null 2>&1; then
+            echo "状态: 已安装且运行中"
+            PANEL_STATUS="running"
+        elif systemctl is-active 1panel >/dev/null 2>&1 && ! systemctl is-active 1panel; then
+            echo "状态: 已安装但未运行"
+            PANEL_STATUS="installed"
+        else
+            echo "状态: 未安装"
+            PANEL_STATUS="not_installed"
+        fi
+        
+        echo ""
+        echo "请选择操作："
+        echo "1. 安装1Panel"
+        echo "2. 启动1Panel服务"
+        echo "3. 停止1Panel服务"
+        echo "4. 重启1Panel服务"
+        echo "5. 查看1Panel状态"
+        echo "6. 查看访问信息"
+        echo "7. 卸载1Panel"
+        echo "0. 返回上级菜单"
+        echo "=========================================="
+        
+        read -p "请输入选项编号: " panel_choice
+
+        case $panel_choice in
+            1)
+                if [ "$PANEL_STATUS" != "not_installed" ]; then
+                    echo "1Panel已经安装，请先卸载后再重新安装。"
+                    read -p "按回车键继续..."
+                    continue
+                fi
+                
+                echo "正在安装1Panel..."
+                echo "下载安装脚本..."
+                curl -sSL https://resource.fit2cloud.com/1panel/package/quick_start.sh -o quick_start.sh
+                
+                if [ $? -eq 0 ]; then
+                    echo "执行安装脚本..."
+                    bash quick_start.sh
+                    if systemctl is-active 1panel >/dev/null 2>&1; then
+                        echo "1Panel安装成功！"
+                    else
+                        echo "1Panel安装完成，但服务未启动。"
+                    fi
+                else
+                    echo "下载安装脚本失败，请检查网络连接。"
+                fi
+                read -p "按回车键继续..."
+                ;;
+            2)
+                if [ "$PANEL_STATUS" = "not_installed" ]; then
+                    echo "1Panel未安装，请先安装。"
+                else
+                    echo "启动1Panel服务..."
+                    systemctl start 1panel
+                    if systemctl is-active 1panel >/dev/null 2>&1; then
+                        echo "1Panel启动成功！"
+                    else
+                        echo "1Panel启动失败，请检查日志。"
+                    fi
+                fi
+                read -p "按回车键继续..."
+                ;;
+            3)
+                if [ "$PANEL_STATUS" = "not_installed" ]; then
+                    echo "1Panel未安装，请先安装。"
+                else
+                    echo "停止1Panel服务..."
+                    systemctl stop 1panel
+                    if ! systemctl is-active 1panel >/dev/null 2>&1; then
+                        echo "1Panel已停止。"
+                    else
+                        echo "停止1Panel失败，请检查日志。"
+                    fi
+                fi
+                read -p "按回车键继续..."
+                ;;
+            4)
+                if [ "$PANEL_STATUS" = "not_installed" ]; then
+                    echo "1Panel未安装，请先安装。"
+                else
+                    echo "重启1Panel服务..."
+                    systemctl restart 1panel
+                    if systemctl is-active 1panel >/dev/null 2>&1; then
+                        echo "1Panel重启成功！"
+                    else
+                        echo "1Panel重启失败，请检查日志。"
+                    fi
+                fi
+                read -p "按回车键继续..."
+                ;;
+            5)
+                if [ "$PANEL_STATUS" = "not_installed" ]; then
+                    echo "1Panel未安装。"
+                else
+                    echo "1Panel服务状态："
+                    systemctl status 1panel --no-pager -l
+                fi
+                read -p "按回车键继续..."
+                ;;
+            6)
+                if [ "$PANEL_STATUS" = "not_installed" ]; then
+                    echo "1Panel未安装，请先安装。"
+                else
+                    echo "1Panel访问信息："
+                    echo "访问地址: https://服务器IP:目标端口"
+                    echo "默认端口: 如果安装时未指定，通常为随机端口"
+                    echo ""
+                    echo "查看实际端口："
+                    # 尝试从配置文件或进程信息中获取端口
+                    if [ -f /opt/1panel/conf/app.yaml ]; then
+                        PORT=$(grep -E '^port: [0-9]+' /opt/1panel/conf/app.yaml 2>/dev/null | awk '{print $2}')
+                        if [ -n "$PORT" ]; then
+                            echo "检测到端口: $PORT"
+                        else
+                            echo "无法从配置文件中获取端口，请查看安装时输出的信息。"
+                        fi
+                    else
+                        echo "配置文件不存在，请查看安装时输出的端口信息。"
+                    fi
+                    echo ""
+                    echo "获取初始密码："
+                    if [ -f /opt/1panel/credentials/password ]; then
+                        PASSWORD=$(cat /opt/1panel/credentials/password 2>/dev/null)
+                        if [ -n "$PASSWORD" ]; then
+                            echo "初始密码: $PASSWORD"
+                        else
+                            echo "无法获取密码文件，请查看安装日志。"
+                        fi
+                    else
+                        echo "密码文件不存在，请查看安装日志获取初始密码。"
+                    fi
+                fi
+                read -p "按回车键继续..."
+                ;;
+            7)
+                if [ "$PANEL_STATUS" = "not_installed" ]; then
+                    echo "1Panel未安装，无需卸载。"
+                else
+                    echo "警告：此操作将卸载1Panel并删除所有数据！"
+                    read -p "确定要卸载1Panel吗？(y/N): " confirm
+                    if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then
+                        echo "停止1Panel服务..."
+                        systemctl stop 1panel
+                        echo "卸载1Panel..."
+                        # 1Panel官方卸载命令
+                        1panel stop && 1panel uninstall
+                        echo "清理残留文件..."
+                        rm -rf /opt/1panel
+                        rm -rf /usr/local/bin/1panel
+                        echo "1Panel卸载完成。"
+                    else
+                        echo "卸载操作已取消。"
+                    fi
+                fi
+                read -p "按回车键继续..."
+                ;;
+            0)
+                return
+                ;;
+            *)
+                echo "无效的选项，请重新输入！"
+                read -p "按回车键继续..."
+                ;;
         esac
     done
 }
