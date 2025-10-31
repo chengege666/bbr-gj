@@ -2811,7 +2811,7 @@ system_tools_menu() {
 }
 
 # -------------------------------
-# 27. 1Panel管理面板函数 (直接安装版，无需Docker)
+# 27. 1Panel管理面板函数 (直接安装版，无需Docker) - 修复版
 # -------------------------------
 manage_1panel() {
     while true; do
@@ -2880,28 +2880,111 @@ manage_1panel() {
                 
                 echo "检测到系统: $OS $ARCH"
                 
-                # 下载安装脚本
+                # 检查磁盘空间
+                echo "检查磁盘空间..."
+                AVAILABLE_SPACE=$(df /tmp | awk 'NR==2 {print $4}')
+                if [ "$AVAILABLE_SPACE" -lt 100000 ]; then
+                    echo "警告: 磁盘空间可能不足，建议清理空间后再安装"
+                    read -p "是否继续安装? (y/N): " space_confirm
+                    if [[ "$space_confirm" != "y" && "$space_confirm" != "Y" ]]; then
+                        echo "安装已取消"
+                        read -p "按回车键继续..."
+                        continue
+                    fi
+                fi
+                
+                # 方法1: 使用官方安装脚本（修复版）
+                echo "方法1: 使用官方安装脚本..."
                 echo "下载1Panel安装脚本..."
-                if command -v curl >/dev/null 2>&1; then
-                    curl -sSL https://resource.fit2cloud.com/1panel/package/quick_start.sh -o /tmp/1panel_install.sh
-                elif command -v wget >/dev/null 2>&1; then
-                    wget -q https://resource.fit2cloud.com/1panel/package/quick_start.sh -O /tmp/1panel_install.sh
-                else
-                    echo "错误: 需要 curl 或 wget 来下载安装脚本"
+                
+                # 尝试不同的下载目录
+                DOWNLOAD_DIRS=("/tmp" "/home" "/opt" "/var/tmp")
+                DOWNLOAD_SUCCESS=0
+                
+                for dir in "${DOWNLOAD_DIRS[@]}"; do
+                    if [ -w "$dir" ]; then
+                        echo "尝试下载到 $dir 目录..."
+                        if command -v curl >/dev/null 2>&1; then
+                            if curl -sSL https://resource.fit2cloud.com/1panel/package/quick_start.sh -o "$dir/1panel_install.sh"; then
+                                DOWNLOAD_FILE="$dir/1panel_install.sh"
+                                DOWNLOAD_SUCCESS=1
+                                echo "下载成功到: $DOWNLOAD_FILE"
+                                break
+                            else
+                                echo "curl下载失败到 $dir，尝试下一个目录..."
+                            fi
+                        elif command -v wget >/dev/null 2>&1; then
+                            if wget -q https://resource.fit2cloud.com/1panel/package/quick_start.sh -O "$dir/1panel_install.sh"; then
+                                DOWNLOAD_FILE="$dir/1panel_install.sh"
+                                DOWNLOAD_SUCCESS=1
+                                echo "下载成功到: $DOWNLOAD_FILE"
+                                break
+                            else
+                                echo "wget下载失败到 $dir，尝试下一个目录..."
+                            fi
+                        fi
+                    fi
+                done
+                
+                # 方法2: 如果官方脚本下载失败，使用备用方法
+                if [ "$DOWNLOAD_SUCCESS" -eq 0 ]; then
+                    echo "官方脚本下载失败，尝试备用安装方法..."
+                    
+                    # 方法2A: 直接下载二进制文件
+                    echo "方法2A: 直接下载二进制文件..."
+                    BINARY_URL="https://github.com/1Panel-dev/1Panel/releases/latest/download/1panel-${OS}-${ARCH}.tar.gz"
+                    echo "下载二进制包: $BINARY_URL"
+                    
+                    for dir in "${DOWNLOAD_DIRS[@]}"; do
+                        if [ -w "$dir" ]; then
+                            if command -v curl >/dev/null 2>&1; then
+                                if curl -sSL -L "$BINARY_URL" -o "$dir/1panel.tar.gz"; then
+                                    echo "下载二进制包成功"
+                                    mkdir -p "$dir/1panel-install"
+                                    tar -xzf "$dir/1panel.tar.gz" -C "$dir/1panel-install"
+                                    if [ -f "$dir/1panel-install/1panel" ]; then
+                                        cp "$dir/1panel-install/1panel" /usr/local/bin/
+                                        chmod +x /usr/local/bin/1panel
+                                        echo "二进制安装完成"
+                                        DOWNLOAD_SUCCESS=2
+                                        break
+                                    fi
+                                fi
+                            fi
+                        fi
+                    done
+                fi
+                
+                # 方法3: 如果前两种方法都失败，使用离线安装
+                if [ "$DOWNLOAD_SUCCESS" -eq 0 ]; then
+                    echo "方法3: 尝试离线安装..."
+                    echo "由于网络问题无法下载，请手动下载安装包后重试"
+                    echo "下载地址: https://github.com/1Panel-dev/1Panel/releases"
+                    echo "或使用以下命令手动安装:"
+                    echo "curl -sSL https://resource.fit2cloud.com/1panel/package/quick_start.sh -o quick_start.sh"
+                    echo "bash quick_start.sh"
                     read -p "按回车键继续..."
                     continue
                 fi
                 
-                if [ ! -f /tmp/1panel_install.sh ]; then
-                    echo "下载安装脚本失败"
-                    read -p "按回车键继续..."
-                    continue
+                # 执行安装（方法1）
+                if [ "$DOWNLOAD_SUCCESS" -eq 1 ]; then
+                    echo "开始安装1Panel..."
+                    chmod +x "$DOWNLOAD_FILE"
+                    
+                    # 检查脚本内容是否有效
+                    if head -n 5 "$DOWNLOAD_FILE" | grep -q "1Panel"; then
+                        bash "$DOWNLOAD_FILE"
+                    else
+                        echo "下载的脚本文件可能损坏，尝试备用安装..."
+                        # 备用安装命令
+                        bash <(curl -sSL https://resource.fit2cloud.com/1panel/package/quick_start.sh) || \
+                        echo "安装失败，请检查网络连接"
+                    fi
+                    
+                    # 清理安装脚本
+                    rm -f "$DOWNLOAD_FILE"
                 fi
-                
-                # 执行安装
-                echo "开始安装1Panel..."
-                chmod +x /tmp/1panel_install.sh
-                bash /tmp/1panel_install.sh
                 
                 # 检查安装结果
                 if systemctl is-active 1panel >/dev/null 2>&1; then
@@ -2912,10 +2995,9 @@ manage_1panel() {
                     echo "请手动启动服务"
                 else
                     echo "1Panel安装可能失败，请检查日志"
+                    echo "可以尝试手动安装: bash <(curl -sSL https://resource.fit2cloud.com/1panel/package/quick_start.sh)"
                 fi
                 
-                # 清理安装脚本
-                rm -f /tmp/1panel_install.sh
                 read -p "按回车键继续..."
                 ;;
             2)
