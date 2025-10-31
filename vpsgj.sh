@@ -2811,20 +2811,21 @@ system_tools_menu() {
 }
 
 # -------------------------------
-# 27. 1Panel管理面板函数
+# 27. 1Panel管理面板函数 (直接安装版，无需Docker)
 # -------------------------------
 manage_1panel() {
     while true; do
         clear
         echo "=========================================="
         echo "             1Panel管理面板               "
+        echo "             (直接安装版)                 "
         echo "=========================================="
         
         # 检查1Panel状态
         if systemctl is-active 1panel >/dev/null 2>&1; then
             echo "状态: 已安装且运行中"
             PANEL_STATUS="running"
-        elif systemctl is-active 1panel >/dev/null 2>&1 && ! systemctl is-active 1panel; then
+        elif [ -f /usr/local/bin/1panel ] || systemctl list-unit-files | grep -q 1panel; then
             echo "状态: 已安装但未运行"
             PANEL_STATUS="installed"
         else
@@ -2834,13 +2835,14 @@ manage_1panel() {
         
         echo ""
         echo "请选择操作："
-        echo "1. 安装1Panel"
+        echo "1. 安装1Panel (直接安装版)"
         echo "2. 启动1Panel服务"
         echo "3. 停止1Panel服务"
         echo "4. 重启1Panel服务"
         echo "5. 查看1Panel状态"
         echo "6. 查看访问信息"
         echo "7. 卸载1Panel"
+        echo "8. 查看安装日志"
         echo "0. 返回上级菜单"
         echo "=========================================="
         
@@ -2854,21 +2856,66 @@ manage_1panel() {
                     continue
                 fi
                 
-                echo "正在安装1Panel..."
-                echo "下载安装脚本..."
-                curl -sSL https://resource.fit2cloud.com/1panel/package/quick_start.sh -o quick_start.sh
+                echo "正在安装1Panel (直接安装版)..."
+                echo "此版本无需Docker，使用二进制直接安装"
                 
-                if [ $? -eq 0 ]; then
-                    echo "执行安装脚本..."
-                    bash quick_start.sh
-                    if systemctl is-active 1panel >/dev/null 2>&1; then
-                        echo "1Panel安装成功！"
-                    else
-                        echo "1Panel安装完成，但服务未启动。"
-                    fi
+                # 检查系统架构
+                ARCH=$(uname -m)
+                case $ARCH in
+                    x86_64) ARCH="amd64" ;;
+                    aarch64) ARCH="arm64" ;;
+                    *) echo "不支持的架构: $ARCH"; read -p "按回车键继续..."; continue ;;
+                esac
+                
+                # 检查操作系统
+                if [ -f /etc/redhat-release ]; then
+                    OS="centos"
+                elif [ -f /etc/debian_version ]; then
+                    OS="ubuntu"
                 else
-                    echo "下载安装脚本失败，请检查网络连接。"
+                    echo "不支持的操作系统"
+                    read -p "按回车键继续..."
+                    continue
                 fi
+                
+                echo "检测到系统: $OS $ARCH"
+                
+                # 下载安装脚本
+                echo "下载1Panel安装脚本..."
+                if command -v curl >/dev/null 2>&1; then
+                    curl -sSL https://resource.fit2cloud.com/1panel/package/quick_start.sh -o /tmp/1panel_install.sh
+                elif command -v wget >/dev/null 2>&1; then
+                    wget -q https://resource.fit2cloud.com/1panel/package/quick_start.sh -O /tmp/1panel_install.sh
+                else
+                    echo "错误: 需要 curl 或 wget 来下载安装脚本"
+                    read -p "按回车键继续..."
+                    continue
+                fi
+                
+                if [ ! -f /tmp/1panel_install.sh ]; then
+                    echo "下载安装脚本失败"
+                    read -p "按回车键继续..."
+                    continue
+                fi
+                
+                # 执行安装
+                echo "开始安装1Panel..."
+                chmod +x /tmp/1panel_install.sh
+                bash /tmp/1panel_install.sh
+                
+                # 检查安装结果
+                if systemctl is-active 1panel >/dev/null 2>&1; then
+                    echo "1Panel安装成功！"
+                    echo "服务已启动并运行"
+                elif [ -f /usr/local/bin/1panel ]; then
+                    echo "1Panel安装完成，但服务未自动启动"
+                    echo "请手动启动服务"
+                else
+                    echo "1Panel安装可能失败，请检查日志"
+                fi
+                
+                # 清理安装脚本
+                rm -f /tmp/1panel_install.sh
                 read -p "按回车键继续..."
                 ;;
             2)
@@ -2877,10 +2924,11 @@ manage_1panel() {
                 else
                     echo "启动1Panel服务..."
                     systemctl start 1panel
+                    sleep 3
                     if systemctl is-active 1panel >/dev/null 2>&1; then
                         echo "1Panel启动成功！"
                     else
-                        echo "1Panel启动失败，请检查日志。"
+                        echo "1Panel启动失败，请检查日志: journalctl -u 1panel"
                     fi
                 fi
                 read -p "按回车键继续..."
@@ -2891,6 +2939,7 @@ manage_1panel() {
                 else
                     echo "停止1Panel服务..."
                     systemctl stop 1panel
+                    sleep 2
                     if ! systemctl is-active 1panel >/dev/null 2>&1; then
                         echo "1Panel已停止。"
                     else
@@ -2905,6 +2954,7 @@ manage_1panel() {
                 else
                     echo "重启1Panel服务..."
                     systemctl restart 1panel
+                    sleep 3
                     if systemctl is-active 1panel >/dev/null 2>&1; then
                         echo "1Panel重启成功！"
                     else
@@ -2927,33 +2977,44 @@ manage_1panel() {
                     echo "1Panel未安装，请先安装。"
                 else
                     echo "1Panel访问信息："
-                    echo "访问地址: https://服务器IP:目标端口"
-                    echo "默认端口: 如果安装时未指定，通常为随机端口"
                     echo ""
-                    echo "查看实际端口："
-                    # 尝试从配置文件或进程信息中获取端口
-                    if [ -f /opt/1panel/conf/app.yaml ]; then
+                    
+                    # 尝试获取端口信息
+                    if [ -f /etc/1panel/conf/app.yaml ]; then
+                        PORT=$(grep -E '^port: [0-9]+' /etc/1panel/conf/app.yaml 2>/dev/null | awk '{print $2}')
+                    elif [ -f /opt/1panel/conf/app.yaml ]; then
                         PORT=$(grep -E '^port: [0-9]+' /opt/1panel/conf/app.yaml 2>/dev/null | awk '{print $2}')
-                        if [ -n "$PORT" ]; then
-                            echo "检测到端口: $PORT"
-                        else
-                            echo "无法从配置文件中获取端口，请查看安装时输出的信息。"
-                        fi
                     else
-                        echo "配置文件不存在，请查看安装时输出的端口信息。"
+                        PORT="未知"
                     fi
+                    
+                    # 尝试获取IP信息
+                    IP=$(curl -s4 ifconfig.me 2>/dev/null || hostname -I 2>/dev/null | awk '{print $1}' || echo "localhost")
+                    
+                    echo "访问地址: https://$IP:${PORT:-未知端口}"
                     echo ""
-                    echo "获取初始密码："
-                    if [ -f /opt/1panel/credentials/password ]; then
-                        PASSWORD=$(cat /opt/1panel/credentials/password 2>/dev/null)
-                        if [ -n "$PASSWORD" ]; then
-                            echo "初始密码: $PASSWORD"
-                        else
-                            echo "无法获取密码文件，请查看安装日志。"
-                        fi
+                    
+                    # 尝试获取用户名密码
+                    if [ -f /etc/1panel/credentials/password ]; then
+                        USERNAME=$(grep -E '^username: ' /etc/1panel/credentials/password 2>/dev/null | awk '{print $2}')
+                        PASSWORD=$(grep -E '^password: ' /etc/1panel/credentials/password 2>/dev/null | awk '{print $2}')
+                    elif [ -f /opt/1panel/credentials/password ]; then
+                        USERNAME=$(grep -E '^username: ' /opt/1panel/credentials/password 2>/dev/null | awk '{print $2}')
+                        PASSWORD=$(grep -E '^password: ' /opt/1panel/credentials/password 2>/dev/null | awk '{print $2}')
                     else
-                        echo "密码文件不存在，请查看安装日志获取初始密码。"
+                        USERNAME="未知"
+                        PASSWORD="未知"
                     fi
+                    
+                    if [ "$USERNAME" != "未知" ] && [ "$PASSWORD" != "未知" ]; then
+                        echo "用户名: $USERNAME"
+                        echo "密码: $PASSWORD"
+                    else
+                        echo "用户名/密码: 请查看安装时输出的信息或日志文件"
+                    fi
+                    
+                    echo ""
+                    echo "如果无法访问，请检查防火墙是否开放端口: ${PORT:-未知端口}"
                 fi
                 read -p "按回车键继续..."
                 ;;
@@ -2966,16 +3027,40 @@ manage_1panel() {
                     if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then
                         echo "停止1Panel服务..."
                         systemctl stop 1panel
-                        echo "卸载1Panel..."
-                        # 1Panel官方卸载命令
-                        1panel stop && 1panel uninstall
-                        echo "清理残留文件..."
+                        
+                        # 尝试使用官方卸载命令
+                        if command -v 1panel >/dev/null 2>&1; then
+                            echo "使用官方卸载命令..."
+                            1panel stop && 1panel uninstall
+                        else
+                            echo "手动卸载..."
+                            systemctl disable 1panel
+                            rm -f /etc/systemd/system/1panel.service
+                            systemctl daemon-reload
+                        fi
+                        
+                        # 清理文件和目录
+                        echo "清理文件..."
                         rm -rf /opt/1panel
+                        rm -rf /etc/1panel
                         rm -rf /usr/local/bin/1panel
+                        rm -rf /var/lib/1panel
+                        
                         echo "1Panel卸载完成。"
                     else
                         echo "卸载操作已取消。"
                     fi
+                fi
+                read -p "按回车键继续..."
+                ;;
+            8)
+                if [ "$PANEL_STATUS" = "not_installed" ]; then
+                    echo "1Panel未安装，无日志可查看。"
+                else
+                    echo "1Panel服务日志 (最后50行):"
+                    journalctl -u 1panel -n 50 --no-pager
+                    echo ""
+                    echo "查看完整日志请使用: journalctl -u 1panel -f"
                 fi
                 read -p "按回车键继续..."
                 ;;
