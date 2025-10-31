@@ -759,127 +759,130 @@ check_docker_status() {
 }
 
 # -------------------------------
-# Docker 环境安装/更新函数 (完全绕过/tmp目录)
+# Docker 环境安装/更新函数 (完全修复版)
 # -------------------------------
 install_update_docker() {
     clear
     echo "正在安装/更新Docker环境..."
     
-    # 检查/tmp目录是否存在
-    if [ ! -d /tmp ]; then
-        echo "警告: /tmp目录不存在，创建并设置权限..."
+    # 先修复/tmp目录
+    echo "检查并修复/tmp目录..."
+    if [ ! -d /tmp ] || [ ! -w /tmp ]; then
+        echo "修复/tmp目录权限..."
         mkdir -p /tmp
         chmod 1777 /tmp
     fi
     
-    # 检查/tmp目录权限
-    if [ ! -w /tmp ]; then
-        echo "修复/tmp目录权限..."
-        chmod 1777 /tmp
-    fi
-    
-    # 设置临时目录环境变量
+    # 设置安全的临时目录
     export TMPDIR=/var/tmp
     export TEMP=/var/tmp
     export TMP=/var/tmp
     mkdir -p /var/tmp
     chmod 1777 /var/tmp
     
-    # 创建apt配置文件，强制使用/var/tmp作为临时目录
-    mkdir -p /etc/apt/apt.conf.d
-    echo 'Dir::Cache::archives "/var/cache/apt/archives";' > /etc/apt/apt.conf.d/99tempdir
-    echo 'Dir::State::lists "/var/lib/apt/lists";' >> /etc/apt/apt.conf.d/99tempdir
-    echo 'APT::ExtractTemplates::TempDir "/var/tmp";' >> /etc/apt/apt.conf.d/99tempdir
+    # 方法1: 使用系统包管理器安装 (最稳定)
+    echo "方法1: 使用系统包管理器安装Docker..."
     
-    # 方法1: 使用Docker官方安装脚本（推荐）
-    echo "方法1: 使用Docker官方安装脚本..."
-    
-    # 下载安装脚本到安全目录
-    SCRIPT_DIR="/opt/docker-install"
-    mkdir -p "$SCRIPT_DIR"
-    
-    if command -v curl >/dev/null 2>&1; then
-        if curl -fsSL https://get.docker.com -o "$SCRIPT_DIR/get-docker.sh"; then
-            echo "下载Docker安装脚本成功"
-        else
-            echo "curl下载失败，尝试wget..."
-            if command -v wget >/dev/null 2>&1; then
-                wget -q https://get.docker.com -O "$SCRIPT_DIR/get-docker.sh"
-            else
-                echo "错误: 需要curl或wget来下载安装脚本"
-                read -p "按回车键继续..."
-                return 1
-            fi
-        fi
+    if command -v apt >/dev/null 2>&1; then
+        # Debian/Ubuntu 系统
+        echo "检测到 Debian/Ubuntu 系统"
+        
+        # 更新系统
+        apt update -y
+        
+        # 安装依赖
+        apt install -y apt-transport-https ca-certificates curl gnupg lsb-release
+        
+        # 添加Docker官方GPG密钥
+        mkdir -p /etc/apt/keyrings
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+        
+        # 添加Docker仓库
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+        
+        # 更新并安装Docker
+        apt update -y
+        apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+        
+    elif command -v yum >/dev/null 2>&1; then
+        # CentOS/RHEL 系统
+        echo "检测到 CentOS/RHEL 系统"
+        
+        # 安装依赖
+        yum install -y yum-utils device-mapper-persistent-data lvm2
+        
+        # 添加Docker仓库
+        yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+        
+        # 安装Docker
+        yum install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+        
+    elif command -v dnf >/dev/null 2>&1; then
+        # Fedora 系统
+        echo "检测到 Fedora 系统"
+        
+        # 安装依赖
+        dnf install -y dnf-plugins-core
+        
+        # 添加Docker仓库
+        dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
+        
+        # 安装Docker
+        dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
     else
-        if command -v wget >/dev/null 2>&1; then
-            wget -q https://get.docker.com -O "$SCRIPT_DIR/get-docker.sh"
-        else
-            echo "错误: 需要curl或wget来下载安装脚本"
-            read -p "按回车键继续..."
-            return 1
-        fi
+        echo "不支持的系统类型，尝试使用通用安装脚本..."
     fi
     
-    if [ ! -f "$SCRIPT_DIR/get-docker.sh" ]; then
-        echo "下载Docker安装脚本失败"
-        echo "尝试方法2: 手动安装..."
+    # 方法2: 如果包管理器安装失败，使用官方脚本
+    if ! command -v docker >/dev/null 2>&1; then
+        echo "方法2: 使用Docker官方安装脚本..."
         
-        # 方法2: 手动安装Docker
-        echo "方法2: 手动安装Docker..."
+        # 下载并运行官方安装脚本
+        curl -fsSL https://get.docker.com -o /var/tmp/get-docker.sh
+        chmod +x /var/tmp/get-docker.sh
+        sh /var/tmp/get-docker.sh
         
-        # 更新包列表（使用/var/tmp作为临时目录）
-        TMPDIR=/var/tmp apt update || apt update
-        
-        # 安装必要工具（简化版本）
-        apt install -y curl wget gnupg lsb-release
-        
-        # 手动创建Docker安装目录结构
-        DOCKER_DIR="/opt/docker-manual"
-        mkdir -p "$DOCKER_DIR"
-        
-        # 下载Docker deb包（如果可用）
-        echo "尝试下载Docker安装包..."
-        # 这里可以添加直接下载deb包的逻辑，但比较复杂
-        
-        # 使用最简安装方法
-        echo "使用最简安装方法..."
-        apt install -y docker.io containerd runc
-        
-        # 启动服务
-        systemctl start docker
-        systemctl enable docker
-        
-    else
-        # 执行官方安装脚本
-        echo "执行Docker官方安装脚本..."
-        chmod +x "$SCRIPT_DIR/get-docker.sh"
-        TMPDIR=/var/tmp TEMP=/var/tmp TMP=/var/tmp "$SCRIPT_DIR/get-docker.sh"
-        
-        # 清理安装脚本
-        rm -f "$SCRIPT_DIR/get-docker.sh"
+        # 清理脚本
+        rm -f /var/tmp/get-docker.sh
     fi
     
     # 检查安装结果
-    if systemctl is-active docker >/dev/null 2>&1; then
-        echo "Docker安装成功！"
-        echo "Docker版本: $(docker --version 2>/dev/null || echo '无法获取版本')"
-    else
-        echo "Docker安装可能失败，尝试启动服务..."
+    if command -v docker >/dev/null 2>&1; then
+        echo "✅ Docker安装成功！"
+        echo "Docker版本: $(docker --version)"
+        
+        # 启动Docker服务
+        echo "启动Docker服务..."
         systemctl start docker
         systemctl enable docker
         
-        # 再次检查
+        # 检查服务状态
         if systemctl is-active docker >/dev/null 2>&1; then
-            echo "Docker启动成功！"
-            echo "Docker版本: $(docker --version 2>/dev/null || echo '无法获取版本')"
+            echo "✅ Docker服务启动成功！"
         else
-            echo "Docker安装失败"
-            echo "请尝试以下手动命令:"
-            echo "1. 检查/tmp目录: ls -la / | grep tmp"
-            echo "2. 手动创建/tmp: mkdir -p /tmp && chmod 1777 /tmp"
-            echo "3. 手动安装: curl -fsSL https://get.docker.com -o get-docker.sh && sh get-docker.sh"
+            echo "⚠️ Docker服务启动失败，尝试手动启动..."
+            systemctl daemon-reload
+            systemctl start docker
         fi
+        
+        # 测试Docker运行
+        echo "测试Docker运行..."
+        if docker run --rm hello-world >/dev/null 2>&1; then
+            echo "✅ Docker运行测试通过！"
+        else
+            echo "⚠️ Docker运行测试失败，但安装已完成"
+        fi
+        
+    else
+        echo "❌ Docker安装失败！"
+        echo "可能的原因："
+        echo "1. 网络连接问题"
+        echo "2. 系统依赖缺失"
+        echo "3. 权限问题"
+        echo ""
+        echo "请尝试手动安装："
+        echo "curl -fsSL https://get.docker.com -o get-docker.sh"
+        echo "sh get-docker.sh"
     fi
     
     read -p "按回车键继续..."
