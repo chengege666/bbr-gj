@@ -791,47 +791,59 @@ run_enhanced_speed_test() {
         echo -e "${RED}❌ 无法设置算法: $ALGO${NC}" | tee -a "$RESULT_FILE"
         return 1
     fi
-    
-    # 等待设置生效
-    sleep 2
-    
-    # 验证算法是否设置成功
+
+    # 验证算法是否设置成功（超时检查替代固定睡眠）
     local CURRENT=$(sysctl net.ipv4.tcp_congestion_control 2>/dev/null | awk '{print $3}')
+    local TIMEOUT=10
+    local ELAPSED=0
+    while [ "$CURRENT" != "$ALGO" ] && [ $ELAPSED -lt $TIMEOUT ]; do
+        sleep 1
+        CURRENT=$(sysctl net.ipv4.tcp_congestion_control 2>/dev/null | awk '{print $3}')
+        ELAPSED=$((ELAPSED + 1))
+    done
     if [ "$CURRENT" != "$ALGO" ]; then
-        echo -e "${RED}❌ 算法设置失败: 期望 $ALGO, 实际 $CURRENT${NC}" | tee -a "$RESULT_FILE"
+        echo -e "${RED}❌ 算法设置超时: 期望 $ALGO, 实际 $CURRENT${NC}" | tee -a "$RESULT_FILE"
         return 1
     fi
-    
-    # 多次测速取平均值
+
+    # 多次测速取平均值（整合备用工具重试）
     local TOTAL_DOWNLOAD=0
     local TOTAL_UPLOAD=0
     local TOTAL_PING=0
     local SUCCESS_COUNT=0
-    
+
     for ((i=1; i<=3; i++)); do
         echo -e "${YELLOW}第 $i 次测速...${NC}"
-        
+
         local RESULT=$(run_single_speedtest "$ALGO")
-        
+        # 主测速失败时尝试备用工具
+        if [ $? -ne 0 ] || [ -z "$RESULT" ]; then
+            RESULT=$(run_backup_speedtest "$ALGO")
+        fi
+
         if [ $? -eq 0 ] && [ -n "$RESULT" ]; then
             local DOWNLOAD=$(echo "$RESULT" | cut -d'|' -f1)
             local UPLOAD=$(echo "$RESULT" | cut -d'|' -f2)
             local PING=$(echo "$RESULT" | cut -d'|' -f3)
-            
+
             if [ "$DOWNLOAD" != "0" ] && [ "$UPLOAD" != "0" ]; then
                 TOTAL_DOWNLOAD=$(echo "$TOTAL_DOWNLOAD + $DOWNLOAD" | bc)
                 TOTAL_UPLOAD=$(echo "$TOTAL_UPLOAD + $UPLOAD" | bc)
                 TOTAL_PING=$(echo "$TOTAL_PING + $PING" | bc)
                 SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
-                
-                echo -e "${GREEN}✓ 下载: ${DOWNLOAD} Mbps, 上传: ${UPLOAD} Mbps, 延迟: ${PING} ms${NC}"
+
+                local TEST_LOG="第 $i 次测试 | 下载: ${DOWNLOAD} Mbps | 上传: ${UPLOAD} Mbps | 延迟: ${PING} ms"
+                echo -e "${GREEN}✓ $TEST_LOG${NC}"
+                echo "$ALGO | $TEST_LOG" | tee -a "$RESULT_FILE"
             else
                 echo -e "${RED}✗ 测速数据异常${NC}"
+                echo "$ALGO | 第 $i 次测试 | 数据异常" | tee -a "$RESULT_FILE"
             fi
         else
             echo -e "${RED}✗ 测速失败${NC}"
+            echo "$ALGO | 第 $i 次测试 | 失败" | tee -a "$RESULT_FILE"
         fi
-        
+
         # 每次测速间隔
         if [ $i -lt 3 ]; then
             sleep 5
