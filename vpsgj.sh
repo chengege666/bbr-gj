@@ -2661,30 +2661,41 @@ file_integrity_check() {
 }
 
 # -------------------------------
-# 系统工具主菜单 (更新，调用实际函数)
+# 系统工具主菜单 (更新为单竖排无颜色)
 # -------------------------------
 system_tools_menu() {
     while true; do
         clear
-        echo -e "${CYAN}"
         echo "=========================================="
         echo "              系统工具菜单                "
         echo "=========================================="
-        echo -e "${NC}"
-        printf "${GREEN}%-40s %-105s${NC}\n" "1. 高级防火墙管理" "14. 磁盘空间分析"
-        printf "${GREEN}%-40s %-105s${NC}\n" "2. 修改登录密码" "15. 服务器性能全面测试 (Bench.sh)"
-        printf "${GREEN}%-40s %-105s${NC}\n" "3. 修改SSH 连接端口" "16. 流媒体解锁检测 (RegionRestrictionCheck)"
-        printf "${GREEN}%-40s %-105s${NC}\n" "4. 切换优先 IPV4/IPV6" "17. 回程路由测试 (BestTrace)"
-        printf "${GREEN}%-40s %-105s${NC}\n" "5. 修改主机名" "18. 炫酷系统信息显示 (neofetch)"
-        printf "${GREEN}%-40s %-105s${NC}\n" "6. 系统时区调整" "19. 实时系统监控仪表板 (gtop/bpytop)"
-        printf "${GREEN}%-40s %-105s${NC}\n" "7. 修改虚拟内存大小 (Swap)" "20. 网速多节点测试 (Speedtest-X)"
-        printf "${GREEN}%-40s %-105s${NC}\n" "8. 内存加速清理" "21. 端口扫描工具 (nmap)"
-        printf "${GREEN}%-40s %-105s${NC}\n" "9. 重启服务器" "22. 证书管理工具 (acme.sh)"
-        printf "${GREEN}%-40s %-105s${NC}\n" "10. 卸载本脚本" "23. 服务器延迟测试 (Ping测试)"
-        printf "${GREEN}%-40s %-105s${NC}\n" "11. Nginx Proxy Manager 管理" "24. 磁盘性能测试 (fio/iozone)"
-        printf "${GREEN}%-40s %-105s${NC}\n" "12. 查看端口占用状态" "25. 系统安全扫描 (Lynis)"
-        printf "${GREEN}%-40s %-105s${NC}\n" "13. 修改DNS 服务器" "26. 文件完整性检查 (AIDE)"
-        echo -e "${GREEN}0. 返回主菜单${NC}"
+        echo "1. 高级防火墙管理"
+        echo "2. 修改登录密码"
+        echo "3. 修改SSH连接端口"
+        echo "4. 切换优先IPV4/IPV6"
+        echo "5. 修改主机名"
+        echo "6. 系统时区调整"
+        echo "7. 修改虚拟内存大小(Swap)"
+        echo "8. 内存加速清理"
+        echo "9. 重启服务器"
+        echo "10. 卸载本脚本"
+        echo "11. Nginx Proxy Manager管理"
+        echo "12. 查看端口占用状态"
+        echo "13. 修改DNS服务器"
+        echo "14. 磁盘空间分析"
+        echo "15. 服务器性能全面测试(Bench.sh)"
+        echo "16. 流媒体解锁检测(RegionRestrictionCheck)"
+        echo "17. 回程路由测试(BestTrace)"
+        echo "18. 炫酷系统信息显示(neofetch)"
+        echo "19. 实时系统监控仪表板(gtop/bpytop)"
+        echo "20. 网速多节点测试(Speedtest-X)"
+        echo "21. 端口扫描工具(nmap)"
+        echo "22. 证书管理工具(acme.sh)"
+        echo "23. 服务器延迟测试(Ping测试)"
+        echo "24. 磁盘性能测试(fio/iozone)"
+        echo "25. 系统安全扫描(Lynis)"
+        echo "26. 文件完整性检查(AIDE)"
+        echo "0. 返回主菜单"
         echo "=========================================="
 
         read -p "请输入选项编号: " tools_choice
@@ -2717,7 +2728,7 @@ system_tools_menu() {
             25) system_security_scan ;;
             26) file_integrity_check ;;
             0) return ;;
-            *) echo -e "${RED}无效的选项，请重新输入！${NC}"; sleep 1 ;;
+            *) echo "无效的选项，请重新输入！"; sleep 1 ;;
         esac
     done
 }
