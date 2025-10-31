@@ -1384,15 +1384,41 @@ clean_docker_resources() {
 change_docker_registry() {
     clear
     echo "请选择Docker镜像源:"
-    echo "1. Docker官方源(国外，恢复默认)"; echo "2. 阿里云镜像源(国内推荐)"; echo "3. 中科大镜像源"; echo "4. 网易镜像源"; echo "5. 腾讯云镜像源"
-    read -p "请输入选择(1-5): " registry_choice
+    echo "1. Docker官方源(国外，恢复默认)"
+    echo "2. 阿里云镜像源"
+    echo "3. 腾讯云镜像源"
+    echo "4. 华为云镜像源"
+    echo "5. 移动云镜像源"
+    echo "6. 网易镜像源"
+    echo "7. 火山引擎镜像源"
+    echo "8. 微软 Azure 中国镜像源"
+    echo "9. 清华大学镜像源"
+    echo "10. 北京大学镜像源"
+    echo "11. 浙江大学镜像源"
+    echo "12. 南京大学镜像源"
+    echo "13. 上海交通大学镜像源"
+    echo "14. 重庆邮电大学镜像源"
+    echo "15. 中国科学技术大学镜像源"
+    echo "16. 中国科学院软件研究所镜像源"
+    read -p "请输入选择(1-16): " registry_choice
     local registry_url=""
     case $registry_choice in
-        1) ;;
+        1) registry_url="" ;;
         2) registry_url="https://registry.cn-hangzhou.aliyuncs.com" ;;
-        3) registry_url="https://docker.mirrors.ustc.edu.cn" ;;
-        4) registry_url="http://hub-mirror.c.163.com" ;;
-        5) registry_url="https://mirror.ccs.tencentyun.com" ;;
+        3) registry_url="https://mirror.ccs.tencentyun.com" ;;
+        4) registry_url="https://repo.huaweicloud.com/repository/docker/" ;;
+        5) registry_url="https://docker.m.daocloud.io" ;;
+        6) registry_url="http://hub-mirror.c.163.com" ;;
+        7) registry_url="https://registry.cn-beijing.aliyuncs.com/" ;;
+        8) registry_url="https://mirror.azure.cn/" ;;
+        9) registry_url="https://mirrors.tuna.tsinghua.edu.cn/docker-ce/" ;;
+        10) registry_url="https://mirrors.pku.edu.cn/docker-ce/" ;;
+        11) registry_url="https://mirrors.zju.edu.cn/docker-ce/" ;;
+        12) registry_url="https://mirrors.nju.edu.cn/docker-ce/" ;;
+        13) registry_url="https://mirror.sjtu.edu.cn/docker-registry/" ;;
+        14) registry_url="https://mirrors.cqupt.edu.cn/docker-ce/" ;;
+        15) registry_url="https://docker.mirrors.ustc.edu.cn" ;;
+        16) registry_url="https://mirror.iscas.ac.cn/docker-ce/" ;;
         *) echo "无效选择，操作已取消。"; return ;;
     esac
     mkdir -p /etc/docker
